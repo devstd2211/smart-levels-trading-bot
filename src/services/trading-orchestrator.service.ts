@@ -300,6 +300,19 @@ export class TradingOrchestrator {
     this.riskCalculator = new RiskCalculator(logger);
     logger.info('✅ Risk Calculator initialized for consistent SL/TP calculation');
 
+    // Week 13 Phase 5c: Initialize filters BEFORE analyzer registration
+    // (BTCAnalyzer needed for BTC_CORRELATION analyzer in AnalyzerRegistrationService)
+    const FilterInitModule = require('./filter-initialization.service') as any;
+    const FilterInit = FilterInitModule.FilterInitializationService;
+    const filterInit = new FilterInit(config, candleProvider, bybitService, logger);
+    const filters = filterInit.initializeAllFilters();
+
+    // Assign initialized filters to class properties
+    this.btcAnalyzer = filters.btcAnalyzer;
+    this.fundingRateFilter = filters.fundingRateFilter;
+    this.flatMarketDetector = filters.flatMarketDetector;
+    this.trendConfirmationService = filters.trendConfirmationService;
+
     // Register all analyzers into the registry (45+ analyzers)
     this.analyzerRegistration = new AnalyzerRegistrationService(
       this.analyzerRegistry,
@@ -331,18 +344,6 @@ export class TradingOrchestrator {
       logger,
     );
     strategyRegistration.registerAllStrategies();
-
-    // Week 13 Phase 5c: Use FilterInitializationService for all filter initialization
-    const FilterInitModule = require('./filter-initialization.service') as any;
-    const FilterInit = FilterInitModule.FilterInitializationService;
-    const filterInit = new FilterInit(config, candleProvider, bybitService, logger);
-    const filters = filterInit.initializeAllFilters();
-
-    // Assign initialized filters to class properties
-    this.btcAnalyzer = filters.btcAnalyzer;
-    this.fundingRateFilter = filters.fundingRateFilter;
-    this.flatMarketDetector = filters.flatMarketDetector;
-    this.trendConfirmationService = filters.trendConfirmationService;
 
     // Initialize Phase 1 services (Smart Entry & Breakeven)
     // Services are passed from bot.ts to ensure single instance shared with PositionManager
