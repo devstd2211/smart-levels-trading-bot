@@ -103,6 +103,7 @@ export class TradingContextService {
    */
   async updateTrendContext(): Promise<void> {
     if (!this.trendAnalyzer) {
+      this.logger.warn('⚠️ TrendAnalyzer not available, skipping trend update');
       return;
     }
 
@@ -116,14 +117,20 @@ export class TradingContextService {
         return;
       }
 
-      this.currentTrendAnalysis = await this.trendAnalyzer.analyzeTrend(primaryCandles, '1h');
+      const result = await this.trendAnalyzer.analyzeTrend(primaryCandles, '1h');
 
-      if (this.currentTrendAnalysis) {
-        this.logTrendStatus('PRIMARY CANDLE CLOSE UPDATE');
+      if (!result) {
+        this.logger.error('🚨 TrendAnalyzer returned null result on PRIMARY candle close');
+        // Keep previous trend analysis if new analysis failed
+        return;
       }
+
+      this.currentTrendAnalysis = result;
+      this.logTrendStatus('PRIMARY CANDLE CLOSE UPDATE');
     } catch (error) {
-      this.logger.warn('Failed to update trend analysis', {
+      this.logger.error('❌ Error during trend analysis update', {
         error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
       // Do not clear currentTrendAnalysis - keep previous value if analysis fails
     }

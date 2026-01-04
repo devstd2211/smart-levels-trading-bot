@@ -143,8 +143,8 @@ describe('TradingContextService', () => {
 
       await service.updateTrendContext();
 
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Failed to update trend analysis'),
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('Error during trend analysis update'),
         expect.any(Object),
       );
       // Should keep previous analysis on error (none in this case)

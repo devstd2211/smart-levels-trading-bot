@@ -731,7 +731,15 @@ export class TradingOrchestrator {
       // PRIMARY closed → Update trend analysis + evaluate exits
       if (role === TimeframeRole.PRIMARY) {
         this.logger.info('📊 PRIMARY candle closed - updating trend analysis');
+        const startTime = Date.now();
         await this.tradingContextService!.updateTrendContext();
+        const elapsed = Date.now() - startTime;
+        this.logger.info('✅ Trend analysis updated on PRIMARY candle close', {
+          timeframeName: 'PRIMARY (5-minute)',
+          timestamp: new Date(candle.timestamp).toISOString(),
+          candleClose: candle.close,
+          elapsedMs: elapsed,
+        });
 
         // PHASE 4 Week 3: Evaluate exit conditions with orchestrator
         const currentPosition = this.positionManager.getCurrentPosition();
