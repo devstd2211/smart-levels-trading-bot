@@ -635,7 +635,7 @@ export class TradingOrchestrator {
       this.bollingerIndicator,
       candleProvider,
       this.emaAnalyzer,
-      this.currentContext,
+      this.tradingContextService,
       this.retestEntryService,
       this.marketDataPreparationService,
       this.externalAnalysisService,
