@@ -179,8 +179,16 @@ describe('SignalProcessingService', () => {
       const mockAnalyzerSignals = [
         { source: 'Test', direction: SignalDirection.LONG, confidence: 75, weight: 0.5, priority: 1 },
       ] as any;
+      const mockTrendAnalysis = {
+        bias: TrendBias.BULLISH,
+        strength: 0.8,
+        pattern: 'UPTREND',
+        timeframe: '1h',
+        restrictedDirections: [],
+        reasoning: ['Bullish trend'],
+      };
 
-      const result = await service.processSignals(mockMarketData, mockAnalyzerSignals, null, null);
+      const result = await service.processSignals(mockMarketData, mockAnalyzerSignals, mockTrendAnalysis, null);
 
       expect(result).toBeNull();
       expect(mockLogger.info).toHaveBeenCalledWith(
@@ -201,8 +209,16 @@ describe('SignalProcessingService', () => {
       const mockAnalyzerSignals = [
         { source: 'Test', direction: SignalDirection.LONG, confidence: 75, weight: 0.5, priority: 1 },
       ] as any;
+      const mockTrendAnalysis = {
+        bias: TrendBias.BULLISH,
+        strength: 0.8,
+        pattern: 'UPTREND',
+        timeframe: '1h',
+        restrictedDirections: [],
+        reasoning: ['Bullish trend'],
+      };
 
-      const result = await service.processSignals(mockMarketData, mockAnalyzerSignals, null, null);
+      const result = await service.processSignals(mockMarketData, mockAnalyzerSignals, mockTrendAnalysis, null);
 
       expect(result).toBeNull();
       expect(mockLogger.error).toHaveBeenCalledWith(
@@ -224,8 +240,16 @@ describe('SignalProcessingService', () => {
       const mockAnalyzerSignals = [
         { source: 'Test', direction: SignalDirection.LONG, confidence: 75, weight: 0.5, priority: 1 },
       ] as any;
+      const mockTrendAnalysis = {
+        bias: TrendBias.BULLISH,
+        strength: 0.8,
+        pattern: 'UPTREND',
+        timeframe: '1h',
+        restrictedDirections: [],
+        reasoning: ['Bullish trend'],
+      };
 
-      const result = await service.processSignals(mockMarketData, mockAnalyzerSignals, null, null);
+      const result = await service.processSignals(mockMarketData, mockAnalyzerSignals, mockTrendAnalysis, null);
 
       expect(result).toBeDefined();
       expect(result?.confidence).toBeGreaterThan(75); // Original 75 + 15 = 90
@@ -237,8 +261,16 @@ describe('SignalProcessingService', () => {
         { source: 'Test', direction: SignalDirection.LONG, confidence: 75, weight: 0.5, priority: 1 },
       ] as any;
       const flatResult = { isFlat: true, confidence: 0.7 };
+      const mockTrendAnalysis = {
+        bias: TrendBias.BULLISH,
+        strength: 0.8,
+        pattern: 'UPTREND',
+        timeframe: '1h',
+        restrictedDirections: [],
+        reasoning: ['Bullish trend'],
+      };
 
-      const result = await service.processSignals(mockMarketData, mockAnalyzerSignals, null, flatResult);
+      const result = await service.processSignals(mockMarketData, mockAnalyzerSignals, mockTrendAnalysis, flatResult);
 
       expect(result).toBeDefined();
       expect(result?.takeProfits.length).toBe(1); // Only one TP in flat market
@@ -251,8 +283,16 @@ describe('SignalProcessingService', () => {
         { source: 'Test', direction: SignalDirection.LONG, confidence: 75, weight: 0.5, priority: 1 },
       ] as any;
       const flatResult = { isFlat: false, confidence: 0.3 };
+      const mockTrendAnalysis = {
+        bias: TrendBias.BULLISH,
+        strength: 0.8,
+        pattern: 'UPTREND',
+        timeframe: '1h',
+        restrictedDirections: [],
+        reasoning: ['Bullish trend'],
+      };
 
-      const result = await service.processSignals(mockMarketData, mockAnalyzerSignals, null, flatResult);
+      const result = await service.processSignals(mockMarketData, mockAnalyzerSignals, mockTrendAnalysis, flatResult);
 
       expect(result).toBeDefined();
       expect(result?.takeProfits.length).toBe(3); // Multiple TPs in trending market
@@ -267,8 +307,16 @@ describe('SignalProcessingService', () => {
       const mockAnalyzerSignals = [
         { source: 'Test', direction: SignalDirection.LONG, confidence: 75, weight: 0.5, priority: 1 },
       ] as any;
+      const mockTrendAnalysis = {
+        bias: TrendBias.BULLISH,
+        strength: 0.8,
+        pattern: 'UPTREND',
+        timeframe: '1h',
+        restrictedDirections: [],
+        reasoning: ['Bullish trend'],
+      };
 
-      const result = await service.processSignals(mockMarketData, mockAnalyzerSignals, null, null);
+      const result = await service.processSignals(mockMarketData, mockAnalyzerSignals, mockTrendAnalysis, null);
 
       expect(result).toBeNull();
       expect(mockLogger.error).toHaveBeenCalledWith(
@@ -361,8 +409,16 @@ describe('SignalProcessingService', () => {
       const mockAnalyzerSignals = [
         { source: 'Test', direction: SignalDirection.LONG, confidence: 75, weight: 0.5, priority: 1 },
       ] as any;
+      const mockTrendAnalysis = {
+        bias: TrendBias.BULLISH,
+        strength: 0.8,
+        pattern: 'UPTREND',
+        timeframe: '1h',
+        restrictedDirections: [],
+        reasoning: ['Bullish trend'],
+      };
 
-      const result = await service.processSignals(mockMarketData, mockAnalyzerSignals, null, null);
+      const result = await service.processSignals(mockMarketData, mockAnalyzerSignals, mockTrendAnalysis, null);
 
       expect(result).toBeDefined();
       expect(result?.confidence).toBe(75); // Original confidence unchanged

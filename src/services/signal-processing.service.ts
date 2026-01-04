@@ -117,6 +117,17 @@ export class SignalProcessingService {
         return null;
       }
 
+      // CRITICAL PROTECTION: Block all signals until trend is determined
+      // This prevents blind trading when trend analysis is not yet available
+      if (trendAnalysis === null) {
+        this.logger.warn('🚨 BLOCKED: Trend analysis not yet available - no signals generated', {
+          reason: 'Trend analyzer must complete first candle analysis',
+          signalsCollected: analyzerSignals.length,
+          nextCheck: 'On next candle close',
+        });
+        return null;
+      }
+
       // PHASE 4: Filter analyzer signals by trend alignment BEFORE aggregation
       const trendFilteredSignals = this.filterSignalsByTrend(analyzerSignals, trendAnalysis);
 
