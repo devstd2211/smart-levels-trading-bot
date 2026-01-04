@@ -60,16 +60,31 @@ export class TradingContextService {
       this.currentTrendAnalysis = await this.trendAnalyzer.analyzeTrend(primaryCandles, '1h');
 
       if (this.currentTrendAnalysis) {
+        const trendEmoji = this.getTrendEmoji(this.currentTrendAnalysis.bias);
+        const restrictedText =
+          this.currentTrendAnalysis.restrictedDirections.length > 0
+            ? this.currentTrendAnalysis.restrictedDirections.join(', ')
+            : 'NONE';
+
+        // Super visible trend status output
+        this.logger.info(
+          `\n${'═'.repeat(80)}\n${trendEmoji} SUPER TREND STATUS (PRIMARY - 5min candles)\n${'═'.repeat(80)}`,
+        );
+
         this.logger.info('📊 TREND ANALYSIS UPDATED (PRIMARY)', {
-          bias: this.currentTrendAnalysis.bias,
+          trendDirection: this.currentTrendAnalysis.bias,
+          trendEmoji: trendEmoji,
           strength: (this.currentTrendAnalysis.strength * 100).toFixed(1) + '%',
           pattern: this.currentTrendAnalysis.pattern,
-          restrictedDirections:
-            this.currentTrendAnalysis.restrictedDirections.length > 0
-              ? this.currentTrendAnalysis.restrictedDirections.join(', ')
-              : 'NONE',
+          timeframe: 'PRIMARY (5-minute)',
+          candles: primaryCandles.length,
+          restrictedDirections: restrictedText,
           reasoning: this.currentTrendAnalysis.reasoning.slice(0, 3).join(' | '),
         });
+
+        this.logger.info(
+          `${trendEmoji} CURRENT MARKET STATE: ${this.getTrendDescription(this.currentTrendAnalysis)}\n${'═'.repeat(80)}\n`,
+        );
       }
     } catch (error) {
       this.logger.warn('Failed to update trend analysis', {
@@ -85,6 +100,68 @@ export class TradingContextService {
    */
   getCurrentTrendAnalysis(): TrendAnalysis | null {
     return this.currentTrendAnalysis;
+  }
+
+  /**
+   * Get emoji representation of trend
+   */
+  private getTrendEmoji(bias: string): string {
+    switch (bias) {
+      case 'BULLISH':
+        return '📈🟢 BULLISH';
+      case 'BEARISH':
+        return '📉🔴 BEARISH';
+      case 'NEUTRAL':
+        return '➡️⚪ NEUTRAL';
+      default:
+        return '❓ UNKNOWN';
+    }
+  }
+
+  /**
+   * Get detailed trend description
+   */
+  private getTrendDescription(analysis: TrendAnalysis): string {
+    const strengthPercent = (analysis.strength * 100).toFixed(0);
+    const strengthBar =
+      '█'.repeat(Math.floor(analysis.strength * 10)) + '░'.repeat(10 - Math.floor(analysis.strength * 10));
+    const blockInfo =
+      analysis.restrictedDirections.length > 0
+        ? `Blocks: ${analysis.restrictedDirections.join(', ')}`
+        : 'No direction restrictions';
+
+    return (
+      `${analysis.bias} (${strengthPercent}% [${strengthBar}]) | ` +
+      `Pattern: ${analysis.pattern} | ${blockInfo}`
+    );
+  }
+
+  /**
+   * Get super summary of current trend status
+   * Used for console display and logging
+   */
+  getSuperTrendStatus(): string {
+    if (!this.currentTrendAnalysis) {
+      return '🚨 TREND ANALYSIS NOT READY YET - Awaiting first PRIMARY candle analysis';
+    }
+
+    const trend = this.currentTrendAnalysis;
+    const emoji = this.getTrendEmoji(trend.bias);
+    const strengthPercent = (trend.strength * 100).toFixed(1);
+    const strengthBar =
+      '█'.repeat(Math.floor(trend.strength * 10)) + '░'.repeat(10 - Math.floor(trend.strength * 10));
+
+    return (
+      `\n${'═'.repeat(80)}\n` +
+      `${emoji} TREND STATUS\n` +
+      `${'═'.repeat(80)}\n` +
+      `Timeframe: PRIMARY (5-minute)\n` +
+      `Bias: ${trend.bias} | Strength: ${strengthPercent}% [${strengthBar}]\n` +
+      `Pattern: ${trend.pattern}\n` +
+      `Restricted: ${trend.restrictedDirections.length > 0 ? trend.restrictedDirections.join(', ') : 'NONE'}\n` +
+      `Reasoning: ${trend.reasoning.slice(0, 2).join(' → ')}\n` +
+      `${'═'.repeat(80)}\n`
+    );
   }
 
   /**

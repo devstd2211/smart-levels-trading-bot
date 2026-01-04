@@ -96,6 +96,12 @@ export class EntryLogicService {
 
     this.logger.info('🔍 ENTRY candle closed - scanning for entry');
 
+    // 🎯 Display SUPER TREND STATUS
+    const trendStatus = this.currentContext?.getSuperTrendStatus?.();
+    if (trendStatus) {
+      this.logger.info(trendStatus);
+    }
+
     // Notify anti-flip service of new candle (for cooldown tracking)
     this.signalProcessingService.onNewCandle();
 

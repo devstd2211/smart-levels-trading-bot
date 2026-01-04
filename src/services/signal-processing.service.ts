@@ -120,11 +120,16 @@ export class SignalProcessingService {
       // CRITICAL PROTECTION: Block all signals until trend is determined
       // This prevents blind trading when trend analysis is not yet available
       if (trendAnalysis === null) {
-        this.logger.warn('🚨 BLOCKED: Trend analysis not yet available - no signals generated', {
-          reason: 'Trend analyzer must complete first candle analysis',
-          signalsCollected: analyzerSignals.length,
-          nextCheck: 'On next candle close',
-        });
+        this.logger.warn(
+          '🚨 BLOCKED: Trend analysis not yet available - no signals generated',
+          {
+            reason: 'Trend analyzer initializing - waiting for first PRIMARY (5min) candle close',
+            signalsCollected: analyzerSignals.length,
+            whenReady: '⏳ Will unblock when PRIMARY (5-minute) candle closes and TrendAnalyzer completes',
+            estimatedWait: '~5 minutes from bot startup',
+            nextCheck: 'On next PRIMARY candle close',
+          },
+        );
         return null;
       }
 
