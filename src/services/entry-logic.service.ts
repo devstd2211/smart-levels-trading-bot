@@ -57,18 +57,29 @@ export class EntryLogicService {
     private bollingerIndicator: BollingerBandsIndicator | undefined,
     private candleProvider: CandleProvider,
     private emaAnalyzer: MultiTimeframeEMAAnalyzer,
-    private currentContext: any | null,
+    private currentContext: any | null, // TradingContextService - provides getCurrentTrendAnalysis()
     private retestEntryService: RetestEntryService | null,
     private marketDataPreparationService: MarketDataPreparationService,
     private externalAnalysisService: any,
     private analyzerRegistry: AnalyzerRegistry,
     private strategyCoordinator: StrategyCoordinator,
-    private currentTrendAnalysis: TrendAnalysis | null,
     private signalProcessingService: SignalProcessingService,
     private tradeExecutionService: TradeExecutionService,
     private bybitService: BybitService,
     private logger: LoggerService,
   ) {}
+
+  /**
+   * Get current trend analysis dynamically from TradingContextService
+   * This ensures we always have the latest trend, not a stale value from initialization
+   */
+  private getCurrentTrendAnalysis(): TrendAnalysis | null {
+    if (!this.currentContext) {
+      return null;
+    }
+    // TradingContextService provides getCurrentTrendAnalysis() method
+    return this.currentContext.getCurrentTrendAnalysis?.();
+  }
 
   /**
    * Main entry scanning pipeline for ENTRY candle
@@ -147,10 +158,12 @@ export class EntryLogicService {
     }
 
     // Process signals through weighted voting
+    // Get fresh trend analysis from TradingContextService (not stale from initialization)
+    const trendAnalysis = this.getCurrentTrendAnalysis();
     const entrySignal = await this.signalProcessingService.processSignals(
       marketData,
       analyzerSignals,
-      this.currentTrendAnalysis,
+      trendAnalysis,
       flatResult,
     );
 
@@ -281,16 +294,17 @@ export class EntryLogicService {
       reason: strategySignals.reason,
     });
 
-    // Check if strategy signal aligns with trend
-    if (this.currentTrendAnalysis) {
-      const isRestricted = this.currentTrendAnalysis.restrictedDirections.includes(
+    // Check if strategy signal aligns with trend (get fresh trend analysis)
+    const trendContext = this.getCurrentTrendAnalysis();
+    if (trendContext) {
+      const isRestricted = trendContext.restrictedDirections.includes(
         strategySignals.signal.direction
       );
       if (isRestricted) {
         this.logger.warn('🚫 Strategy signal BLOCKED by trend alignment', {
           signal: strategySignals.signal.direction,
-          trend: this.currentTrendAnalysis.bias,
-          reason: `${strategySignals.signal.direction} blocked in ${this.currentTrendAnalysis.bias} trend`,
+          trend: trendContext.bias,
+          reason: `${strategySignals.signal.direction} blocked in ${trendContext.bias} trend`,
         });
         return false; // Continue to weighted voting
       }
@@ -416,10 +430,11 @@ export class EntryLogicService {
     marketData?: StrategyMarketData | undefined,
     flatMarketAnalysis?: { isFlat: boolean; confidence: number } | null,
   ): Promise<void> {
+    const trendAnalysis = this.getCurrentTrendAnalysis();
     await this.tradeExecutionService.executeTrade(
       entrySignal,
       marketData,
-      this.currentTrendAnalysis,
+      trendAnalysis,
       flatMarketAnalysis,
     );
   }

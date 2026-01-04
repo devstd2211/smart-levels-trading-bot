@@ -638,7 +638,6 @@ export class TradingOrchestrator {
       this.externalAnalysisService,
       this.analyzerRegistry,
       this.strategyCoordinator,
-      this.currentTrendAnalysis,
       this.signalProcessingService,
       this.tradeExecutionService,
       bybitService,
