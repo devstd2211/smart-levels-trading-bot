@@ -44,6 +44,8 @@ export class TradingContextService {
    * This prevents the "trend not available" blocking that lasts ~5 minutes
    */
   async initializeTrendAnalysis(): Promise<void> {
+    this.logger.info('📍 TradingContextService.initializeTrendAnalysis() called');
+
     if (!this.trendAnalyzer) {
       this.logger.warn('⚠️ TrendAnalyzer not available - trend analysis skipped');
       return;
@@ -51,6 +53,11 @@ export class TradingContextService {
 
     try {
       const primaryCandles = await this.candleProvider.getCandles(TimeframeRole.PRIMARY);
+      this.logger.info('📍 Got primary candles for trend init', {
+        count: primaryCandles?.length || 0,
+        required: 20,
+      });
+
       if (!primaryCandles || primaryCandles.length < 20) {
         this.logger.warn('⚠️ Insufficient candles for trend initialization', {
           available: primaryCandles?.length || 0,
@@ -63,6 +70,7 @@ export class TradingContextService {
       this.currentTrendAnalysis = await this.trendAnalyzer.analyzeTrend(primaryCandles, '1h');
 
       if (this.currentTrendAnalysis) {
+        this.logger.info('✅ Trend analysis initialized successfully at startup!');
         this.logTrendStatus('STARTUP INITIALIZATION');
       } else {
         this.logger.warn('⚠️ Trend analysis initialization returned null');

@@ -57,7 +57,11 @@ export class BotInitializer {
       // Phase 5: Initialize trend analysis from loaded candles (CRITICAL - prevents ~5 minute startup delay)
       // MUST be called after candles are loaded but before trading starts
       if ((this.services as any).tradingOrchestrator) {
+        this.logger.info('📍 Phase 5: Calling TradingOrchestrator.initializeTrendAnalysis()...');
         await (this.services as any).tradingOrchestrator.initializeTrendAnalysis();
+        this.logger.info('✅ Phase 5: TradingOrchestrator.initializeTrendAnalysis() completed');
+      } else {
+        this.logger.warn('⚠️ TradingOrchestrator not available in BotServices');
       }
 
       this.logger.info('✅ Bot initialization complete - ready to start trading');

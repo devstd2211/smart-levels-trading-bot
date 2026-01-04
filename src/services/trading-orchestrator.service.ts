@@ -703,9 +703,13 @@ export class TradingOrchestrator {
    */
   async initializeTrendAnalysis(): Promise<void> {
     try {
+      this.logger.info('📍 TradingOrchestrator.initializeTrendAnalysis() called');
       if (this.tradingContextService) {
         this.logger.info('🚀 Initializing trend analysis from loaded candles...');
         await this.tradingContextService.initializeTrendAnalysis();
+        this.logger.info('✅ TradingContextService.initializeTrendAnalysis() completed');
+      } else {
+        this.logger.warn('⚠️ TradingContextService not available');
       }
     } catch (error) {
       this.logger.error('Failed to initialize trend analysis', {
