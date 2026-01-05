@@ -96,7 +96,15 @@ export class BotServices {
   readonly wallTrackerService?: WallTrackerService;
 
   constructor(config: Config) {
-    // 1. Initialize logger first
+    // 0. Initialize dashboard FIRST to capture early logs
+    this.dashboard = new ConsoleDashboardService({
+      enabled: true,
+      updateInterval: 500,
+      theme: 'dark',
+    });
+    console.log('🎨 Console Dashboard initialized - live terminal UI enabled');
+
+    // 1. Initialize logger
     this.logger = new LoggerService(
       config.logging.level,
       config.logging.logDir,
@@ -395,17 +403,7 @@ export class BotServices {
       this.logger.info('🔗 BTC candles store linked to PublicWebSocket');
     }
 
-    // 14. Initialize Console Dashboard (real-time UI in terminal)
-    this.dashboard = new ConsoleDashboardService({
-      enabled: true, // Always enabled
-      updateInterval: 500, // Update every 500ms
-      theme: 'dark',
-    });
-    if (this.dashboard) {
-      this.logger.info('🎨 Console Dashboard initialized - live terminal UI enabled');
-    }
-
-    // 15. Initialize Dashboard Integration (connects dashboard to data sources)
+    // 14. Initialize Dashboard Integration (connects dashboard to data sources)
     this.dashboardIntegration = new DashboardIntegrationService(
       this.dashboard,
       this.eventBus,

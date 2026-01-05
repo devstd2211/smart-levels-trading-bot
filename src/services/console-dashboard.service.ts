@@ -413,7 +413,7 @@ export class ConsoleDashboardService extends EventEmitter {
       case 'info':
         return '{cyan-fg}';
       case 'debug':
-        return '{gray-fg}';
+        return '{white-fg}'; // Changed from gray-fg to white-fg for visibility
       default:
         return '{white-fg}';
     }
@@ -428,7 +428,7 @@ export class ConsoleDashboardService extends EventEmitter {
       case 'info':
         return 'cyan-fg}';
       case 'debug':
-        return 'gray-fg}';
+        return 'white-fg}'; // Changed from gray-fg to white-fg for visibility
       default:
         return 'white-fg}';
     }
@@ -437,7 +437,7 @@ export class ConsoleDashboardService extends EventEmitter {
   public addLog(level: string, message: string): void {
     this.state.logs.push({
       level,
-      message: message.substring(0, 100), // Truncate long messages
+      message: message.substring(0, 300), // Truncate long messages (300 chars for better visibility)
       timestamp: new Date(),
     });
 
