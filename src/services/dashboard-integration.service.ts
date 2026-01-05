@@ -82,12 +82,15 @@ export class DashboardIntegrationService {
       });
     }
 
-    // Candle updates
+    // Candle updates - trigger real-time data refresh
     this.eventBus.on('candle-closed', (data: any) => {
       if (data?.candle?.close) {
         this.lastPrice = data.candle.close;
         this.dashboard.updatePrice(data.candle.close);
       }
+
+      // Update all analyzers on candle close
+      void this.updateAnalyzerData();
     });
   }
 
@@ -150,57 +153,69 @@ export class DashboardIntegrationService {
 
   private startUpdateLoop(): void {
     this.updateInterval = setInterval(() => {
-      this.updateAllData();
+      // Periodic update for position/PnL (not dependent on candle close)
+      void this.updatePositionPnLData();
     }, 1000); // Update every second
   }
 
-  private updateAllData(): void {
+  private async updateAnalyzerData(): Promise<void> {
     try {
-      this.updateTrendData();
-      this.updateRSIData();
-      this.updateEMAData();
+      // Get real-time data from analyzers when candle closes
+      await Promise.all([
+        this.updateTrendDataAsync(),
+        this.updateRSIDataAsync(),
+        this.updateEMADataAsync(),
+      ]);
       this.updatePositionData();
-      this.updatePnLData();
     } catch (error) {
       // Silently fail - don't break the bot
     }
   }
 
-  private updateTrendData(): void {
+  private async updateTrendDataAsync(): Promise<void> {
     if (!this.trendAnalyzer) return;
 
     try {
-      // Get current analysis from trend analyzer
-      const analysis = (this.trendAnalyzer as any).lastAnalysis;
-      if (analysis && analysis.bias) {
-        const timeframe = (this.trendAnalyzer as any).timeframe || '5m';
+      // Use multiTimeframeAnalysis to get all timeframes
+      const multiTrend = (this.trendAnalyzer as any).lastAnalysis;
+      if (multiTrend && multiTrend.byTimeframe) {
+        // Update each timeframe from the analysis
+        Object.entries(multiTrend.byTimeframe).forEach(([timeframe, analysis]: any) => {
+          if (analysis && analysis.bias) {
+            const trend = analysis.bias === 'BULLISH' ? 'UPTREND ↑' : 'DOWNTREND ↓';
 
-        const trend =
-          analysis.bias === 'BULLISH' ? 'UPTREND ↑' : 'DOWNTREND ↓';
-
-        if (this.lastTrend.get(timeframe) !== trend) {
-          this.lastTrend.set(timeframe, trend);
-          this.dashboard.updateMarketData(timeframe, {
-            timeframe,
-            trend,
-            pattern: this.detectCurrentPattern(),
-          });
-        }
+            if (this.lastTrend.get(timeframe) !== trend) {
+              this.lastTrend.set(timeframe, trend);
+              this.dashboard.updateMarketData(timeframe, {
+                timeframe,
+                trend,
+                pattern: this.detectCurrentPattern(),
+              });
+            }
+          }
+        });
       }
     } catch (error) {
       // Ignore errors
     }
   }
 
-  private updateRSIData(): void {
+  private async updateRSIDataAsync(): Promise<void> {
     if (!this.rsiAnalyzer) return;
 
     try {
-      const rsiData = (this.rsiAnalyzer as any).getCurrentRSI?.();
+      // Call calculateAll() to get real-time RSI values
+      const rsiData = await (this.rsiAnalyzer as any).calculateAll?.();
       if (rsiData) {
-        const timeframes = ['1m', '5m', '15m', '30m'];
-        timeframes.forEach((tf) => {
-          const rsi = rsiData[tf] || 50;
+        const timeframeMap: Record<string, string> = {
+          entry: '1m',
+          primary: '5m',
+          trend1: '15m',
+          trend2: '30m',
+        };
+
+        Object.entries(timeframeMap).forEach(([key, tf]) => {
+          const rsi = (rsiData as any)[key] || 50;
           if (Math.abs((this.lastRSI.get(tf) || 50) - rsi) > 0.5) {
             this.lastRSI.set(tf, rsi);
             this.dashboard.updateMarketData(tf, { rsi });
@@ -212,24 +227,43 @@ export class DashboardIntegrationService {
     }
   }
 
-  private updateEMAData(): void {
+  private async updateEMADataAsync(): Promise<void> {
     if (!this.emaAnalyzer) return;
 
     try {
-      const emaData = (this.emaAnalyzer as any).getCurrentEMA?.();
+      // Call calculateAll() to get real-time EMA values
+      const emaData = await (this.emaAnalyzer as any).calculateAll?.();
       if (emaData) {
-        const timeframes = ['1m', '5m', '15m', '30m'];
-        timeframes.forEach((tf) => {
-          const fast = emaData.fast?.[tf] || 0;
-          const slow = emaData.slow?.[tf] || 0;
+        const timeframeMap: Record<string, string> = {
+          entry: '1m',
+          primary: '5m',
+          trend1: '15m',
+          trend2: '30m',
+        };
 
-          const lastEma = this.lastEMA.get(tf);
-          if (!lastEma || Math.abs(lastEma.fast - fast) > 0.0001) {
-            this.lastEMA.set(tf, { fast, slow });
-            this.dashboard.updateMarketData(tf, { emaFast: fast, emaSlow: slow });
+        Object.entries(timeframeMap).forEach(([key, tf]) => {
+          const emaValues = (emaData as any)[key];
+          if (emaValues) {
+            const fast = emaValues.fast || 0;
+            const slow = emaValues.slow || 0;
+
+            const lastEma = this.lastEMA.get(tf);
+            if (!lastEma || Math.abs(lastEma.fast - fast) > 0.0001) {
+              this.lastEMA.set(tf, { fast, slow });
+              this.dashboard.updateMarketData(tf, { emaFast: fast, emaSlow: slow });
+            }
           }
         });
       }
+    } catch (error) {
+      // Ignore errors
+    }
+  }
+
+  private updatePositionPnLData(): void {
+    try {
+      this.updatePositionData();
+      this.updatePnLData();
     } catch (error) {
       // Ignore errors
     }
