@@ -23,3 +23,5 @@ export * from './bot-metrics.service';
 export * from './swing-point-detector.service';
 export * from './multi-timeframe-trend.service';
 export * from './timeframe-weighting.service';
+export * from './console-dashboard.service';
+export * from './dashboard-integration.service';

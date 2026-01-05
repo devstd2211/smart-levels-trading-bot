@@ -36,6 +36,8 @@ import { RetestEntryService } from './retest-entry.service';
 import { DeltaAnalyzerService } from './delta-analyzer.service';
 import { OrderbookImbalanceService } from './orderbook-imbalance.service';
 import { WallTrackerService } from './wall-tracker.service';
+import { ConsoleDashboardService } from './console-dashboard.service';
+import { DashboardIntegrationService } from './dashboard-integration.service';
 import {
   CHOCH_ALIGNED_BOOST,
   CHOCH_AGAINST_PENALTY,
@@ -81,6 +83,10 @@ export class BotServices {
   // Event Handlers
   readonly positionEventHandler: PositionEventHandler;
   readonly webSocketEventHandler: WebSocketEventHandler;
+
+  // UI & Dashboard
+  readonly dashboard: ConsoleDashboardService;
+  readonly dashboardIntegration: DashboardIntegrationService;
 
   // Optional services
   readonly compoundInterestCalculator?: CompoundInterestCalculatorService;
@@ -388,6 +394,29 @@ export class BotServices {
       this.publicWebSocket.setBtcCandlesStore(this);
       this.logger.info('🔗 BTC candles store linked to PublicWebSocket');
     }
+
+    // 14. Initialize Console Dashboard (real-time UI in terminal)
+    this.dashboard = new ConsoleDashboardService({
+      enabled: true, // Always enabled
+      updateInterval: 500, // Update every 500ms
+      theme: 'dark',
+    });
+    if (this.dashboard) {
+      this.logger.info('🎨 Console Dashboard initialized - live terminal UI enabled');
+    }
+
+    // 15. Initialize Dashboard Integration (connects dashboard to data sources)
+    this.dashboardIntegration = new DashboardIntegrationService(
+      this.dashboard,
+      this.eventBus,
+      this.logger,
+      (this.tradingOrchestrator as any).trendAnalyzer,
+      (this.tradingOrchestrator as any).rsiAnalyzer,
+      (this.tradingOrchestrator as any).emaAnalyzer,
+      this.positionManager,
+      this.publicWebSocket,
+    );
+    this.logger.info('🔗 Dashboard Integration Service initialized - real-time updates enabled');
 
     this.logger.info('✅ BotServices initialized - all dependencies ready');
   }

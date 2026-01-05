@@ -101,6 +101,7 @@
   "author": "Trading Bot Developer",
   "license": "MIT",
   "dependencies": {
+    "blessed": "^0.1.81",
     "bybit-api": "^4.4.0",
     "dotenv": "^16.4.4",
     "glob": "^11.0.3",
@@ -110,6 +111,7 @@
   },
   "devDependencies": {
     "@jest/globals": "^30.2.0",
+    "@types/blessed": "^0.1.27",
     "@types/jest": "^30.0.0",
     "@types/node": "^20.11.16",
     "@types/ws": "^8.5.10",
