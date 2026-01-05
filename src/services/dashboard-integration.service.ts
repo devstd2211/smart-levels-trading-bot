@@ -179,6 +179,17 @@ export class DashboardIntegrationService {
 
     this.isUpdatingAnalyzers = true;
     try {
+      // Log which analyzers we have
+      const hasAnalyzers = {
+        trend: !!this.trendAnalyzer,
+        rsi: !!this.rsiAnalyzer,
+        ema: !!this.emaAnalyzer,
+      };
+
+      if (!hasAnalyzers.trend && !hasAnalyzers.rsi && !hasAnalyzers.ema) {
+        console.warn('[DASHBOARD] No analyzers available yet');
+      }
+
       // Get real-time data from analyzers when candle closes
       // Add timeout to prevent hanging on slow analyzer calls
       await Promise.race([
@@ -201,12 +212,21 @@ export class DashboardIntegrationService {
   }
 
   private async updateTrendDataAsync(): Promise<void> {
-    if (!this.trendAnalyzer) return;
+    if (!this.trendAnalyzer) {
+      console.debug('[DASHBOARD] TrendAnalyzer not available');
+      return;
+    }
 
     try {
       // Use multiTimeframeAnalysis to get all timeframes
       const multiTrend = (this.trendAnalyzer as any).lastAnalysis;
+      if (!multiTrend) {
+        console.debug('[DASHBOARD] TrendAnalyzer.lastAnalysis is null/undefined');
+        return;
+      }
+
       if (multiTrend && multiTrend.byTimeframe) {
+        console.debug('[DASHBOARD] Trend data found, updating:', Object.keys(multiTrend.byTimeframe).join(', '));
         // Update each timeframe from the analysis
         Object.entries(multiTrend.byTimeframe).forEach(([timeframe, analysis]: any) => {
           if (analysis && analysis.bias) {
@@ -222,19 +242,31 @@ export class DashboardIntegrationService {
             }
           }
         });
+      } else {
+        console.debug('[DASHBOARD] TrendAnalyzer.lastAnalysis.byTimeframe missing');
       }
     } catch (error) {
-      // Ignore errors
+      console.debug('[DASHBOARD] Trend update error:', error instanceof Error ? error.message : String(error));
     }
   }
 
   private async updateRSIDataAsync(): Promise<void> {
-    if (!this.rsiAnalyzer) return;
+    if (!this.rsiAnalyzer) {
+      console.debug('[DASHBOARD] RSIAnalyzer not available');
+      return;
+    }
 
     try {
       // Call calculateAll() to get real-time RSI values
-      const rsiData = await (this.rsiAnalyzer as any).calculateAll?.();
+      const calculateAllMethod = (this.rsiAnalyzer as any).calculateAll;
+      if (!calculateAllMethod) {
+        console.debug('[DASHBOARD] RSIAnalyzer.calculateAll method not found');
+        return;
+      }
+
+      const rsiData = await calculateAllMethod();
       if (rsiData) {
+        console.debug('[DASHBOARD] RSI data received, keys:', Object.keys(rsiData).join(', '));
         const timeframeMap: Record<string, string> = {
           entry: '1m',
           primary: '5m',
@@ -249,19 +281,31 @@ export class DashboardIntegrationService {
             this.dashboard.updateMarketData(tf, { rsi });
           }
         });
+      } else {
+        console.debug('[DASHBOARD] RSIAnalyzer.calculateAll() returned empty/null');
       }
     } catch (error) {
-      // Ignore errors
+      console.debug('[DASHBOARD] RSI update error:', error instanceof Error ? error.message : String(error));
     }
   }
 
   private async updateEMADataAsync(): Promise<void> {
-    if (!this.emaAnalyzer) return;
+    if (!this.emaAnalyzer) {
+      console.debug('[DASHBOARD] EMAAnalyzer not available');
+      return;
+    }
 
     try {
       // Call calculateAll() to get real-time EMA values
-      const emaData = await (this.emaAnalyzer as any).calculateAll?.();
+      const calculateAllMethod = (this.emaAnalyzer as any).calculateAll;
+      if (!calculateAllMethod) {
+        console.debug('[DASHBOARD] EMAAnalyzer.calculateAll method not found');
+        return;
+      }
+
+      const emaData = await calculateAllMethod();
       if (emaData) {
+        console.debug('[DASHBOARD] EMA data received, keys:', Object.keys(emaData).join(', '));
         const timeframeMap: Record<string, string> = {
           entry: '1m',
           primary: '5m',
@@ -282,9 +326,11 @@ export class DashboardIntegrationService {
             }
           }
         });
+      } else {
+        console.debug('[DASHBOARD] EMAAnalyzer.calculateAll() returned empty/null');
       }
     } catch (error) {
-      // Ignore errors
+      console.debug('[DASHBOARD] EMA update error:', error instanceof Error ? error.message : String(error));
     }
   }
 
