@@ -117,7 +117,7 @@ export class ConsoleDashboardService extends EventEmitter {
       left: 0,
       right: 0,
       height: 3,
-      content: '{bold}{yellow-fg,yellow-bg} E {/yellow-bg,yellow-fg} {white-fg}EDISON TRADING DASHBOARD{/white-fg}{/bold}',
+      content: '{bold}{yellow-fg,yellow-bg}E{/yellow-bg,yellow-fg}{white-fg}DISON TRADING DASHBOARD{/white-fg}{/bold}',
       style: {
         fg: 'white',
         bg: 'darkblue',
@@ -258,29 +258,36 @@ export class ConsoleDashboardService extends EventEmitter {
 
     content += '{bold}{cyan-fg}MARKET DATA{/cyan-fg}{/bold}\n';
     content += '{cyan-fg}═══════════════════════════════════════{/cyan-fg}\n';
-    content += '{bold}TF    Trend        RSI    EMA{/bold}\n';
+    content += '{bold}TF    Trend        RSI   EMA{/bold}\n';
     content += '{cyan-fg}───────────────────────────────────────{/cyan-fg}\n';
 
     timeframes.forEach((tf) => {
       const data = this.state.marketData.get(tf);
       if (data) {
-        // Format trend with color
+        // Format trend with color (fixed width: 11 chars for display)
+        const trendValue = data.trend.includes('UP') ? 'UPTREND ↑' : 'DOWNTREND ↓';
         const trendText = data.trend.includes('UP')
-          ? `{green-fg}${data.trend}{/green-fg}`
-          : `{red-fg}${data.trend}{/red-fg}`;
+          ? `{green-fg}${trendValue}{/green-fg}`
+          : `{red-fg}${trendValue}{/red-fg}`;
 
-        // Format RSI with color - yellow if extreme
+        // Format RSI with color - yellow if extreme (fixed width: 3 chars)
         let rsiColor = '';
         if (data.rsi > 70 || data.rsi < 30) rsiColor = '{yellow-fg}';
         const rsiEnd = rsiColor ? '{/yellow-fg}' : '';
-        const rsiText = `${rsiColor}${data.rsi.toFixed(0)}${rsiEnd}`;
+        const rsiValue = data.rsi.toFixed(0);
+        const rsiText = `${rsiColor}${rsiValue}${rsiEnd}`;
 
-        // Format EMA
+        // Format EMA (fixed width: 8 chars)
         const emaText = `${data.emaFast.toFixed(1)}/${data.emaSlow.toFixed(1)}`;
 
-        content += `${tf.padEnd(5)}${trendText.padEnd(14)} ${rsiText.padEnd(6)}  ${emaText}\n`;
+        // Fixed column alignment without padEnd (which breaks with color tags)
+        const tfCol = tf.padEnd(5);
+        const trendCol = `${trendText} `.padEnd(15); // Account for tag overhead
+        const rsiCol = rsiText.padEnd(5); // RSI is 3 chars, pad to 5
+
+        content += `${tfCol}${trendCol}${rsiCol}${emaText}\n`;
       } else {
-        content += `${tf.padEnd(5)}{yellow-fg}Loading...{/yellow-fg}     {yellow-fg}--{/yellow-fg}    {yellow-fg}--/--{/yellow-fg}\n`;
+        content += `${tf.padEnd(5)}{yellow-fg}Loading...{/yellow-fg}  {yellow-fg}--{/yellow-fg}   {yellow-fg}--/--{/yellow-fg}\n`;
       }
     });
 
