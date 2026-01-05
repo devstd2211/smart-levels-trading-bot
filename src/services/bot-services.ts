@@ -86,7 +86,7 @@ export class BotServices {
 
   // UI & Dashboard
   readonly dashboard: ConsoleDashboardService;
-  readonly dashboardIntegration: DashboardIntegrationService;
+  readonly dashboardIntegration?: DashboardIntegrationService; // Optional now - disabled due to hang issues
 
   // Optional services
   readonly compoundInterestCalculator?: CompoundInterestCalculatorService;
@@ -98,11 +98,11 @@ export class BotServices {
   constructor(config: Config) {
     // 0. Initialize dashboard FIRST to capture early logs
     this.dashboard = new ConsoleDashboardService({
-      enabled: true,
+      enabled: false, // TEMPORARILY DISABLED - dashboard was causing hang/freeze issues
       updateInterval: 500,
       theme: 'dark',
     });
-    console.log('🎨 Console Dashboard initialized - live terminal UI enabled');
+    console.log('🎨 Console Dashboard DISABLED - focus on fixing position-opened event issue');
 
     // 1. Initialize logger
     this.logger = new LoggerService(
@@ -405,17 +405,18 @@ export class BotServices {
     }
 
     // 14. Initialize Dashboard Integration (connects dashboard to data sources)
-    this.dashboardIntegration = new DashboardIntegrationService(
-      this.dashboard,
-      this.eventBus,
-      this.logger,
-      (this.tradingOrchestrator as any).trendAnalyzer,
-      (this.tradingOrchestrator as any).rsiAnalyzer,
-      (this.tradingOrchestrator as any).emaAnalyzer,
-      this.positionManager,
-      this.publicWebSocket,
-    );
-    this.logger.info('🔗 Dashboard Integration Service initialized - real-time updates enabled');
+    // TEMPORARILY DISABLED - dashboard was causing hang/freeze issues
+    // this.dashboardIntegration = new DashboardIntegrationService(
+    //   this.dashboard,
+    //   this.eventBus,
+    //   this.logger,
+    //   (this.tradingOrchestrator as any).trendAnalyzer,
+    //   (this.tradingOrchestrator as any).rsiAnalyzer,
+    //   (this.tradingOrchestrator as any).emaAnalyzer,
+    //   this.positionManager,
+    //   this.publicWebSocket,
+    // );
+    // this.logger.info('🔗 Dashboard Integration Service initialized - real-time updates enabled');
 
     this.logger.info('✅ BotServices initialized - all dependencies ready');
   }

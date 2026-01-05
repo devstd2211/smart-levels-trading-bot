@@ -66,9 +66,48 @@ export class DashboardIntegrationService {
 
     // Position events
     this.eventBus.on('position-opened', (data: any) => {
-      this.logger.info('🎯 [DASHBOARD] position-opened received', { positionId: data?.position?.id });
-      this.updatePositionData(data?.position);
-      this.dashboard.addPattern('Position Opened');
+      this.logger.info('🎯 [DASHBOARD] position-opened event triggered', { dataKeys: Object.keys(data || {}) });
+      const position = data?.position;
+      this.logger.info('🎯 [DASHBOARD] position-opened received', {
+        positionId: position?.id,
+        hasPosition: !!position,
+        positionSide: position?.side,
+        positionEntry: position?.entryPrice
+      });
+
+      if (position) {
+        this.logger.info('📊 [DASHBOARD] Updating position data', {
+          id: position.id,
+          side: position.side,
+          entry: position.entryPrice,
+          qty: position.quantity
+        });
+        try {
+          this.updatePositionData(position);
+          this.logger.info('✅ [DASHBOARD] Position data updated successfully');
+        } catch (error) {
+          this.logger.error('❌ [DASHBOARD] updatePositionData threw error', {
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+
+        try {
+          this.logger.info('📊 [DASHBOARD] Adding pattern "Position Opened"');
+          this.dashboard.addPattern('Position Opened');
+          this.logger.info('✅ [DASHBOARD] Pattern added successfully');
+        } catch (error) {
+          this.logger.error('❌ [DASHBOARD] addPattern threw error', {
+            error: error instanceof Error ? error.message : String(error)
+          });
+        }
+      } else {
+        this.logger.warn('⚠️ [DASHBOARD] position-opened event received but position data is null/undefined', {
+          dataIsNull: data === null,
+          dataIsUndefined: data === undefined,
+          dataType: typeof data,
+          dataKeys: Object.keys(data || {})
+        });
+      }
     });
 
     this.eventBus.on('position-closed', (data: any) => {
@@ -341,28 +380,68 @@ export class DashboardIntegrationService {
   }
 
   private updatePositionData(position?: Position): void {
-    if (!this.positionManager && !position) return;
+    this.logger.info('🎯 [DASHBOARD] updatePositionData() called', {
+      positionProvided: !!position,
+      positionId: position?.id,
+      hasPositionManager: !!this.positionManager
+    });
+
+    if (!this.positionManager && !position) {
+      this.logger.warn('⚠️ [DASHBOARD] updatePositionData: no position manager and no position data');
+      return;
+    }
 
     try {
       const currentPosition =
         position || (this.positionManager as any).getCurrentPosition?.();
 
+      this.logger.info('📊 [DASHBOARD] updatePositionData: resolved position', {
+        hasPosition: !!currentPosition,
+        positionId: currentPosition?.id,
+        side: currentPosition?.side,
+        entry: currentPosition?.entryPrice,
+        qty: currentPosition?.quantity
+      });
+
       if (currentPosition) {
+        this.logger.info('📊 [DASHBOARD] updatePositionData: calling dashboard.updatePosition()', {
+          id: currentPosition.id,
+          side: currentPosition.side,
+          entry: currentPosition.entryPrice,
+          qty: currentPosition.quantity
+        });
         this.dashboard.updatePosition(currentPosition);
+        this.logger.info('✅ [DASHBOARD] dashboard.updatePosition() completed');
+
         this.dashboard.setEntryPrice(currentPosition.entryPrice);
+        this.logger.info('✅ [DASHBOARD] setEntryPrice() completed');
 
         if (currentPosition.tpLevels) {
+          this.logger.info('📊 [DASHBOARD] Setting TP levels', { count: currentPosition.tpLevels.length });
           this.dashboard.setTakeProfits(currentPosition.tpLevels);
+          this.logger.info('✅ [DASHBOARD] setTakeProfits() completed');
+        } else {
+          this.logger.warn('⚠️ [DASHBOARD] No TP levels in position');
         }
 
         if (currentPosition.stopLoss) {
-          this.dashboard.setStopLoss(currentPosition.stopLoss);
+          this.logger.info('📊 [DASHBOARD] Setting SL', { sl: currentPosition.stopLoss.price });
+          this.dashboard.setStopLoss(currentPosition.stopLoss.price);
+          this.logger.info('✅ [DASHBOARD] setStopLoss() completed');
+        } else {
+          this.logger.warn('⚠️ [DASHBOARD] No SL in position');
         }
       } else {
+        this.logger.warn('⚠️ [DASHBOARD] updatePositionData: currentPosition is null/undefined');
         this.dashboard.updatePosition(undefined);
+        this.logger.info('✅ [DASHBOARD] dashboard.updatePosition(undefined) completed');
       }
     } catch (error) {
-      // Ignore errors
+      this.logger.error('❌ [DASHBOARD] updatePositionData error', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      throw error; // Re-throw so caller can see the error
     }
   }
 

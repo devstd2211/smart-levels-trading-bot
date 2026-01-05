@@ -375,6 +375,11 @@ export class ConsoleDashboardService extends EventEmitter {
 
   public updatePosition(position: Position | undefined): void {
     this.state.position = position;
+    if (position) {
+      console.log(`[DASHBOARD] Position updated: ${position.id} ${position.side} @ ${position.entryPrice}`);
+    } else {
+      console.log(`[DASHBOARD] Position cleared`);
+    }
   }
 
   public setEntryPrice(price: number): void {
@@ -403,10 +408,13 @@ export class ConsoleDashboardService extends EventEmitter {
   public addPattern(pattern: string): void {
     if (!this.state.patterns.includes(pattern)) {
       this.state.patterns.push(pattern);
+      console.log(`[DASHBOARD] Pattern added: ${pattern}`);
       // Keep only last 5 patterns
       if (this.state.patterns.length > 5) {
         this.state.patterns.shift();
       }
+    } else {
+      console.log(`[DASHBOARD] Pattern already exists (skipped): ${pattern}`);
     }
   }
 
