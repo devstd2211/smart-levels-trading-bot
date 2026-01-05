@@ -45,8 +45,14 @@ export class DashboardIntegrationService {
   }
 
   private subscribeToEvents(): void {
-    // Intercept logger to show logs in dashboard
+    // Intercept logger FIRST to capture all logs
     this.interceptLoggerOutput();
+
+    // NOTE: Do NOT disable console output in logger!
+    // If we disable it, LoggerService.writeToConsole() returns early before calling console methods,
+    // so our interception never gets triggered for DEBUG/INFO/WARN/ERROR logs.
+    // Instead, we let all console calls go through to our interception which routes them to dashboard.
+    // this.logger.disableConsoleOutput();  // ← REMOVED - keeps console methods active for interception
 
     // Position events
     this.eventBus.on('position-opened', (data: any) => {
@@ -90,8 +96,20 @@ export class DashboardIntegrationService {
     const originalLog = console.log;
     const originalWarn = console.warn;
     const originalError = console.error;
+    const originalDebug = console.debug;
+    const originalInfo = console.info;
 
     // Override console methods to also update dashboard
+    console.debug = (...args: any[]) => {
+      const message = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+      this.dashboard.addLog('debug', message);
+    };
+
+    console.info = (...args: any[]) => {
+      const message = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+      this.dashboard.addLog('info', message);
+    };
+
     console.log = (...args: any[]) => {
       const message = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
       // Extract log level from message if present

@@ -115,7 +115,7 @@ export class ConsoleDashboardService extends EventEmitter {
       left: 0,
       right: 0,
       height: 3,
-      content: '{bold}{cyan}📊 EDISON TRADING DASHBOARD{/cyan}{/bold}',
+      content: '{bold}{cyan-fg}📊 EDISON TRADING DASHBOARD{/cyan-fg}{/bold}',
       style: {
         fg: 'cyan',
         bg: 'blue',
@@ -253,15 +253,17 @@ export class ConsoleDashboardService extends EventEmitter {
     timeframes.forEach((tf) => {
       const data = this.state.marketData.get(tf);
       if (data) {
-        const trendColor = data.trend.includes('UP') ? '{green}' : '{red}';
-        const rsiColor =
-          data.rsi > 70 || data.rsi < 30 ? '{yellow}' : '{white}';
+        const trendText = data.trend.includes('UP') ? `{green-fg}${data.trend}{/green-fg}` : `{red-fg}${data.trend}{/red-fg}`;
+        const rsiText =
+          data.rsi > 70 || data.rsi < 30
+            ? `{yellow-fg}${data.rsi.toFixed(0)}{/yellow-fg}`
+            : `${data.rsi.toFixed(0)}`;
 
-        content += `${tf.padEnd(10)}│ ${trendColor}${data.trend.padEnd(10)}{/}│ ${rsiColor}${data.rsi.toFixed(0).padEnd(4)}{/} │ ${data.emaFast.toFixed(4)}/${data.emaSlow.toFixed(4)} │ ${data.pattern}\n`;
+        content += `${tf.padEnd(10)}│ ${trendText.padEnd(20)}│ ${rsiText.padEnd(4)} │ ${data.emaFast.toFixed(4)}/${data.emaSlow.toFixed(4)} │ ${data.pattern}\n`;
       }
     });
 
-    content += '\n{bold}Current Price: {cyan}' + this.state.currentPrice.toFixed(4) + '{/cyan}{/bold}';
+    content += `\n{bold}Current Price: {cyan-fg}${this.state.currentPrice.toFixed(4)}{/cyan-fg}{/bold}`;
 
     marketWidget.setContent(content);
   }
@@ -271,24 +273,28 @@ export class ConsoleDashboardService extends EventEmitter {
     if (!posWidget) return;
 
     if (!this.state.position) {
-      posWidget.setContent('{yellow}No active position{/yellow}');
+      posWidget.setContent('{yellow-fg}No active position{/yellow-fg}');
       return;
     }
 
     let content = '';
     const isOpen = (this.state.position as any).isOpen ?? true;
-    content += `{bold}Status:{/bold} ${isOpen ? '{green}OPEN{/green}' : '{red}CLOSED{/red}'}\n`;
+    const statusText = isOpen ? `{green-fg}OPEN{/green-fg}` : `{red-fg}CLOSED{/red-fg}`;
+    content += `{bold}Status:{/bold} ${statusText}\n`;
     content += `\n{bold}Entry Price:{/bold} ${this.state.entryPrice?.toFixed(4)}\n`;
     content += `{bold}Current Price:{/bold} ${this.state.currentPrice.toFixed(4)}\n`;
 
-    const pnlColor =
-      (this.state.currentPnLPercent || 0) >= 0 ? '{green}' : '{red}';
-    content += `\n{bold}Current P&L:{/bold} ${pnlColor}${this.state.currentPnLPercent?.toFixed(2)}% ($${this.state.currentPnL?.toFixed(2)}){/}\n`;
+    const pnlPercent = this.state.currentPnLPercent || 0;
+    const pnlText =
+      pnlPercent >= 0
+        ? `{green-fg}${pnlPercent.toFixed(2)}% ($${this.state.currentPnL?.toFixed(2)}){/green-fg}`
+        : `{red-fg}${pnlPercent.toFixed(2)}% ($${this.state.currentPnL?.toFixed(2)}){/red-fg}`;
+    content += `\n{bold}Current P&L:{/bold} ${pnlText}\n`;
 
     content += '\n{bold}Take Profits:{/bold}\n';
     this.state.tpLevels.forEach((tp, idx) => {
-      const reached = tp.reached ? '{green}✓{/green}' : ' ';
-      content += `  TP${idx + 1}: ${tp.level.toFixed(4)} (${tp.percent}%) ${reached}\n`;
+      const reachedText = tp.reached ? '{green-fg}✓{/green-fg}' : ' ';
+      content += `  TP${idx + 1}: ${tp.level.toFixed(4)} (${tp.percent}%) ${reachedText}\n`;
     });
 
     if (this.state.slLevel) {
@@ -303,13 +309,13 @@ export class ConsoleDashboardService extends EventEmitter {
     if (!patternsWidget) return;
 
     if (this.state.patterns.length === 0) {
-      patternsWidget.setContent('{yellow}No patterns detected{/yellow}');
+      patternsWidget.setContent('{yellow-fg}No patterns detected{/yellow-fg}');
       return;
     }
 
     let content = '{bold}Detected Patterns:{/bold}\n';
     this.state.patterns.forEach((pattern) => {
-      content += `  {green}✓{/green} ${pattern}\n`;
+      content += `  {green-fg}✓{/green-fg} ${pattern}\n`;
     });
 
     patternsWidget.setContent(content);
@@ -392,24 +398,39 @@ export class ConsoleDashboardService extends EventEmitter {
     lastLogs.forEach((log) => {
       const levelColor = this.getLevelColor(log.level);
       const time = log.timestamp.toLocaleTimeString();
-      content += `${levelColor}[${time}] ${log.level.toUpperCase()}{/} ${log.message}\n`;
+      content += `${levelColor}[${time}] ${log.level.toUpperCase()}{/${this.getLevelColorClose(log.level)}} ${log.message}\n`;
     });
 
-    logsWidget.setContent(content || '{yellow}No logs yet...{/yellow}');
+    logsWidget.setContent(content || '{yellow-fg}No logs yet...{/yellow-fg}');
   }
 
   private getLevelColor(level: string): string {
     switch (level.toLowerCase()) {
       case 'error':
-        return '{red}';
+        return '{red-fg}';
       case 'warn':
-        return '{yellow}';
+        return '{yellow-fg}';
       case 'info':
-        return '{cyan}';
+        return '{cyan-fg}';
       case 'debug':
-        return '{gray}';
+        return '{gray-fg}';
       default:
-        return '{white}';
+        return '{white-fg}';
+    }
+  }
+
+  private getLevelColorClose(level: string): string {
+    switch (level.toLowerCase()) {
+      case 'error':
+        return 'red-fg}';
+      case 'warn':
+        return 'yellow-fg}';
+      case 'info':
+        return 'cyan-fg}';
+      case 'debug':
+        return 'gray-fg}';
+      default:
+        return 'white-fg}';
     }
   }
 

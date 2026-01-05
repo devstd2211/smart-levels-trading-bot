@@ -36,6 +36,7 @@ export class LoggerService {
   private logs: LogEntry[] = [];
   private writeQueue: WriteQueueItem[] = [];
   private isProcessingQueue: boolean = false;
+  private enableConsoleOutput: boolean = true; // Can be disabled for dashboard
 
   constructor(
     minLevel: LogLevel = LogLevel.INFO,
@@ -186,6 +187,11 @@ export class LoggerService {
    * Write log entry to console with colors
    */
   private writeToConsole(entry: LogEntry): void {
+    // Skip console output if disabled (for dashboard mode)
+    if (!this.enableConsoleOutput) {
+      return;
+    }
+
     const formattedMessage = this.formatLogEntry(entry);
 
     switch (entry.level) {
@@ -202,6 +208,20 @@ export class LoggerService {
       console.error('\x1b[31m%s\x1b[0m', formattedMessage); // Red
       break;
     }
+  }
+
+  /**
+   * Disable console output (useful for dashboard mode)
+   */
+  public disableConsoleOutput(): void {
+    this.enableConsoleOutput = false;
+  }
+
+  /**
+   * Enable console output
+   */
+  public enableConsoleOutputMode(): void {
+    this.enableConsoleOutput = true;
   }
 
   /**
