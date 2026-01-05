@@ -36,6 +36,15 @@ export class DashboardIntegrationService {
   }
 
   private initialize(): void {
+    // Log which analyzers are available
+    const hasAnalyzers = {
+      trend: !!this.trendAnalyzer,
+      rsi: !!this.rsiAnalyzer,
+      ema: !!this.emaAnalyzer,
+      publicWebSocket: !!this.publicWebSocket,
+    };
+    this.logger.info('📊 Dashboard Integration - Analyzer availability', hasAnalyzers);
+
     // Subscribe to all relevant events
     this.subscribeToEvents();
 
@@ -57,13 +66,13 @@ export class DashboardIntegrationService {
 
     // Position events
     this.eventBus.on('position-opened', (data: any) => {
-      console.log('[DASHBOARD EVENT] position-opened received:', data?.position?.id);
+      this.logger.info('🎯 [DASHBOARD] position-opened received', { positionId: data?.position?.id });
       this.updatePositionData(data?.position);
       this.dashboard.addPattern('Position Opened');
     });
 
     this.eventBus.on('position-closed', (data: any) => {
-      console.log('[DASHBOARD EVENT] position-closed received:', data?.position?.id);
+      this.logger.info('🎯 [DASHBOARD] position-closed received', { positionId: data?.position?.id });
       this.dashboard.updatePosition(undefined);
       this.dashboard.addPattern('Position Closed');
     });
@@ -89,27 +98,21 @@ export class DashboardIntegrationService {
       }
     });
 
-    // Price updates via WebSocket
+    // Price updates via WebSocket - also trigger analyzer updates
     if (this.publicWebSocket) {
       this.publicWebSocket.on('candleClosed', (data: any) => {
+        this.logger.debug('📊 [DASHBOARD] candleClosed event received', { role: data?.role, price: data?.candle?.close });
         if (data?.candle?.close) {
           this.lastPrice = data.candle.close;
           this.dashboard.updatePrice(data.candle.close);
+
+          // Update all analyzers on candle close
+          void this.updateAnalyzerData();
         }
       });
+    } else {
+      this.logger.warn('⚠️ [DASHBOARD] PublicWebSocket not available - price updates disabled');
     }
-
-    // Candle updates - trigger real-time data refresh
-    this.eventBus.on('candle-closed', (data: any) => {
-      console.log('[DASHBOARD EVENT] candle-closed received:', data?.candle?.close);
-      if (data?.candle?.close) {
-        this.lastPrice = data.candle.close;
-        this.dashboard.updatePrice(data.candle.close);
-      }
-
-      // Update all analyzers on candle close
-      void this.updateAnalyzerData();
-    });
   }
 
   private interceptLoggerOutput(): void {
@@ -190,7 +193,7 @@ export class DashboardIntegrationService {
       };
 
       if (!hasAnalyzers.trend && !hasAnalyzers.rsi && !hasAnalyzers.ema) {
-        console.warn('[DASHBOARD] No analyzers available yet');
+        this.logger.warn('⚠️ [DASHBOARD] No analyzers available yet', hasAnalyzers);
       }
 
       // Get real-time data from analyzers when candle closes
@@ -216,7 +219,7 @@ export class DashboardIntegrationService {
 
   private async updateTrendDataAsync(): Promise<void> {
     if (!this.trendAnalyzer) {
-      console.debug('[DASHBOARD] TrendAnalyzer not available');
+      this.logger.debug('⚠️ [DASHBOARD] TrendAnalyzer not available');
       return;
     }
 
@@ -224,12 +227,12 @@ export class DashboardIntegrationService {
       // Use multiTimeframeAnalysis to get all timeframes
       const multiTrend = (this.trendAnalyzer as any).lastAnalysis;
       if (!multiTrend) {
-        console.debug('[DASHBOARD] TrendAnalyzer.lastAnalysis is null/undefined');
+        this.logger.debug('⚠️ [DASHBOARD] TrendAnalyzer.lastAnalysis is null/undefined');
         return;
       }
 
       if (multiTrend && multiTrend.byTimeframe) {
-        console.debug('[DASHBOARD] Trend data found, updating:', Object.keys(multiTrend.byTimeframe).join(', '));
+        this.logger.debug('📈 [DASHBOARD] Trend data found', { timeframes: Object.keys(multiTrend.byTimeframe).join(', ') });
         // Update each timeframe from the analysis
         Object.entries(multiTrend.byTimeframe).forEach(([timeframe, analysis]: any) => {
           if (analysis && analysis.bias) {
@@ -246,30 +249,24 @@ export class DashboardIntegrationService {
           }
         });
       } else {
-        console.debug('[DASHBOARD] TrendAnalyzer.lastAnalysis.byTimeframe missing');
+        this.logger.debug('⚠️ [DASHBOARD] TrendAnalyzer.lastAnalysis.byTimeframe missing');
       }
     } catch (error) {
-      console.debug('[DASHBOARD] Trend update error:', error instanceof Error ? error.message : String(error));
+      this.logger.debug('❌ [DASHBOARD] Trend update error', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
   private async updateRSIDataAsync(): Promise<void> {
     if (!this.rsiAnalyzer) {
-      console.debug('[DASHBOARD] RSIAnalyzer not available');
+      this.logger.debug('⚠️ [DASHBOARD] RSIAnalyzer not available');
       return;
     }
 
     try {
-      // Call calculateAll() to get real-time RSI values
-      const calculateAllMethod = (this.rsiAnalyzer as any).calculateAll;
-      if (!calculateAllMethod) {
-        console.debug('[DASHBOARD] RSIAnalyzer.calculateAll method not found');
-        return;
-      }
-
-      const rsiData = await calculateAllMethod();
+      // Call calculateAll() directly to preserve 'this' context
+      const rsiData = await (this.rsiAnalyzer as any).calculateAll();
       if (rsiData) {
-        console.debug('[DASHBOARD] RSI data received, keys:', Object.keys(rsiData).join(', '));
+        this.logger.debug('📊 [DASHBOARD] RSI data received', { keys: Object.keys(rsiData).join(', ') });
         const timeframeMap: Record<string, string> = {
           entry: '1m',
           primary: '5m',
@@ -285,30 +282,24 @@ export class DashboardIntegrationService {
           }
         });
       } else {
-        console.debug('[DASHBOARD] RSIAnalyzer.calculateAll() returned empty/null');
+        this.logger.debug('⚠️ [DASHBOARD] RSIAnalyzer.calculateAll() returned empty/null');
       }
     } catch (error) {
-      console.debug('[DASHBOARD] RSI update error:', error instanceof Error ? error.message : String(error));
+      this.logger.debug('❌ [DASHBOARD] RSI update error', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
   private async updateEMADataAsync(): Promise<void> {
     if (!this.emaAnalyzer) {
-      console.debug('[DASHBOARD] EMAAnalyzer not available');
+      this.logger.debug('⚠️ [DASHBOARD] EMAAnalyzer not available');
       return;
     }
 
     try {
-      // Call calculateAll() to get real-time EMA values
-      const calculateAllMethod = (this.emaAnalyzer as any).calculateAll;
-      if (!calculateAllMethod) {
-        console.debug('[DASHBOARD] EMAAnalyzer.calculateAll method not found');
-        return;
-      }
-
-      const emaData = await calculateAllMethod();
+      // Call calculateAll() directly to preserve 'this' context
+      const emaData = await (this.emaAnalyzer as any).calculateAll();
       if (emaData) {
-        console.debug('[DASHBOARD] EMA data received, keys:', Object.keys(emaData).join(', '));
+        this.logger.debug('📊 [DASHBOARD] EMA data received', { keys: Object.keys(emaData).join(', ') });
         const timeframeMap: Record<string, string> = {
           entry: '1m',
           primary: '5m',
@@ -330,10 +321,10 @@ export class DashboardIntegrationService {
           }
         });
       } else {
-        console.debug('[DASHBOARD] EMAAnalyzer.calculateAll() returned empty/null');
+        this.logger.debug('⚠️ [DASHBOARD] EMAAnalyzer.calculateAll() returned empty/null');
       }
     } catch (error) {
-      console.debug('[DASHBOARD] EMA update error:', error instanceof Error ? error.message : String(error));
+      this.logger.debug('❌ [DASHBOARD] EMA update error', { error: error instanceof Error ? error.message : String(error) });
     }
   }
 
