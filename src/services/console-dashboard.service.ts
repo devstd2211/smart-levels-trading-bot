@@ -117,7 +117,7 @@ export class ConsoleDashboardService extends EventEmitter {
       left: 0,
       right: 0,
       height: 3,
-      content: '{bold}{yellow-fg,yellow-bg}E{/yellow-bg,yellow-fg}{white-fg}DISON TRADING DASHBOARD{/white-fg}{/bold}',
+      content: '{bold}{yellow-fg,yellow-bg}E{/yellow-bg,yellow-fg}{white-fg}  →  →  EDISON TRADING DASHBOARD{/white-fg}{/bold}',
       style: {
         fg: 'white',
         bg: 'darkblue',
@@ -264,30 +264,26 @@ export class ConsoleDashboardService extends EventEmitter {
     timeframes.forEach((tf) => {
       const data = this.state.marketData.get(tf);
       if (data) {
-        // Format trend with color (fixed width: 11 chars for display)
+        // Format trend with color
         const trendValue = data.trend.includes('UP') ? 'UPTREND ↑' : 'DOWNTREND ↓';
         const trendText = data.trend.includes('UP')
           ? `{green-fg}${trendValue}{/green-fg}`
           : `{red-fg}${trendValue}{/red-fg}`;
 
-        // Format RSI with color - yellow if extreme (fixed width: 3 chars)
+        // Format RSI with color - yellow if extreme
         let rsiColor = '';
         if (data.rsi > 70 || data.rsi < 30) rsiColor = '{yellow-fg}';
         const rsiEnd = rsiColor ? '{/yellow-fg}' : '';
         const rsiValue = data.rsi.toFixed(0);
         const rsiText = `${rsiColor}${rsiValue}${rsiEnd}`;
 
-        // Format EMA (fixed width: 8 chars)
+        // Format EMA
         const emaText = `${data.emaFast.toFixed(1)}/${data.emaSlow.toFixed(1)}`;
 
-        // Fixed column alignment without padEnd (which breaks with color tags)
-        const tfCol = tf.padEnd(5);
-        const trendCol = `${trendText} `.padEnd(15); // Account for tag overhead
-        const rsiCol = rsiText.padEnd(5); // RSI is 3 chars, pad to 5
-
-        content += `${tfCol}${trendCol}${rsiCol}${emaText}\n`;
+        // Use explicit spacing instead of padEnd (which breaks with color tags)
+        content += `${tf.padEnd(5)}${trendText}      ${rsiText}    ${emaText}\n`;
       } else {
-        content += `${tf.padEnd(5)}{yellow-fg}Loading...{/yellow-fg}  {yellow-fg}--{/yellow-fg}   {yellow-fg}--/--{/yellow-fg}\n`;
+        content += `${tf.padEnd(5)}{yellow-fg}Loading...{/yellow-fg}   {yellow-fg}--{/yellow-fg}     {yellow-fg}--/--{/yellow-fg}\n`;
       }
     });
 
