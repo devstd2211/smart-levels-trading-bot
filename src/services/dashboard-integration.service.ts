@@ -65,10 +65,24 @@ export class DashboardIntegrationService {
       this.dashboard.addPattern('Position Closed');
     });
 
-    // Entry signal events
+    // Entry signal events - extract pattern name from reason
     this.eventBus.on('entry-signal', (data: any) => {
       if (data?.signal) {
-        this.dashboard.addPattern(`Signal: ${data.signal.direction}`);
+        const direction = data.signal.direction || 'UNKNOWN';
+        const confidence = data.signal.confidence ? `${Math.round(data.signal.confidence)}%` : '';
+        const reason = data.signal.reason || '';
+
+        // Extract pattern name from reason (e.g., "Chart Pattern: Head & Shoulders" -> "Head & Shoulders")
+        let patternName = direction;
+        if (reason) {
+          const match = reason.match(/(?:Chart Pattern|Engulfing|Flag|Triangle|Wedge|Triple):\s*(.+?)(?:\s*\(|$)/);
+          if (match && match[1]) {
+            patternName = match[1].trim();
+          }
+        }
+
+        const pattern = confidence ? `${patternName} (${confidence})` : patternName;
+        this.dashboard.addPattern(pattern);
       }
     });
 

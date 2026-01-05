@@ -34,6 +34,7 @@ import {
   SignalType,
 } from '../types';
 import { BybitService } from './bybit';
+import { BotEventBus } from './event-bus';
 import { TelegramService } from './telegram.service';
 import { TradingJournalService } from './trading-journal.service';
 import { TakeProfitManagerService } from './take-profit-manager.service';
@@ -85,6 +86,7 @@ export class PositionManagerService {
     private readonly journal: TradingJournalService,
     private readonly entryConfirmationConfig: EntryConfirmationConfig,
     private readonly fullConfig: Config,
+    private readonly eventBus: BotEventBus,
     compoundInterestCalculator?: CompoundInterestCalculatorService,
     sessionStats?: SessionStatsService,
   ) {
@@ -192,6 +194,9 @@ export class PositionManagerService {
       // Between this point and setting currentPosition, periodic cleanup might cancel new TP/SL orders
       // By setting it immediately, we signal that position is under management
       this.currentPosition = position;
+
+      // Emit position-opened event for dashboard and other listeners
+      this.eventBus.emit('position-opened', { position });
 
       // Initialize TakeProfitManager for partial close tracking
       this.takeProfitManager = new TakeProfitManagerService(
@@ -318,9 +323,15 @@ export class PositionManagerService {
    * Delegates to PositionSyncService for cleanup
    */
   async clearPosition(): Promise<void> {
+    const closedPosition = this.currentPosition;
     await this.syncService.clearPosition(this.currentPosition);
     this.currentPosition = null;
     this.takeProfitManager = null;
     this.isOpeningPosition = false; // FIX: Reset flag when clearing position
+
+    // Emit position-closed event for dashboard and other listeners
+    if (closedPosition) {
+      this.eventBus.emit('position-closed', { position: closedPosition });
+    }
   }
 }

@@ -266,6 +266,7 @@ export class BotServices {
       this.journal,
       config.entryConfirmation,
       config,
+      this.eventBus,
       this.compoundInterestCalculator,
       this.sessionStats,
     );

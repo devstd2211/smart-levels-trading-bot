@@ -132,6 +132,12 @@ describe('PositionManagerService', () => {
       getOpenPositionBySymbol: jest.fn(),
     } as any;
 
+    const mockEventBus = {
+      emit: jest.fn(),
+      on: jest.fn(),
+      off: jest.fn(),
+    } as any;
+
     positionManager = new PositionManagerService(
       mockBybitService,
       config.trading,
@@ -141,6 +147,7 @@ describe('PositionManagerService', () => {
       mockJournal,
       { long: { enabled: true, expirySeconds: 120 }, short: { enabled: false, expirySeconds: 120 } }, // Entry confirmation config
       config as any, // Full config (mock)
+      mockEventBus,
     );
   });
 
