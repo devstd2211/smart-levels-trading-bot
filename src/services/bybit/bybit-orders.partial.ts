@@ -12,6 +12,7 @@ import { DECIMAL_PLACES, PERCENTAGE_THRESHOLDS } from '../../constants';
 
 import { PositionSide, TakeProfit, ProtectionVerification, BybitOrder, isStopLossOrder, isTakeProfitOrder } from '../../types';
 import { BybitBase, BYBIT_SUCCESS_CODE, BYBIT_NOT_MODIFIED_CODE, BYBIT_ORDER_NOT_EXISTS_CODE, BYBIT_ZERO_POSITION_CODE, POSITION_IDX_ONE_WAY, PERCENT_TO_DECIMAL } from './bybit-base.partial';
+import { isCriticalApiError } from '../../utils/error-helper';
 
 // ============================================================================
 // BYBIT ORDERS PARTIAL
@@ -183,6 +184,60 @@ export class BybitOrders extends BybitBase {
       }
 
       this.logger.info('Take-profit price updated', { orderId, newPrice });
+    });
+  }
+
+  /**
+   * Set take-profit in Partial mode (for multiple TP levels)
+   *
+   * Used for setting additional TP levels after position opening.
+   * Bybit Partial mode allows fractional position closing at different TP prices.
+   *
+   * @param params.price TP price
+   * @param params.size Size to close at this TP level (in contracts)
+   * @param params.index TP level index (for logging)
+   */
+  async updateTakeProfitPartial(params: {
+    price: number;
+    size: number;
+    index?: number;
+  }): Promise<void> {
+    return await this.retry(async () => {
+      const { price, size, index = 0 } = params;
+      const roundedPrice = this.roundPrice(price);
+      const roundedSize = this.roundQuantity(size);
+
+      this.logger.info(`Setting TP${index + 1} (Partial mode)`, {
+        price: roundedPrice,
+        size: roundedSize,
+      });
+
+      const response = await this.restClient.setTradingStop({
+        category: 'linear',
+        symbol: this.symbol,
+        takeProfit: roundedPrice.toString(),
+        tpslMode: 'Partial', // Allow multiple TP levels
+        tpOrderType: 'Market', // Market execution
+        tpSize: roundedSize.toString(), // Size to close at this TP
+        positionIdx: POSITION_IDX_ONE_WAY,
+      });
+
+      // Code 10001 means "zero position" - position already closed (race condition), which is OK
+      if (response.retCode === 10001) {
+        this.logger.info(`Position already closed, skipping TP${index + 1}`, {
+          price: roundedPrice,
+        });
+        return;
+      }
+
+      if (response.retCode !== BYBIT_SUCCESS_CODE) {
+        throw new Error(`Failed to set TP${index + 1}: ${response.retMsg}`);
+      }
+
+      this.logger.info(`✅ TP${index + 1} set successfully (Partial mode)`, {
+        price: roundedPrice,
+        size: roundedSize,
+      });
     });
   }
 
@@ -515,6 +570,18 @@ export class BybitOrders extends BybitBase {
       });
 
       if (response.retCode !== BYBIT_SUCCESS_CODE) {
+        // Check if this is a critical error
+        const error = new Error(`Bybit API error: ${response.retMsg}. (code: ${response.retCode})`);
+        (error as any).code = response.retCode;
+
+        if (isCriticalApiError(error)) {
+          this.logger.error('🚨 CRITICAL API ERROR in getActiveOrders - throwing immediately!', {
+            error: response.retMsg,
+            code: response.retCode,
+          });
+          throw error;
+        }
+
         this.logger.warn('Failed to get active orders', {
           error: response.retMsg,
           code: response.retCode,
@@ -550,6 +617,18 @@ export class BybitOrders extends BybitBase {
       });
 
       if (response.retCode !== BYBIT_SUCCESS_CODE) {
+        // Check if this is a critical error
+        const error = new Error(`Bybit API error: ${response.retMsg}. (code: ${response.retCode})`);
+        (error as any).code = response.retCode;
+
+        if (isCriticalApiError(error)) {
+          this.logger.error('🚨 CRITICAL API ERROR in getOrderHistory - throwing immediately!', {
+            error: response.retMsg,
+            code: response.retCode,
+          });
+          throw error;
+        }
+
         this.logger.warn('Failed to get order history', {
           error: response.retMsg,
           code: response.retCode,
@@ -641,8 +720,19 @@ export class BybitOrders extends BybitBase {
         processed: conditionalOrders.length,
       });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Check if this is a critical error
+      if (isCriticalApiError(error)) {
+        this.logger.error('🚨 CRITICAL API ERROR in cancelAllConditionalOrders - re-throwing!', {
+          error: errorMessage,
+          isCritical: true,
+        });
+        throw error; // Re-throw critical errors
+      }
+
       this.logger.error('Error in cancelAllConditionalOrders', {
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
       });
     }
   }

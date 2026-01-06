@@ -2,6 +2,7 @@ import { INTEGER_MULTIPLIERS } from '../constants';
 import { TIME_MULTIPLIERS } from '../constants/technical.constants';
 import { Config, LoggerService } from '../types';
 import { BotServices } from './bot-services';
+import { isCriticalApiError } from '../utils/error-helper';
 
 /**
  * BotInitializer - Manages bot lifecycle (initialization and shutdown)
@@ -339,8 +340,28 @@ export class BotInitializer {
           }
         }
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+
+        // Check if this is a critical error
+        if (isCriticalApiError(error)) {
+          this.logger.error('🚨 CRITICAL API ERROR in periodic tasks - emitting critical-error!', {
+            error: errorMessage,
+            isCritical: true,
+          });
+
+          // Stop periodic tasks immediately
+          if (this.periodicTaskInterval) {
+            clearInterval(this.periodicTaskInterval);
+            this.periodicTaskInterval = null;
+          }
+
+          // Emit critical error event through EventBus for bot to handle
+          this.services.eventBus.emit('critical-error', error);
+          return;
+        }
+
         this.logger.error('Error in periodic tasks', {
-          error: error instanceof Error ? error.message : String(error),
+          error: errorMessage,
         });
       }
     }, PERIODIC_INTERVAL_MS);

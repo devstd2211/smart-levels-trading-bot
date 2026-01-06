@@ -16,6 +16,7 @@ import { EventEmitter } from 'events';
 import { BybitService } from './bybit';
 import { PositionManagerService } from './position-manager.service';
 import { Position, PositionSide, RiskManagementConfig, LoggerService, ExitType, BybitOrder, isStopLossOrder, isTakeProfitOrder } from '../types';
+import { isCriticalApiError } from '../utils/error-helper';
 import { TelegramService } from './telegram.service';
 
 // ============================================================================
@@ -32,6 +33,7 @@ export class PositionMonitorService extends EventEmitter {
   private monitorInterval: NodeJS.Timeout | null = null;
   private deepSyncInterval: NodeJS.Timeout | null = null;
   private isMonitoring: boolean = false;
+  private criticalErrorEmitted = false; // Prevent duplicate critical error handling
 
   constructor(
     private readonly bybitService: BybitService,
@@ -253,11 +255,48 @@ export class PositionMonitorService extends EventEmitter {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       const errorStack = error instanceof Error ? error.stack : undefined;
-      this.logger.error('Position Monitor caught error', {
-        message: errorMessage,
-        stack: errorStack,
-      });
-      this.emit('error', error);
+
+      // Check if this is a critical API error (e.g., API key expired)
+      if (isCriticalApiError(error)) {
+        // Prevent duplicate handling
+        if (this.criticalErrorEmitted) {
+          return;
+        }
+        this.criticalErrorEmitted = true;
+
+        this.logger.error('🚨🚨🚨 CRITICAL: API error requires IMMEDIATE shutdown! 🚨🚨🚨', {
+          message: errorMessage,
+          stack: errorStack,
+          isCritical: true,
+        });
+
+        // Stop monitoring immediately
+        this.stop();
+        this.logger.error('✅ Position monitor stopped immediately');
+
+        // Send alert (don't await to avoid delays)
+        this.telegram.sendAlert(
+          '🚨🚨🚨 CRITICAL: API Authentication Failed 🚨🚨🚨\n' +
+          `Error: ${errorMessage}\n` +
+          'Bot will shutdown immediately.',
+        ).catch((telegramError) => {
+          this.logger.error('Failed to send Telegram alert', {
+            error: telegramError instanceof Error ? telegramError.message : String(telegramError),
+          });
+        });
+
+        // Emit critical error event - bot should handle this and shutdown
+        // Use setImmediate to ensure it's processed as soon as possible
+        setImmediate(() => {
+          this.emit('critical-error', error);
+        });
+      } else {
+        this.logger.error('Position Monitor caught error', {
+          message: errorMessage,
+          stack: errorStack,
+        });
+        this.emit('error', error);
+      }
     }
   }
 
@@ -653,9 +692,45 @@ export class PositionMonitorService extends EventEmitter {
       });
 
     } catch (error) {
-      this.logger.error('Deep sync check failed', {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Check if this is a critical API error
+      if (isCriticalApiError(error)) {
+        // Prevent duplicate handling
+        if (this.criticalErrorEmitted) {
+          return;
+        }
+        this.criticalErrorEmitted = true;
+
+        this.logger.error('🚨🚨🚨 CRITICAL: API error during deep sync check - IMMEDIATE shutdown! 🚨🚨🚨', {
+          error: errorMessage,
+          isCritical: true,
+        });
+
+        // Stop monitoring immediately
+        this.stop();
+        this.logger.error('✅ Position monitor stopped immediately (deep sync)');
+
+        // Send alert (don't await to avoid delays)
+        this.telegram.sendAlert(
+          '🚨🚨🚨 CRITICAL: API Authentication Failed (Deep Sync) 🚨🚨🚨\n' +
+          `Error: ${errorMessage}\n` +
+          'Bot will shutdown immediately.',
+        ).catch((telegramError) => {
+          this.logger.error('Failed to send Telegram alert', {
+            error: telegramError instanceof Error ? telegramError.message : String(telegramError),
+          });
+        });
+
+        // Emit critical error event - bot should handle this and shutdown
+        setImmediate(() => {
+          this.emit('critical-error', error);
+        });
+      } else {
+        this.logger.error('Deep sync check failed', {
+          error: errorMessage,
+        });
+      }
     }
   }
 }

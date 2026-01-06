@@ -709,10 +709,10 @@ export const ENGULFING_CONFIDENCE_BONUS_PER_RATIO = 20;
 export const EQUAL_THRESHOLD_PRECISION = 0.001;
 /** Breakeven tolerance in USDT (e.g., $0.01) - TECHNICAL: PnL classification */
 export const BREAKEVEN_TOLERANCE_USDT = 0.01;
-/** Default minimum total weighted score for strategy coordination (55%) - TECHNICAL: signal aggregation */
-export const MIN_TOTAL_SCORE_DEFAULT = 0.55;
-/** Default minimum confidence threshold for strategy coordination (60%) - TECHNICAL: signal aggregation */
-export const MIN_CONFIDENCE_DEFAULT = 60; // Increased from 45% to avoid weak reversal entries
+/** Default minimum total weighted score for strategy coordination (65%) - TECHNICAL: signal aggregation */
+export const MIN_TOTAL_SCORE_DEFAULT = 0.65;
+/** Default minimum confidence threshold for strategy coordination (65%) - TECHNICAL: signal aggregation */
+export const MIN_CONFIDENCE_DEFAULT = 65; // Increased from 55% to filter out weak signals on neutral trends
 
 // ============================================================================
 // PHASE 4: RISK MANAGER CONSTANTS (NO FALLBACKS - EXPLICIT REQUIRED)
@@ -724,8 +724,8 @@ export const MIN_CONFIDENCE_DEFAULT = 60; // Increased from 45% to avoid weak re
 /** Estimated new position size ratio for exposure calculation (50% of risk per trade) */
 export const RISK_MANAGER_ESTIMATED_NEW_POSITION_RATIO = 0.5;
 
-/** Minimum stop loss distance in percent (prevents extreme SL values) */
-export const RISK_MANAGER_MIN_SL_DISTANCE_PERCENT = 0.5;
+/** Minimum stop loss distance in percent (prevents extreme SL values and premature hits) */
+export const RISK_MANAGER_MIN_SL_DISTANCE_PERCENT = 1.2;
 
 /** Position size multiplier after 2 consecutive losses (75% of normal size) */
 export const RISK_MANAGER_LOSS_STREAK_MULTIPLIER_2_LOSSES = 0.75;

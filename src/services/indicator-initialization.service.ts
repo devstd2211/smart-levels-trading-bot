@@ -55,17 +55,33 @@ export class IndicatorInitializationService {
     private candleProvider: CandleProvider,
     private timeframeProvider: TimeframeProvider,
     private logger: LoggerService,
+    private mainConfig?: any,  // Main Config to access divergenceDetector from entryConfig
   ) {}
 
   /**
    * Initialize all indicators and analyzers
    */
   initializeAllIndicators(): InitializedIndicators {
-    // Initialize EntryScanner
+    // Initialize detectors FIRST (before EntryScanner)
+    // Initialize DivergenceDetector with strategic config from main config.entryConfig (fail-fast)
+    const divergenceDetectorConfig = this.mainConfig?.entryConfig?.divergenceDetector;
+    if (!divergenceDetectorConfig) {
+      throw new Error(
+        'CRITICAL: Missing divergenceDetector config in entryConfig. ' +
+        'Expected: entryConfig.divergenceDetector with minStrength and priceDiffPercent properties'
+      );
+    }
+    const divergenceDetector = new DivergenceDetector(
+      this.logger,
+      divergenceDetectorConfig,
+    );
+
+    // Initialize EntryScanner (pass DivergenceDetector to avoid duplication)
     const entryScanner = new EntryScanner(
       this.config.entryConfig as any,
       this.candleProvider,
       this.logger,
+      divergenceDetector,  // Pass initialized divergenceDetector
     );
 
     // Initialize multi-timeframe analyzers
@@ -94,11 +110,8 @@ export class IndicatorInitializationService {
       (this.config.analysisConfig as any).liquidityDetector!,
       this.logger,
     );
-    // Initialize DivergenceDetector with strategic config from entryConfig (fail-fast)
-    const divergenceDetector = new DivergenceDetector(
-      this.logger,
-      (this.config.entryConfig as any).divergenceDetector!,
-    );
+
+    // NOTE: DivergenceDetector already initialized above (before EntryScanner) to avoid duplication
     const breakoutPredictor = new BreakoutPredictor(this.logger, {
       rsiLongThreshold: this.config.entryConfig.rsiOverbought,
       rsiShortThreshold: this.config.entryConfig.rsiOversold,

@@ -46,13 +46,6 @@ import { PositionSizingService } from './position-sizing.service';
 import { DECIMAL_PLACES, PERCENT_MULTIPLIER, INTEGER_MULTIPLIERS, TIMING_CONSTANTS } from '../constants';
 
 // ============================================================================
-// CONSTANTS
-// ============================================================================
-
-const MAX_VERIFICATION_RETRIES = TIMING_CONSTANTS.MAX_VERIFICATION_RETRIES;
-const VERIFICATION_RETRY_DELAY_MS = INTEGER_MULTIPLIERS.ONE_THOUSAND; // 1 second between retries
-
-// ============================================================================
 // POSITION OPENING SERVICE
 // ============================================================================
 
@@ -126,46 +119,7 @@ export class PositionOpeningService {
     });
 
     // =========================================================================
-    // STEP 4: Execute exchange operations
-    // =========================================================================
-    let orderId: string | undefined;
-    let tpOrderIds: (string | undefined)[] = [];
-
-    try {
-      // 4a. Open position with limit order
-      orderId = await this.bybitService.openPosition({
-        side,
-        quantity: sizingResult.quantity,
-        leverage: this.tradingConfig.leverage,
-      });
-
-      this.logger.info('✅ Position order placed', {
-        orderId,
-        side: side === PositionSide.LONG ? 'LONG' : 'SHORT',
-        quantity: sizingResult.quantity,
-      });
-
-      // 4b. Place take-profit levels
-      tpOrderIds = await this.bybitService.placeTakeProfitLevels({
-        side,
-        entryPrice: signal.price,
-        totalQuantity: sizingResult.quantity,
-        levels: signal.takeProfits,
-      });
-
-      this.logger.info('✅ Take-profit levels placed', {
-        count: tpOrderIds.length,
-        orderIds: tpOrderIds,
-      });
-    } catch (error) {
-      this.logger.error('❌ Failed to execute exchange operations', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw error;
-    }
-
-    // =========================================================================
-    // STEP 5: Set stop-loss with price recalculation
+    // STEP 4: Calculate SL with price recalculation (BEFORE opening position)
     // =========================================================================
     const slDistance = this.calculateSLDistance(signal.price, signal.stopLoss);
     const currentPrice = await this.bybitService.getCurrentPrice();
@@ -183,34 +137,83 @@ export class PositionOpeningService {
       actualStopLoss: actualStopLoss.toFixed(DECIMAL_PLACES.PERCENT),
     });
 
+    // =========================================================================
+    // STEP 5: ATOMIC POSITION OPENING - SL+TP in ONE call (CRITICAL FIX)
+    // =========================================================================
+    // This prevents race condition liquidations by setting SL atomically with position opening
+    let orderId: string | undefined;
+    let tpOrderIds: (string | undefined)[] = [];
+
     try {
-      await this.bybitService.updateStopLoss(actualStopLoss);
-      this.logger.info('✅ Stop-loss set', { stopLoss: actualStopLoss.toFixed(DECIMAL_PLACES.PERCENT) });
+      // Get first TP level (or undefined if no TPs)
+      const firstTP = signal.takeProfits && signal.takeProfits.length > 0
+        ? signal.takeProfits[0].price
+        : undefined;
+
+      // 5a. Open position WITH atomic SL and first TP protection
+      orderId = await this.bybitService.openPosition({
+        side,
+        quantity: sizingResult.quantity,
+        leverage: this.tradingConfig.leverage,
+        stopLoss: actualStopLoss, // CRITICAL: SL set atomically with position
+        takeProfit: firstTP, // First TP set atomically (optional, can be modified later)
+      });
+
+      this.logger.info('✅ Position opened WITH atomic SL/TP protection', {
+        orderId,
+        side: side === PositionSide.LONG ? 'LONG' : 'SHORT',
+        quantity: sizingResult.quantity,
+        slSet: true,
+        tpSet: firstTP !== undefined,
+      });
+
+      // Store first TP order ID
+      if (firstTP !== undefined) {
+        tpOrderIds.push(orderId); // Bybit returns same orderId for position+SL+TP
+      }
+
+      // 5b. Set additional TP levels (if more than 1)
+      // Using setTradingStop for additional TPs (Partial mode with different tpSize)
+      if (signal.takeProfits && signal.takeProfits.length > 1) {
+        this.logger.info('📋 Setting additional TP levels', {
+          additionalLevels: signal.takeProfits.length - 1,
+        });
+
+        // For each additional TP level, we update via setTradingStop
+        // Note: Bybit Partial mode allows multiple TPs by changing tpSize
+        // but we'll set them sequentially for clarity
+        for (let i = 1; i < signal.takeProfits.length; i++) {
+          const tp = signal.takeProfits[i];
+          const tpSize = sizingResult.quantity / signal.takeProfits.length;
+
+          try {
+            await this.bybitService.updateTakeProfitPartial({
+              price: tp.price,
+              size: tpSize,
+              index: i,
+            });
+
+            this.logger.debug(`✅ TP${i + 1} set`, {
+              price: tp.price,
+              size: tpSize,
+            });
+          } catch (error) {
+            this.logger.warn(`Failed to set TP${i + 1} level`, {
+              error: error instanceof Error ? error.message : String(error),
+            });
+            // Continue with other TPs - don't fail entire position
+          }
+        }
+      }
     } catch (error) {
-      this.logger.error('❌ Failed to set stop-loss', {
+      this.logger.error('❌ Failed to open position with protection', {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
     }
 
     // =========================================================================
-    // STEP 6: CRITICAL - Verify protection is actually set (with retries)
-    // =========================================================================
-    const protectionVerified = await this.verifyProtectionWithRetries(
-      side,
-      signal.price,
-      sizingResult.quantity,
-      actualStopLoss,
-      tpOrderIds,
-    );
-
-    if (!protectionVerified) {
-      this.logger.error('🚨 CRITICAL: Failed to verify protection after retries!');
-      throw new Error('Failed to set protection for position - position emergency closed for safety');
-    }
-
-    // =========================================================================
-    // STEP 7: Create Position object
+    // STEP 6: Create Position object
     // =========================================================================
     const timestamp = Date.now();
     const sideName = side === PositionSide.LONG ? 'Buy' : 'Sell';
@@ -315,160 +318,6 @@ export class PositionOpeningService {
     });
 
     return position;
-  }
-
-  /**
-   * Verify protection is set with retry logic
-   * CRITICAL: This ensures SL/TP are actually active before considering trade safe
-   *
-   * @param side - Position side (LONG/SHORT)
-   * @param entryPrice - Entry price
-   * @param quantity - Position quantity
-   * @param actualStopLoss - Calculated SL price
-   * @param tpOrderIds - Take-profit order IDs
-   * @returns true if protection verified, false if failed after retries
-   */
-  private async verifyProtectionWithRetries(
-    side: PositionSide,
-    entryPrice: number,
-    quantity: number,
-    actualStopLoss: number,
-    tpOrderIds: (string | undefined)[],
-  ): Promise<boolean> {
-    let verificationAttempt = 0;
-
-    while (verificationAttempt < MAX_VERIFICATION_RETRIES) {
-      verificationAttempt++;
-
-      // Wait before verification to allow orders to propagate
-      await this.sleep(VERIFICATION_RETRY_DELAY_MS);
-
-      this.logger.debug(`🔍 Verifying protection (attempt ${verificationAttempt}/${MAX_VERIFICATION_RETRIES})...`);
-
-      try {
-        const verification = await this.bybitService.verifyProtectionSet(side);
-
-        if (verification.verified) {
-          this.logger.info('✅ Protection verified successfully', {
-            hasStopLoss: verification.hasStopLoss,
-            hasTakeProfit: verification.hasTakeProfit,
-            stopLossPrice: verification.stopLossPrice?.toFixed(DECIMAL_PLACES.PERCENT),
-            takeProfitCount: verification.takeProfitPrices?.length,
-            activeOrders: verification.activeOrders,
-            hasTrailingStop: verification.hasTrailingStop,
-          });
-          return true;
-        }
-
-        this.logger.warn(`⚠️ Protection verification failed (attempt ${verificationAttempt})`, {
-          hasStopLoss: verification.hasStopLoss,
-          hasTakeProfit: verification.hasTakeProfit,
-          activeOrders: verification.activeOrders,
-        });
-
-        // Retry if not verified and more attempts available
-        if (verificationAttempt < MAX_VERIFICATION_RETRIES) {
-          await this.retryFailedProtection(
-            side,
-            entryPrice,
-            quantity,
-            actualStopLoss,
-            tpOrderIds,
-            verification,
-          );
-        }
-      } catch (error) {
-        this.logger.error(`❌ Verification attempt ${verificationAttempt} failed`, {
-          error: error instanceof Error ? error.message : String(error),
-        });
-
-        if (verificationAttempt >= MAX_VERIFICATION_RETRIES) {
-          break;
-        }
-      }
-    }
-
-    // Protection verification failed after all retries
-    this.logger.error('🚨 CRITICAL: Failed to verify protection after all retries!', {
-      maxRetries: MAX_VERIFICATION_RETRIES,
-      side: side === PositionSide.LONG ? 'LONG' : 'SHORT',
-    });
-
-    // Emergency close position
-    await this.emergencyClosePosition(side, quantity);
-
-    return false;
-  }
-
-  /**
-   * Retry failed protection placement
-   *
-   * @param side - Position side
-   * @param entryPrice - Entry price
-   * @param quantity - Position quantity
-   * @param actualStopLoss - Stop-loss price
-   * @param tpOrderIds - Take-profit order IDs
-   * @param verification - Verification result indicating what failed
-   */
-  private async retryFailedProtection(
-    side: PositionSide,
-    entryPrice: number,
-    quantity: number,
-    actualStopLoss: number,
-    tpOrderIds: (string | undefined)[],
-    verification: any,
-  ): Promise<void> {
-    // Retry SL placement if missing
-    if (!verification.hasStopLoss) {
-      this.logger.warn('🔄 Retrying SL placement...');
-      try {
-        await this.bybitService.updateStopLoss(actualStopLoss);
-      } catch (error) {
-        this.logger.error('Failed to retry SL placement', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
-    // Retry TP placement if missing
-    if (!verification.hasTakeProfit) {
-      this.logger.warn('🔄 Retrying TP placement...');
-      try {
-        // Note: We would need to pass the TP levels again
-        // This is a limitation - we only have orderIds, not the original TP config
-        // For now, just log the issue
-        this.logger.warn('⚠️ Cannot retry TP placement - original TP levels not available in this context');
-      } catch (error) {
-        this.logger.error('Failed to retry TP placement', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-  }
-
-  /**
-   * Emergency close position if protection verification fails
-   * This is a safety mechanism to prevent leaving unprotected positions open
-   *
-   * @param side - Position side
-   * @param quantity - Position quantity
-   */
-  private async emergencyClosePosition(side: PositionSide, quantity: number): Promise<void> {
-    this.logger.error('🚨 EMERGENCY: Closing position without protection!');
-    try {
-      await this.bybitService.closePosition(side, quantity);
-      await this.telegram.sendAlert(
-        '🚨 EMERGENCY: Position closed due to missing TP/SL protection!',
-      );
-      this.logger.info('✅ Emergency close completed successfully');
-    } catch (closeError) {
-      this.logger.error('Failed to emergency close position!', {
-        error: closeError instanceof Error ? closeError.message : String(closeError),
-      });
-      await this.telegram.sendAlert(
-        '🚨🚨🚨 CRITICAL: Position open WITHOUT PROTECTION - MANUAL INTERVENTION REQUIRED!',
-      );
-    }
   }
 
   /**

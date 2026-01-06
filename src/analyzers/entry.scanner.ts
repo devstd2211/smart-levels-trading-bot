@@ -98,6 +98,7 @@ export class EntryScanner {
     private config: EntryScannerConfig,
     private candleProvider: CandleProvider,
     private logger: LoggerService,
+    divergenceDetectorParam?: DivergenceDetector,
   ) {
     this.rsi = new RSIIndicator(config.rsiPeriod);
     this.emaFast = new EMAIndicator(config.fastEmaPeriod);
@@ -131,8 +132,9 @@ export class EntryScanner {
       oldTouchesWeight: THRESHOLD_VALUES.THIRTY_PERCENT,
     };
     this.liquidityDetector = new LiquidityDetector(liquidityConfig, logger);
-    // Pass divergence config from EntryScannerConfig (fail-fast if missing)
-    this.divergenceDetector = new DivergenceDetector(
+    // Use injected DivergenceDetector (created in IndicatorInitializationService to avoid duplication)
+    // Fallback to creating one if not provided (for backward compatibility with tests)
+    this.divergenceDetector = divergenceDetectorParam || new DivergenceDetector(
       logger,
       this.config.divergenceDetector!,
     );

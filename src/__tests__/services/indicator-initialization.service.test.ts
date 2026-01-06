@@ -47,10 +47,6 @@ describe('IndicatorInitializationService', () => {
         zigzagDepth: 50,
         rsiOverbought: 70,
         rsiOversold: 30,
-        divergenceDetector: {
-          enabled: true,
-          minRsiDivergence: 5,
-        },
       },
       contextConfig: {
         atrPeriod: 14,
@@ -77,11 +73,21 @@ describe('IndicatorInitializationService', () => {
       },
     };
 
+    const mockMainConfig = {
+      entryConfig: {
+        divergenceDetector: {
+          minStrength: 0.3,
+          priceDiffPercent: 0.2,
+        },
+      },
+    };
+
     service = new IndicatorInitializationService(
       mockConfig,
       mockCandleProvider,
       mockTimeframeProvider,
       mockLogger,
+      mockMainConfig,
     );
   });
 

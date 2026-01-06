@@ -97,3 +97,62 @@ export function isErrorContext(value: unknown): value is ErrorContext {
     typeof ctx.timestamp === 'number'
   );
 }
+
+/**
+ * Check if error is a critical API error that requires immediate shutdown
+ * Critical errors include:
+ * - API key expired or invalid (code 33004, 30001, 10002, 11000)
+ * - Unauthorized/forbidden access (401, 403)
+ * - Rate limit exceeded repeatedly
+ * - Connection refused or unreachable
+ *
+ * @param error - Unknown error type
+ * @returns true if error is critical and requires shutdown
+ */
+export function isCriticalApiError(error: unknown): boolean {
+  const message = extractErrorMessage(error);
+  const code = extractErrorCode(error);
+
+  // Check message for critical keywords
+  const criticalPatterns = [
+    /api key.*expired/i,
+    /expired api key/i,
+    /invalid api key/i,
+    /api key invalid/i,
+    /unauthorized/i,
+    /forbidden/i,
+    /authentication.*failed/i,
+    /permission.*denied/i,
+  ];
+
+  if (criticalPatterns.some(pattern => pattern.test(message))) {
+    return true;
+  }
+
+  // Check for critical Bybit API error codes
+  const criticalBybitCodes = [
+    33004, // API key has expired
+    30001, // Unauthorized
+    10002, // Invalid API key
+    11000, // Invalid request
+    9000,  // Access Denied
+  ];
+
+  if (typeof error === 'object' && error !== null) {
+    const err = error as Record<string, unknown>;
+    const errorCode = err.code as unknown;
+    if (typeof errorCode === 'number' && criticalBybitCodes.includes(errorCode)) {
+      return true;
+    }
+    // Also check for error code in the message (e.g., "code: 33004")
+    const codeMatch = message.match(/code:\s*(\d+)/i);
+    if (codeMatch) {
+      const parsedCode = parseInt(codeMatch[1], 10);
+      if (criticalBybitCodes.includes(parsedCode)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}

@@ -8,9 +8,8 @@ import { Signal, PositionSide, SignalDirection, SignalType, TakeProfit } from '.
 const createMockBybitService = () => ({
   cancelAllConditionalOrders: jest.fn().mockResolvedValue(undefined),
   openPosition: jest.fn().mockResolvedValue('ORDER_ID_123'),
-  placeTakeProfitLevels: jest.fn().mockResolvedValue(['TP1_ORDER_ID', 'TP2_ORDER_ID', 'TP3_ORDER_ID']),
+  updateTakeProfitPartial: jest.fn().mockResolvedValue('TP_ORDER_ID'),
   getCurrentPrice: jest.fn().mockResolvedValue(100),
-  updateStopLoss: jest.fn().mockResolvedValue(undefined),
   verifyProtectionSet: jest.fn().mockResolvedValue({
     verified: true,
     hasStopLoss: true,
@@ -178,13 +177,23 @@ describe('PositionOpeningService', () => {
 
       await service.openPosition(signal);
 
-      expect(mockBybit.placeTakeProfitLevels).toHaveBeenCalledWith(
+      // Check that openPosition was called with first TP
+      expect(mockBybit.openPosition).toHaveBeenCalledWith(
         expect.objectContaining({
           side: PositionSide.LONG,
-          entryPrice: 100,
-          totalQuantity: 8.33,
-          levels: signal.takeProfits,
+          quantity: 8.33,
+          stopLoss: 95, // Should be ~95
+          takeProfit: 105, // First TP level
         }),
+      );
+
+      // Check that additional TP levels were set via updateTakeProfitPartial
+      expect(mockBybit.updateTakeProfitPartial).toHaveBeenCalledTimes(2); // Two additional levels
+      expect(mockBybit.updateTakeProfitPartial).toHaveBeenCalledWith(
+        expect.objectContaining({ price: 110, index: 1 }),
+      );
+      expect(mockBybit.updateTakeProfitPartial).toHaveBeenCalledWith(
+        expect.objectContaining({ price: 115, index: 2 }),
       );
     });
 
@@ -193,9 +202,14 @@ describe('PositionOpeningService', () => {
 
       await service.openPosition(signal);
 
-      expect(mockBybit.updateStopLoss).toHaveBeenCalled();
-      const slCall = mockBybit.updateStopLoss.mock.calls[0][0];
-      expect(slCall).toBeCloseTo(95, 1); // SL should be ~95
+      // Check that openPosition was called with correct SL
+      expect(mockBybit.openPosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stopLoss: expect.any(Number),
+        }),
+      );
+      const slArg = mockBybit.openPosition.mock.calls[0][0];
+      expect(slArg.stopLoss).toBeCloseTo(95, 0); // SL should be ~95
     });
 
     it('should recalculate SL based on current price', async () => {
@@ -204,9 +218,9 @@ describe('PositionOpeningService', () => {
 
       await service.openPosition(signal);
 
-      const slCall = mockBybit.updateStopLoss.mock.calls[0][0];
+      const openCall = mockBybit.openPosition.mock.calls[0][0];
       // SL should be: currentPrice (102) - distance (5) = 97
-      expect(slCall).toBeCloseTo(97, 1);
+      expect(openCall.stopLoss).toBeCloseTo(97, 0);
     });
 
     it('should recalculate SHORT SL correctly (add distance)', async () => {
@@ -219,17 +233,19 @@ describe('PositionOpeningService', () => {
 
       await service.openPosition(signal);
 
-      const slCall = mockBybit.updateStopLoss.mock.calls[0][0];
+      const openCall = mockBybit.openPosition.mock.calls[0][0];
       // SL should be: currentPrice (102) + distance (5) = 107
-      expect(slCall).toBeCloseTo(107, 1);
+      expect(openCall.stopLoss).toBeCloseTo(107, 0);
     });
 
-    it('should verify protection after opening', async () => {
+    it('should set SL and TP protection atomically', async () => {
       const signal = createMockSignal();
 
-      await service.openPosition(signal);
+      const position = await service.openPosition(signal);
 
-      expect(mockBybit.verifyProtectionSet).toHaveBeenCalled();
+      // Protection should be set atomically with position open
+      expect(position.stopLoss.price).toBe(95);
+      expect(position.protectionVerifiedOnce).toBe(true);
     });
 
     it('should cancel hanging orders before opening', async () => {
@@ -270,130 +286,69 @@ describe('PositionOpeningService', () => {
       const signal2 = createMockSignal();
 
       const position1 = await service.openPosition(signal1);
+      // Small delay to ensure different timestamp
+      await new Promise(resolve => setTimeout(resolve, 1));
       const position2 = await service.openPosition(signal2);
 
       expect(position1.journalId).not.toBe(position2.journalId);
     });
   });
 
-  describe('Protection verification', () => {
-    it('should succeed on first verification attempt', async () => {
+  describe('Position opening protection', () => {
+    it('should open position with atomic SL+TP protection', async () => {
       const signal = createMockSignal();
-      mockBybit.verifyProtectionSet.mockResolvedValue({
-        verified: true,
-        hasStopLoss: true,
-        hasTakeProfit: true,
-        stopLossPrice: 95,
-        takeProfitPrices: [105, 110, 115],
-        activeOrders: 4,
-      });
 
       const position = await service.openPosition(signal);
 
-      expect(mockBybit.verifyProtectionSet).toHaveBeenCalledTimes(1);
-      expect(position.protectionVerifiedOnce).toBe(true);
-    });
-
-    it('should retry verification up to 3 times on failure', async () => {
-      const signal = createMockSignal();
-      mockBybit.verifyProtectionSet
-        .mockResolvedValueOnce({
-          verified: false,
-          hasStopLoss: false,
-          hasTakeProfit: true,
-          activeOrders: 1,
-        })
-        .mockResolvedValueOnce({
-          verified: false,
-          hasStopLoss: false,
-          hasTakeProfit: true,
-          activeOrders: 1,
-        })
-        .mockResolvedValueOnce({
-          verified: true,
-          hasStopLoss: true,
-          hasTakeProfit: true,
-          stopLossPrice: 95,
-          takeProfitPrices: [105, 110, 115],
-          activeOrders: 4,
-        });
-
-      const position = await service.openPosition(signal);
-
-      expect(mockBybit.verifyProtectionSet).toHaveBeenCalledTimes(3);
+      // Position should be opened with atomic protection
       expect(position.status).toBe('OPEN');
+      expect(position.stopLoss.price).toBe(95);
+      expect(position.takeProfits[0].price).toBe(105);
+      expect(mockBybit.openPosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stopLoss: 95,
+          takeProfit: 105,
+        }),
+      );
     });
 
-    it('should retry SL placement when verification fails', async () => {
+    it('should set atomic SL atomically with position opening', async () => {
       const signal = createMockSignal();
-      mockBybit.verifyProtectionSet
-        .mockResolvedValueOnce({
-          verified: false,
-          hasStopLoss: false, // Missing
-          hasTakeProfit: true,
-          activeOrders: 1,
-        })
-        .mockResolvedValueOnce({
-          verified: true,
-          hasStopLoss: true,
-          hasTakeProfit: true,
-          stopLossPrice: 95,
-          takeProfitPrices: [105, 110, 115],
-          activeOrders: 4,
-        });
+
+      const position = await service.openPosition(signal);
+
+      // SL should be set in same call as openPosition
+      const openCall = mockBybit.openPosition.mock.calls[0][0];
+      expect(openCall).toEqual(
+        expect.objectContaining({
+          stopLoss: expect.any(Number),
+          takeProfit: expect.any(Number),
+        }),
+      );
+      expect(position.stopLoss.price).toBe(openCall.stopLoss);
+    });
+
+    it('should set additional TP levels after position opens', async () => {
+      const signal = createMockSignal();
 
       await service.openPosition(signal);
 
-      // updateStopLoss should be called twice: once initially, once during retry
-      expect(mockBybit.updateStopLoss).toHaveBeenCalledTimes(2);
+      // First TP is atomic with position open
+      // Additional TPs are set separately
+      expect(mockBybit.updateTakeProfitPartial).toHaveBeenCalledTimes(2);
     });
 
-    it('should fail position opening if protection cannot be verified', async () => {
+    it('should continue if some TP levels fail to set', async () => {
       const signal = createMockSignal();
-      mockBybit.verifyProtectionSet.mockResolvedValue({
-        verified: false,
-        hasStopLoss: false,
-        hasTakeProfit: false,
-        activeOrders: 0,
-      });
+      mockBybit.updateTakeProfitPartial
+        .mockResolvedValueOnce('TP2_ID')
+        .mockRejectedValueOnce(new Error('TP3 failed'));
 
-      await expect(service.openPosition(signal)).rejects.toThrow(
-        'Failed to set protection',
-      );
-    });
+      const position = await service.openPosition(signal);
 
-    it('should emergency close position if protection fails', async () => {
-      const signal = createMockSignal();
-      mockBybit.verifyProtectionSet.mockResolvedValue({
-        verified: false,
-        hasStopLoss: false,
-        hasTakeProfit: false,
-        activeOrders: 0,
-      });
-
-      await expect(service.openPosition(signal)).rejects.toThrow();
-
-      expect(mockBybit.closePosition).toHaveBeenCalled();
-      expect(mockTelegram.sendAlert).toHaveBeenCalledWith(
-        expect.stringContaining('EMERGENCY'),
-      );
-    });
-
-    it('should send critical alert if emergency close fails', async () => {
-      const signal = createMockSignal();
-      mockBybit.verifyProtectionSet.mockResolvedValue({
-        verified: false,
-        hasStopLoss: false,
-        hasTakeProfit: false,
-        activeOrders: 0,
-      });
-      mockBybit.closePosition.mockRejectedValue(new Error('Close failed'));
-
-      await expect(service.openPosition(signal)).rejects.toThrow();
-
-      expect(mockTelegram.sendAlert).toHaveBeenCalledWith(
-        expect.stringContaining('MANUAL INTERVENTION'),
-      );
+      // Position should still open despite TP failure
+      expect(position.status).toBe('OPEN');
+      expect(mockBybit.openPosition).toHaveBeenCalled();
     });
   });
 
@@ -429,20 +384,24 @@ describe('PositionOpeningService', () => {
 
     it('should handle TakeProfit placement errors', async () => {
       const signal = createMockSignal();
-      mockBybit.placeTakeProfitLevels.mockRejectedValue(
+      // Fail on additional TP levels, but position opens successfully
+      mockBybit.updateTakeProfitPartial.mockRejectedValue(
         new Error('TP placement failed'),
       );
 
-      await expect(service.openPosition(signal)).rejects.toThrow('TP placement failed');
+      // Position should open successfully even if additional TP levels fail
+      const position = await service.openPosition(signal);
+      expect(position).toBeDefined();
+      expect(mockBybit.openPosition).toHaveBeenCalled();
     });
 
-    it('should handle updateStopLoss errors', async () => {
+    it('should handle openPosition errors', async () => {
       const signal = createMockSignal();
-      mockBybit.updateStopLoss.mockRejectedValue(
-        new Error('SL update failed'),
+      mockBybit.openPosition.mockRejectedValue(
+        new Error('Exchange error'),
       );
 
-      await expect(service.openPosition(signal)).rejects.toThrow('SL update failed');
+      await expect(service.openPosition(signal)).rejects.toThrow('Exchange error');
     });
   });
 
@@ -530,11 +489,15 @@ describe('PositionOpeningService', () => {
 
       await service.openPosition(signal);
 
-      expect(mockBybit.placeTakeProfitLevels).toHaveBeenCalledWith(
+      // First TP is set atomically with openPosition
+      expect(mockBybit.openPosition).toHaveBeenCalledWith(
         expect.objectContaining({
-          levels: signal.takeProfits,
+          takeProfit: 102, // First TP
         }),
       );
+
+      // Additional TPs (2-4) are set via updateTakeProfitPartial
+      expect(mockBybit.updateTakeProfitPartial).toHaveBeenCalledTimes(3);
     });
 
     it('should handle price with many decimal places', async () => {

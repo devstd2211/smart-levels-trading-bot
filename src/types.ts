@@ -3328,6 +3328,7 @@ export interface OrchestratorConfig {
       chochBoost?: number;
       liquiditySweepBoost?: number;
     };
+    // NOTE: divergenceDetector comes from main config.entryConfig, passed separately to IndicatorInitializationService
   };
   // Strategies config (NEW - no more magic numbers!)
   strategiesConfig?: StrategiesConfig;

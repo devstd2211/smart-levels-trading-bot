@@ -11,6 +11,7 @@
 
 import { Position, PositionSide } from '../../types';
 import { BybitBase, BYBIT_SUCCESS_CODE, POSITION_SIZE_ZERO, POSITION_IDX_ONE_WAY } from './bybit-base.partial';
+import { isCriticalApiError } from '../../utils/error-helper';
 
 // ============================================================================
 // BYBIT POSITIONS PARTIAL
@@ -95,46 +96,84 @@ export class BybitPositions extends BybitBase {
   // ==========================================================================
 
   /**
-   * Open futures position with limit order
+   * Open futures position with ATOMIC SL/TP protection
+   *
+   * CRITICAL FIX: SL is set in submitOrder to prevent race condition liquidations.
+   * Before: Market order → delay → setTradingStop (vulnerable window)
+   * After: Market order WITH stopLoss in one atomic call (safe)
+   *
+   * @param params.side Position direction (LONG/SHORT)
+   * @param params.quantity Position size
+   * @param params.leverage Leverage multiplier
+   * @param params.stopLoss SL price to set atomically
+   * @param params.takeProfit TP price (optional, can be set later with setTradingStop)
    */
   async openPosition(params: {
     side: PositionSide;
     quantity: number;
     leverage: number;
+    stopLoss?: number;
+    takeProfit?: number;
   }): Promise<string> {
     return await this.retry(async () => {
-      const { side, quantity, leverage } = params;
+      const { side, quantity, leverage, stopLoss, takeProfit } = params;
 
       // Set leverage first
       await this.setLeverage(leverage);
 
-      // Round quantity to exchange precision
+      // Round quantity and prices to exchange precision
       const orderQty = this.roundQuantity(quantity);
+      const slPrice = stopLoss ? this.roundPrice(stopLoss) : undefined;
+      const tpPrice = takeProfit ? this.roundPrice(takeProfit) : undefined;
 
-      this.logger.info('📤 Submitting MARKET order to Bybit', {
+      this.logger.info('📤 Submitting MARKET order with ATOMIC SL protection', {
         side,
         quantity,
         quantityString: orderQty,
+        stopLoss: slPrice,
+        takeProfit: tpPrice,
         symbol: this.symbol,
         leverage,
       });
 
-      // Place MARKET order for immediate execution
-      const response = await this.restClient.submitOrder({
+      // Build order with SL/TP for atomic execution
+      const orderPayload: any = {
         category: 'linear',
         symbol: this.symbol,
         side: side === PositionSide.LONG ? 'Buy' : 'Sell',
         orderType: 'Market',
         qty: orderQty,
         positionIdx: POSITION_IDX_ONE_WAY,
-      });
+      };
+
+      // CRITICAL: Add SL atomically to prevent race condition liquidations
+      if (slPrice !== undefined) {
+        orderPayload.stopLoss = slPrice.toString();
+        orderPayload.slOrderType = 'Market'; // Market execution for SL
+      }
+
+      // Optional: Add TP (can be modified later with setTradingStop for multiple levels)
+      if (tpPrice !== undefined) {
+        orderPayload.takeProfit = tpPrice.toString();
+        orderPayload.tpOrderType = 'Market'; // Market execution for TP
+        orderPayload.tpslMode = 'Partial'; // Allow multiple TP levels
+      }
+
+      // Place MARKET order for immediate execution with protection
+      const response = await this.restClient.submitOrder(orderPayload);
 
       if (response.retCode !== BYBIT_SUCCESS_CODE) {
         throw new Error(`Failed to open position: ${response.retMsg}`);
       }
 
       const orderId = response.result.orderId;
-      this.logger.info('Position MARKET order placed', { orderId, side, quantity: orderQty });
+      this.logger.info('✅ Position MARKET order placed WITH atomic SL protection', {
+        orderId,
+        side,
+        quantity: orderQty,
+        slSet: slPrice !== undefined,
+        tpSet: tpPrice !== undefined,
+      });
 
       return orderId;
     });
@@ -151,7 +190,17 @@ export class BybitPositions extends BybitBase {
       });
 
       if (response.retCode !== BYBIT_SUCCESS_CODE) {
-        throw new Error(`Bybit API error: ${response.retMsg} (code: ${response.retCode})`);
+        // Check if this is a critical error
+        const error = new Error(`Bybit API error: ${response.retMsg} (code: ${response.retCode})`);
+        (error as any).code = response.retCode;
+
+        if (isCriticalApiError(error)) {
+          this.logger.error('🚨 CRITICAL API ERROR in getPosition - throwing immediately!', {
+            error: response.retMsg,
+            code: response.retCode,
+          });
+        }
+        throw error;
       }
 
       const positions = response.result.list;

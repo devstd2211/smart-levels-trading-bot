@@ -59,6 +59,12 @@ const createMinimalConfig = (): Config => ({
     candles: { enabled: true, calculateIndicators: true },
     orderbook: { enabled: true, updateIntervalMs: 100 },
   },
+  entryConfig: {
+    divergenceDetector: {
+      minStrength: 0.3,
+      priceDiffPercent: 0.2,
+    },
+  },
   strategies: {} as unknown as any,
   entryConfirmation: {} as unknown as any,
   telegram: { enabled: false },

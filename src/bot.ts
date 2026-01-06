@@ -141,6 +141,9 @@ export class TradingBot {
       // Phase 4: Register all event handlers
       this.eventHandlerManager.registerAllHandlers(this);
 
+      // Phase 4.5: Setup critical error handling
+      this.setupCriticalErrorHandling();
+
       // Phase 5: Start position monitoring and periodic tasks
       await this.initializer.startMonitoring();
 
@@ -174,6 +177,44 @@ export class TradingBot {
   // - ContextAnalyzer (PRIMARY timeframe analysis)
   // - EntryScanner (ENTRY timeframe scanning)
   // - TradingOrchestrator (coordination & execution)
+
+  /**
+   * Setup critical error handling
+   * Listen for critical errors from position monitor and EventBus
+   */
+  private setupCriticalErrorHandling(): void {
+    // Handler for critical errors
+    const handleCriticalError = (error: Error) => {
+      this.logger.error('🚨🚨🚨 CRITICAL ERROR RECEIVED - Initiating IMMEDIATE shutdown 🚨🚨🚨', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      // Set a hard timeout - if shutdown takes too long, force exit
+      const shutdownTimeout = setTimeout(() => {
+        this.logger.error('⏱️ TIMEOUT: Shutdown took too long. Force exiting...');
+        process.exit(1);
+      }, 5000); // 5 second timeout
+
+      // Trigger graceful shutdown on critical error
+      void this.stop().then(() => {
+        clearTimeout(shutdownTimeout);
+        this.logger.error('✅ Bot stopped due to critical error. Exiting process.');
+        process.exit(1);
+      }).catch((stopError) => {
+        clearTimeout(shutdownTimeout);
+        this.logger.error('Failed to stop bot gracefully', { error: stopError });
+        process.exit(1);
+      });
+    };
+
+    // Listen for critical API errors from position monitor
+    this.positionMonitor.on('critical-error', handleCriticalError);
+
+    // Listen for critical API errors from EventBus (e.g., periodic tasks)
+    this.services.eventBus.on('critical-error', handleCriticalError);
+
+    this.logger.debug('Critical error handlers registered (positionMonitor + EventBus)');
+  }
 
   /**
    * Stop the trading bot gracefully

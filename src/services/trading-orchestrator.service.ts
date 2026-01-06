@@ -64,6 +64,8 @@ import { TrendConfirmationService } from './trend-confirmation.service';
 import { RiskManager } from './risk-manager.service';
 // PHASE 4: EntryOrchestrator (PRIMARY entry decision point - Week 2)
 import { EntryOrchestrator } from '../orchestrators/entry.orchestrator';
+// PHASE 4.1: NEUTRAL Trend Strength Filter (optimization for SHORT entries)
+import { NeutralTrendStrengthFilter } from '../filters/neutral-trend-strength.filter';
 // PHASE 4: ExitOrchestrator (PRIMARY exit state machine - Week 3)
 import { ExitOrchestrator } from '../orchestrators/exit.orchestrator';
 import { PositionExitingService } from './position-exiting.service';
@@ -201,11 +203,12 @@ export class TradingOrchestrator {
     trendAnalyzer?: TrendAnalyzer,  // PHASE 4: Global trend detection
     private tradingJournal?: TradingJournalService,  // For PositionExitingService (Session 68)
     private sessionStats?: SessionStatsService,  // For PositionExitingService (Session 68)
+    private mainConfig?: any,  // Main Config for IndicatorInitializationService to access divergenceDetector
   ) {
     // Week 13 Phase 5b: Use IndicatorInitializationService for all indicator initialization
     const IndicatorInitModule = require('./indicator-initialization.service') as any;
     const IndicatorInit = IndicatorInitModule.IndicatorInitializationService;
-    const indicatorInit = new IndicatorInit(config, candleProvider, timeframeProvider, logger);
+    const indicatorInit = new IndicatorInit(config, candleProvider, timeframeProvider, logger, mainConfig);
     const indicators = indicatorInit.initializeAllIndicators();
 
     // Assign initialized indicators to class properties
@@ -371,11 +374,17 @@ export class TradingOrchestrator {
 
     // PHASE 4: Initialize EntryOrchestrator (PRIMARY - single entry decision point - Week 2)
     if (this.riskManager) {
-      this.entryOrchestrator = new EntryOrchestrator(this.riskManager, logger);
+      // PHASE 4.1: Create NEUTRAL trend strength filter (optimization for SHORT entries)
+      // Blocks SHORT entries with 65-70% confidence on weak NEUTRAL trends (strength < 40%)
+      // Root cause: SHORT win rate was 50% (vs LONG 90%), losing -47 USDT in session
+      const neutralTrendFilter = new NeutralTrendStrengthFilter(logger, 0.70); // 70% min confidence
+
+      this.entryOrchestrator = new EntryOrchestrator(this.riskManager, logger, neutralTrendFilter);
       this.logger.info('✅ EntryOrchestrator initialized (PHASE 4 PRIMARY Week 2)', {
         role: 'Single atomic entry decision point',
         consolidates: ['EntryScanner', 'FastEntryService', 'EntryConfirmationManager', 'StrategyCoordinator entry logic'],
-        logic: ['Signal ranking by confidence', 'Trend alignment check', 'RiskManager approval'],
+        logic: ['Signal ranking by confidence', 'Trend alignment check', 'NEUTRAL trend strength check', 'RiskManager approval'],
+        optimization: 'SHORT entries filtered on weak NEUTRAL trends (strength < 40%)',
       });
     } else {
       this.logger.error('❌ CRITICAL: RiskManager not initialized - EntryOrchestrator disabled. Trading will not work.');

@@ -469,8 +469,8 @@ export class WebSocketManagerService extends EventEmitter {
         execData.createType === 'CreateByUser' &&
         closedSize > 0;
 
-      // Detect Stop Loss: stopOrderType="Stop"
-      const isStopLoss = execData.stopOrderType === 'Stop';
+      // Detect Stop Loss: stopOrderType="StopLoss" or "Stop" (Bybit uses both)
+      const isStopLoss = execData.stopOrderType === 'StopLoss' || execData.stopOrderType === 'Stop';
 
       // Detect Trailing Stop: stopOrderType="TrailingStop" (should not happen in execution, but just in case)
       const isTrailingStop = execData.stopOrderType === 'TrailingStop';

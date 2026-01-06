@@ -35,6 +35,7 @@ import {
   FlatMarketResult,
   RiskManager,
 } from '../types';
+import { NeutralTrendStrengthFilter } from '../filters/neutral-trend-strength.filter';
 
 // ============================================================================
 // CONSTANTS (PHASE 4: NO FALLBACKS RULE)
@@ -60,6 +61,7 @@ export class EntryOrchestrator {
   constructor(
     private riskManager: RiskManager,
     private logger: LoggerService,
+    private neutralTrendFilter?: NeutralTrendStrengthFilter,
   ) {
     this.logger.info('🎯 EntryOrchestrator initialized (PHASE 4)');
   }
@@ -186,6 +188,29 @@ export class EntryOrchestrator {
           direction: topSignal.direction,
           trend: globalTrendBias.bias,
         });
+
+        // =====================================================================
+        // STEP 3.5: Check NEUTRAL trend strength (via filter class)
+        // =====================================================================
+        if (this.neutralTrendFilter) {
+          const neutralCheck = this.neutralTrendFilter.evaluate(topSignal, globalTrendBias);
+          if (!neutralCheck.allowed) {
+            this.logger.info('❌ Signal blocked by NEUTRAL trend strength filter', {
+              signal: topSignal.type,
+              direction: topSignal.direction,
+              reason: neutralCheck.reason,
+            });
+            return {
+              decision: EntryDecision.SKIP,
+              reason: `NEUTRAL trend filter: ${neutralCheck.reason}`,
+            };
+          }
+
+          this.logger.debug('✅ Signal passed NEUTRAL trend strength filter', {
+            signal: topSignal.type,
+            reason: neutralCheck.reason,
+          });
+        }
       }
 
       // =====================================================================

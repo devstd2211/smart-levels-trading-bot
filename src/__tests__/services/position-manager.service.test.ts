@@ -167,16 +167,16 @@ describe('PositionManagerService', () => {
       // Should cancel hanging orders first
       expect(mockBybitService.cancelAllConditionalOrders).toHaveBeenCalled();
 
-      // Should open position
-      expect(mockBybitService.openPosition).toHaveBeenCalledWith({
-        side: PositionSide.LONG,
-        quantity: 1,
-        leverage: 10,
-      });
-
-      // Should place TPs and SL (using position-level SL, not conditional)
-      expect(mockBybitService.placeTakeProfitLevels).toHaveBeenCalled();
-      expect(mockBybitService.updateStopLoss).toHaveBeenCalled();
+      // Should open position with atomic SL+TP protection
+      expect(mockBybitService.openPosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          side: PositionSide.LONG,
+          quantity: 1,
+          leverage: 10,
+          stopLoss: expect.any(Number), // SL set atomically
+          takeProfit: expect.any(Number), // First TP set atomically
+        }),
+      );
 
       // Should notify Telegram
       expect(mockTelegram.notifyPositionOpened).toHaveBeenCalled();

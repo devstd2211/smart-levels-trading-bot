@@ -23,6 +23,7 @@ import { BybitBase, RECV_WINDOW } from './bybit-base.partial';
 import { BybitMarketData } from './bybit-market-data.partial';
 import { BybitPositions } from './bybit-positions.partial';
 import { BybitOrders } from './bybit-orders.partial';
+import { isCriticalApiError } from '../../utils/error-helper';
 
 // ============================================================================
 // BYBIT SERVICE (MAIN ORCHESTRATOR)
@@ -163,8 +164,19 @@ export class BybitService {
         driftChange: newOffset - oldOffset,
       });
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Check if this is a critical error
+      if (isCriticalApiError(error)) {
+        this.logger.error('🚨 CRITICAL API ERROR in resyncTime - throwing!', {
+          error: errorMessage,
+          isCritical: true,
+        });
+        throw error; // Re-throw critical errors
+      }
+
       this.logger.warn('Failed to re-sync time:', {
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMessage,
       });
     }
   }
@@ -205,7 +217,13 @@ export class BybitService {
     return this.positions.setLeverage(leverage);
   }
 
-  async openPosition(params: { side: PositionSide; quantity: number; leverage: number }) {
+  async openPosition(params: {
+    side: PositionSide;
+    quantity: number;
+    leverage: number;
+    stopLoss?: number;
+    takeProfit?: number;
+  }) {
     return this.positions.openPosition(params);
   }
 
@@ -231,6 +249,10 @@ export class BybitService {
 
   async updateTakeProfit(orderId: string, newPrice: number) {
     return this.orders.updateTakeProfit(orderId, newPrice);
+  }
+
+  async updateTakeProfitPartial(params: { price: number; size: number; index?: number }) {
+    return this.orders.updateTakeProfitPartial(params);
   }
 
   async placeStopLoss(params: { side: PositionSide; quantity: number; stopPrice: number }) {
