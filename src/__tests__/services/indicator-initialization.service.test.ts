@@ -47,6 +47,10 @@ describe('IndicatorInitializationService', () => {
         zigzagDepth: 50,
         rsiOverbought: 70,
         rsiOversold: 30,
+        divergenceDetector: {
+          minStrength: 0.3,
+          priceDiffPercent: 0.2,
+        },
       },
       contextConfig: {
         atrPeriod: 14,
@@ -73,21 +77,11 @@ describe('IndicatorInitializationService', () => {
       },
     };
 
-    const mockMainConfig = {
-      entryConfig: {
-        divergenceDetector: {
-          minStrength: 0.3,
-          priceDiffPercent: 0.2,
-        },
-      },
-    };
-
     service = new IndicatorInitializationService(
       mockConfig,
       mockCandleProvider,
       mockTimeframeProvider,
       mockLogger,
-      mockMainConfig,
     );
   });
 
@@ -207,10 +201,10 @@ describe('IndicatorInitializationService', () => {
       // Create new service with undefined divergence detector
       mockConfig.entryConfig.divergenceDetector = undefined;
 
-      // The divergenceDetector uses ! operator which passes undefined to constructor
-      // DivergenceDetector might handle this gracefully or throw
-      const result = service.initializeAllIndicators();
-      expect(result.divergenceDetector).toBeDefined(); // Should still be created
+      // divergenceDetector is now REQUIRED - should throw
+      expect(() => service.initializeAllIndicators()).toThrow(
+        'Missing divergenceDetector config'
+      );
     });
 
     it('should handle stochastic initialization error gracefully', () => {

@@ -203,12 +203,11 @@ export class TradingOrchestrator {
     trendAnalyzer?: TrendAnalyzer,  // PHASE 4: Global trend detection
     private tradingJournal?: TradingJournalService,  // For PositionExitingService (Session 68)
     private sessionStats?: SessionStatsService,  // For PositionExitingService (Session 68)
-    private mainConfig?: any,  // Main Config for IndicatorInitializationService to access divergenceDetector
   ) {
     // Week 13 Phase 5b: Use IndicatorInitializationService for all indicator initialization
     const IndicatorInitModule = require('./indicator-initialization.service') as any;
     const IndicatorInit = IndicatorInitModule.IndicatorInitializationService;
-    const indicatorInit = new IndicatorInit(config, candleProvider, timeframeProvider, logger, mainConfig);
+    const indicatorInit = new IndicatorInit(config, candleProvider, timeframeProvider, logger);
     const indicators = indicatorInit.initializeAllIndicators();
 
     // Assign initialized indicators to class properties

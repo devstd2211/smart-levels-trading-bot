@@ -55,7 +55,6 @@ export class IndicatorInitializationService {
     private candleProvider: CandleProvider,
     private timeframeProvider: TimeframeProvider,
     private logger: LoggerService,
-    private mainConfig?: any,  // Main Config to access divergenceDetector from entryConfig
   ) {}
 
   /**
@@ -63,8 +62,8 @@ export class IndicatorInitializationService {
    */
   initializeAllIndicators(): InitializedIndicators {
     // Initialize detectors FIRST (before EntryScanner)
-    // Initialize DivergenceDetector with strategic config from main config.entryConfig (fail-fast)
-    const divergenceDetectorConfig = this.mainConfig?.entryConfig?.divergenceDetector;
+    // Initialize DivergenceDetector with strategic config from OrchestratorConfig.entryConfig
+    const divergenceDetectorConfig = this.config.entryConfig.divergenceDetector;
     if (!divergenceDetectorConfig) {
       throw new Error(
         'CRITICAL: Missing divergenceDetector config in entryConfig. ' +

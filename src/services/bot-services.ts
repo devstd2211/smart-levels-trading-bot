@@ -338,6 +338,7 @@ export class BotServices {
         stopLossPercent: config.riskManagement.stopLossPercent,
         takeProfits: config.riskManagement.takeProfits,
         priceAction: config?.strategy?.priceAction,
+        divergenceDetector: config.entryConfig.divergenceDetector,
       },
       strategiesConfig: config.strategies,
       positionSizeUsdt: config.riskManagement.positionSizeUsdt,
@@ -371,7 +372,6 @@ export class BotServices {
       undefined,             // 12 - trendAnalyzer (will be created internally)
       this.journal,          // 13
       this.sessionStats,     // 14
-      config,                // 15 - Main Config for IndicatorInitializationService to access divergenceDetector
     );
 
     // 11.5. Link BTC candles store to TradingOrchestrator for BTC_CORRELATION analyzer
