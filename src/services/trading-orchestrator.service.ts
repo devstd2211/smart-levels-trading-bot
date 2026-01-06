@@ -73,6 +73,8 @@ import { EntryLogicService } from './entry-logic.service';
 import { SwingPointDetectorService } from './swing-point-detector.service';
 import { MultiTimeframeTrendService } from './multi-timeframe-trend.service';
 import { TimeframeWeightingService } from './timeframe-weighting.service';
+import { IndicatorInitializationService } from './indicator-initialization.service';
+import { FilterInitializationService } from './filter-initialization.service';
 
 // ============================================================================
 // TYPES
@@ -140,7 +142,7 @@ export class TradingOrchestrator {
   private currentTrendAnalysis: TrendAnalysis | null = null;
 
   // PHASE 4: RiskManager (PRIMARY - unified atomic risk gatekeeper)
-  private riskManager: RiskManager | null = null;
+  // Now a REQUIRED constructor parameter - no longer optional
 
   // PHASE 4: EntryOrchestrator (PRIMARY - single entry decision point - Week 2)
   private entryOrchestrator: EntryOrchestrator | null = null;
@@ -196,18 +198,17 @@ export class TradingOrchestrator {
     private positionManager: PositionManagerService,
     private telegram: TelegramService | null,
     private logger: LoggerService,
+    private riskManager: RiskManager,  // PHASE 4: REQUIRED - Unified risk decision point
+    // Optional parameters after required ones
     retestEntryService?: RetestEntryService,
     deltaAnalyzerService?: DeltaAnalyzerService,
     orderbookImbalanceService?: OrderbookImbalanceService,
-    riskManager?: RiskManager,  // PHASE 4: Unified risk decision point
-    trendAnalyzer?: TrendAnalyzer,  // PHASE 4: Global trend detection
+    trendAnalyzer?: TrendAnalyzer,  // PHASE 4: Global trend detection (optional - created internally if not provided)
     private tradingJournal?: TradingJournalService,  // For PositionExitingService (Session 68)
     private sessionStats?: SessionStatsService,  // For PositionExitingService (Session 68)
   ) {
     // Week 13 Phase 5b: Use IndicatorInitializationService for all indicator initialization
-    const IndicatorInitModule = require('./indicator-initialization.service') as any;
-    const IndicatorInit = IndicatorInitModule.IndicatorInitializationService;
-    const indicatorInit = new IndicatorInit(config, candleProvider, timeframeProvider, logger);
+    const indicatorInit = new IndicatorInitializationService(config, candleProvider, timeframeProvider, logger);
     const indicators = indicatorInit.initializeAllIndicators();
 
     // Assign initialized indicators to class properties
@@ -239,9 +240,7 @@ export class TradingOrchestrator {
 
     // Week 13 Phase 5c: Initialize filters BEFORE analyzer registration
     // (BTCAnalyzer needed for BTC_CORRELATION analyzer in AnalyzerRegistrationService)
-    const FilterInitModule = require('./filter-initialization.service') as any;
-    const FilterInit = FilterInitModule.FilterInitializationService;
-    const filterInit = new FilterInit(config, candleProvider, bybitService, logger);
+    const filterInit = new FilterInitializationService(config, candleProvider, bybitService, logger);
     const filters = filterInit.initializeAllFilters();
 
     // Assign initialized filters to class properties
@@ -357,37 +356,27 @@ export class TradingOrchestrator {
       });
     }
 
-    // PHASE 4: Initialize RiskManager (PRIMARY - atomic risk gatekeeper)
-    if (riskManager) {
-      this.riskManager = riskManager;
-    }
+    // PHASE 4: RiskManager is now REQUIRED (no longer optional!)
     // Note: RiskManager requires RiskManagerConfig structure (not the Config.riskManagement structure)
     // It must be passed as a constructor parameter from BotServices
-
-    if (this.riskManager) {
-      this.logger.info('✅ RiskManager initialized (PHASE 4 PRIMARY)', {
-        role: 'Unified atomic risk decision point',
-        checks: ['Daily loss limits', 'Loss streak penalties', 'Concurrent risk', 'Position sizing'],
-      });
-    }
+    this.logger.info('✅ RiskManager initialized (PHASE 4 PRIMARY)', {
+      role: 'Unified atomic risk decision point',
+      checks: ['Daily loss limits', 'Loss streak penalties', 'Concurrent risk', 'Position sizing'],
+    });
 
     // PHASE 4: Initialize EntryOrchestrator (PRIMARY - single entry decision point - Week 2)
-    if (this.riskManager) {
-      // PHASE 4.1: Create NEUTRAL trend strength filter (optimization for SHORT entries)
-      // Blocks SHORT entries with 65-70% confidence on weak NEUTRAL trends (strength < 40%)
-      // Root cause: SHORT win rate was 50% (vs LONG 90%), losing -47 USDT in session
-      const neutralTrendFilter = new NeutralTrendStrengthFilter(logger, 0.70); // 70% min confidence
+    // PHASE 4.1: Create NEUTRAL trend strength filter (optimization for SHORT entries)
+    // Blocks SHORT entries with 65-70% confidence on weak NEUTRAL trends (strength < 40%)
+    // Root cause: SHORT win rate was 50% (vs LONG 90%), losing -47 USDT in session
+    const neutralTrendFilter = new NeutralTrendStrengthFilter(logger, 0.70); // 70% min confidence
 
-      this.entryOrchestrator = new EntryOrchestrator(this.riskManager, logger, neutralTrendFilter);
-      this.logger.info('✅ EntryOrchestrator initialized (PHASE 4 PRIMARY Week 2)', {
-        role: 'Single atomic entry decision point',
-        consolidates: ['EntryScanner', 'FastEntryService', 'EntryConfirmationManager', 'StrategyCoordinator entry logic'],
-        logic: ['Signal ranking by confidence', 'Trend alignment check', 'NEUTRAL trend strength check', 'RiskManager approval'],
-        optimization: 'SHORT entries filtered on weak NEUTRAL trends (strength < 40%)',
-      });
-    } else {
-      this.logger.error('❌ CRITICAL: RiskManager not initialized - EntryOrchestrator disabled. Trading will not work.');
-    }
+    this.entryOrchestrator = new EntryOrchestrator(this.riskManager, logger, neutralTrendFilter);
+    this.logger.info('✅ EntryOrchestrator initialized (PHASE 4 PRIMARY Week 2)', {
+      role: 'Single atomic entry decision point',
+      consolidates: ['EntryScanner', 'FastEntryService', 'EntryConfirmationManager', 'StrategyCoordinator entry logic'],
+      logic: ['Signal ranking by confidence', 'Trend alignment check', 'NEUTRAL trend strength check', 'RiskManager approval'],
+      optimization: 'SHORT entries filtered on weak NEUTRAL trends (strength < 40%)',
+    });
 
     // PHASE 4: Initialize ExitOrchestrator (PRIMARY - position exit state machine - Week 3)
     this.exitOrchestrator = new ExitOrchestrator(logger);

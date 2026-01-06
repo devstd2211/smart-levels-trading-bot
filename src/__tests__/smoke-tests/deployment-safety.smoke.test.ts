@@ -190,13 +190,14 @@ describe('SMOKE TESTS: Deployment Safety Checks', () => {
       expect(code).toContain('EntryOrchestrator');
     });
 
-    it('should verify error logging for missing RiskManager', () => {
+    it('should verify RiskManager is initialized', () => {
       const Module = require('../../services/trading-orchestrator.service') as any;
       const code = Module.TradingOrchestrator.toString();
 
-      // Should have clear error logging
-      expect(code).toContain('CRITICAL');
-      expect(code).toContain('logger.error');
+      // RiskManager is now REQUIRED (no longer optional)
+      // Should have logging for successful initialization
+      expect(code).toContain('this.riskManager');
+      expect(code).toContain('logger.info');
     });
 
     it('should verify services have error handling', () => {

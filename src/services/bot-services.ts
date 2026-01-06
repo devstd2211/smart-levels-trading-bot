@@ -364,13 +364,13 @@ export class BotServices {
       this.positionManager,
       this.telegram,
       this.logger,
-      this.retestEntryService,
-      this.deltaAnalyzerService,
-      this.orderbookImbalanceService,
-      riskManager,           // 11 - PHASE 4 unified risk decision point
-      undefined,             // 12 - trendAnalyzer (will be created internally)
-      this.journal,          // 13
-      this.sessionStats,     // 14
+      riskManager,           // 8 - PHASE 4 REQUIRED: unified risk decision point
+      this.retestEntryService,  // 9 - optional
+      this.deltaAnalyzerService,  // 10 - optional
+      this.orderbookImbalanceService,  // 11 - optional
+      undefined,             // 12 - trendAnalyzer (optional, created internally)
+      this.journal,          // 13 - optional
+      this.sessionStats,     // 14 - optional
     );
 
     // 11.5. Link BTC candles store to TradingOrchestrator for BTC_CORRELATION analyzer
