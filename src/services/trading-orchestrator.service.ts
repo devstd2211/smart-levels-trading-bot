@@ -75,6 +75,13 @@ import { MultiTimeframeTrendService } from './multi-timeframe-trend.service';
 import { TimeframeWeightingService } from './timeframe-weighting.service';
 import { IndicatorInitializationService } from './indicator-initialization.service';
 import { FilterInitializationService } from './filter-initialization.service';
+import { StrategyRegistrationService } from './strategy-registration.service';
+import { MarketDataPreparationService } from './market-data-preparation.service';
+import { TradingContextService } from './trading-context.service';
+import { ExternalAnalysisService } from './external-analysis.service';
+import { SignalProcessingService } from './signal-processing.service';
+import { TradeExecutionService } from './trade-execution.service';
+import { WhaleSignalDetectionService } from './whale-signal-detection.service';
 
 // ============================================================================
 // TYPES
@@ -271,9 +278,7 @@ export class TradingOrchestrator {
     this.analyzerRegistration.registerAllAnalyzers();
 
     // Week 13 Phase 5a: Use StrategyRegistrationService for all strategy registration
-    const StrategyRegistrationModule = require('./strategy-registration.service') as any;
-    const StrategyRegistration = StrategyRegistrationModule.StrategyRegistrationService;
-    const strategyRegistration = new StrategyRegistration(
+    const strategyRegistration = new StrategyRegistrationService(
       this.strategyCoordinator,
       config,
       bybitService,
@@ -459,10 +464,7 @@ export class TradingOrchestrator {
     }
 
     // Week 13: Initialize MarketDataPreparationService (extracted market data aggregation)
-    // Dynamic import to avoid circular dependencies
-    const MarketDataPrepModule = require('./market-data-preparation.service') as any;
-    const MarketDataPrep = MarketDataPrepModule.MarketDataPreparationService;
-    this.marketDataPreparationService = new MarketDataPrep(
+    this.marketDataPreparationService = new MarketDataPreparationService(
       config,
       candleProvider,
       timeframeProvider,
@@ -486,9 +488,7 @@ export class TradingOrchestrator {
     });
 
     // Week 13: Initialize TradingContextService (extracted trend analysis)
-    const TradingContextModule = require('./trading-context.service') as any;
-    const TradingContext = TradingContextModule.TradingContextService;
-    this.tradingContextService = new TradingContext(
+    this.tradingContextService = new TradingContextService(
       candleProvider,
       this.trendAnalyzer,
       logger,
@@ -502,9 +502,7 @@ export class TradingOrchestrator {
     // This prevents the ~5 minute wait for first PRIMARY candle close
 
     // Week 13: Initialize ExternalAnalysisService (extracted external data analysis)
-    const ExternalAnalysisModule = require('./external-analysis.service') as any;
-    const ExternalAnalysis = ExternalAnalysisModule.ExternalAnalysisService;
-    this.externalAnalysisService = new ExternalAnalysis(
+    this.externalAnalysisService = new ExternalAnalysisService(
       this.bybitService,
       candleProvider,
       this.btcAnalyzer,
@@ -521,9 +519,7 @@ export class TradingOrchestrator {
     });
 
     // Week 13: Initialize SignalProcessingService (extracted signal processing pipeline)
-    const SignalProcessingModule = require('./signal-processing.service') as any;
-    const SignalProcessing = SignalProcessingModule.SignalProcessingService;
-    this.signalProcessingService = new SignalProcessing(
+    this.signalProcessingService = new SignalProcessingService(
       this.strategyCoordinator,
       this.trendConfirmationService,
       this.riskCalculator,
@@ -536,9 +532,7 @@ export class TradingOrchestrator {
     });
 
     // Week 13: Initialize TradeExecutionService (extracted trade execution pipeline)
-    const TradeExecutionModule = require('./trade-execution.service') as any;
-    const TradeExecution = TradeExecutionModule.TradeExecutionService;
-    this.tradeExecutionService = new TradeExecution(
+    this.tradeExecutionService = new TradeExecutionService(
       this.bybitService,
       this.positionManager,
       candleProvider,
@@ -559,9 +553,7 @@ export class TradingOrchestrator {
     });
 
     // Week 13 Phase 5d: Initialize EntryLogicService (extracted entry scanning pipeline)
-    const EntryLogicModule = require('./entry-logic.service') as any;
-    const EntryLogic = EntryLogicModule.EntryLogicService;
-    this.entryLogicService = new EntryLogic(
+    this.entryLogicService = new EntryLogicService(
       config,
       this.positionManager,
       this.bollingerIndicator,
@@ -584,9 +576,7 @@ export class TradingOrchestrator {
     });
 
     // Week 13 Phase 5e: Initialize WhaleSignalDetectionService (extracted whale signal detection)
-    const WhaleSignalDetModule = require('./whale-signal-detection.service') as any;
-    const WhaleSignalDet = WhaleSignalDetModule.WhaleSignalDetectionService;
-    this.whaleSignalDetectionService = new WhaleSignalDet(
+    this.whaleSignalDetectionService = new WhaleSignalDetectionService(
       this.strategyCoordinator,
       this.positionManager,
       this.marketDataPreparationService,
