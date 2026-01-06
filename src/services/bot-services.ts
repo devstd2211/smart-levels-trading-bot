@@ -24,6 +24,7 @@ import {
   BotEventBus,
   PositionExitingService,
 } from './index';
+import { RiskManager } from './risk-manager.service';
 import { PositionEventHandler, WebSocketEventHandler } from './handlers';
 import { CompoundInterestCalculatorService } from './compound-interest-calculator.service';
 import { PublicWebSocketService } from './public-websocket.service';
@@ -158,7 +159,7 @@ export class BotServices {
     );
 
     // 6. Initialize analyzers
-    const marketStructureConfig = (config.analysisConfig as any)?.marketStructure || {
+    const marketStructureConfig = config.analysisConfig?.marketStructure || {
       chochAlignedBoost: CHOCH_ALIGNED_BOOST,
       chochAgainstPenalty: CHOCH_AGAINST_PENALTY,
       bosAlignedBoost: BOS_ALIGNED_BOOST,
@@ -225,8 +226,6 @@ export class BotServices {
     }
 
     // 7.5 Initialize RiskManager with proper RiskManagerConfig structure (PHASE 4)
-    const RiskManagerModule = require('./risk-manager.service') as any;
-    const RiskManager = RiskManagerModule.RiskManager;
     const riskManagerConfig = {
       dailyLimits: {
         maxDailyLossPercent: 5.0,
@@ -325,7 +324,7 @@ export class BotServices {
         minimumATR: config.atrFilter?.minimumATR || 0.01,
         maximumATR: config.atrFilter?.maximumATR || 100,
         maxEmaDistance: config.strategy?.emaDistanceThreshold || 0.5,
-        filteringMode: (config.strategy?.contextFilteringMode as any) || 'HARD_BLOCK',
+        filteringMode: (config.strategy?.contextFilteringMode) || 'HARD_BLOCK',
         atrFilterEnabled: config.atrFilter?.enabled === true,
       },
       entryConfig: {
