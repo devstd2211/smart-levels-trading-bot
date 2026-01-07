@@ -26,6 +26,7 @@ import {
   OrderExecutionData,
   OrderUpdateData,
 } from '../types';
+import { OrderExecutionDetectorService } from './order-execution-detector.service';
 
 // ============================================================================
 // CONSTANTS
@@ -82,8 +83,6 @@ export class WebSocketManagerService extends EventEmitter {
   private reconnectAttempts: number = 0;
   private isConnecting: boolean = false;
   private shouldReconnect: boolean = true;
-  private tpCounter: number = 0;
-  private lastCloseReason: 'SL' | 'TP' | 'TRAILING' | null = null; // Track last close reason for journal
 
   // Event deduplication
   private processedEvents = new Map<string, number>(); // eventKey → timestamp
@@ -94,6 +93,7 @@ export class WebSocketManagerService extends EventEmitter {
     private readonly config: ExchangeConfig,
     private readonly symbol: string,
     private readonly logger: LoggerService,
+    private readonly orderExecutionDetector: OrderExecutionDetectorService,
   ) {
     super();
   }
@@ -172,6 +172,7 @@ export class WebSocketManagerService extends EventEmitter {
   disconnect(): void {
     this.shouldReconnect = false;
     this.stopPing();
+    this.processedEvents.clear();
 
     if (this.ws !== null) {
       this.ws.close();
@@ -190,14 +191,14 @@ export class WebSocketManagerService extends EventEmitter {
    * Get last close reason (for determining exitType in journal)
    */
   getLastCloseReason(): 'SL' | 'TP' | 'TRAILING' | null {
-    return this.lastCloseReason;
+    return this.orderExecutionDetector.getLastCloseReason();
   }
 
   /**
    * Reset last close reason (called after position closes)
    */
   resetLastCloseReason(): void {
-    this.lastCloseReason = null;
+    this.orderExecutionDetector.resetLastCloseReason();
   }
 
   // ==========================================================================
@@ -401,8 +402,7 @@ export class WebSocketManagerService extends EventEmitter {
 
     // Position closed - reset TP counter
     if (size === POSITION_SIZE_ZERO) {
-      this.logger.debug('Position closed - resetting TP counter', { previousCounter: this.tpCounter });
-      this.tpCounter = 0;
+      this.orderExecutionDetector.resetTpCounter();
       this.emit('positionClosed', { symbol: this.symbol });
       return;
     }
@@ -436,142 +436,110 @@ export class WebSocketManagerService extends EventEmitter {
 
   /**
    * Handle order execution from WebSocket
-   * This is where TP/SL fills come through!
+   * Delegates order detection to OrderExecutionDetectorService
    */
   private handleOrderExecution(data: OrderExecutionData | OrderExecutionData[]): void {
     const executions = Array.isArray(data) ? data : [data];
 
-    for (const exec of executions) {
-      const execData = exec;
-
-      // Log all executions for debugging
-      this.logger.debug('Processing execution event', {
-        orderId: execData.orderId,
-        symbol: execData.symbol,
-        execType: execData.execType,
-        stopOrderType: execData.stopOrderType,
-        orderType: execData.orderType,
-        createType: execData.createType,
-        execPrice: execData.execPrice,
-        execQty: execData.execQty,
-        closedSize: execData.closedSize,
-      });
-
+    for (const execData of executions) {
       // Filter by our symbol
       if (execData.symbol !== this.symbol) {
         continue;
       }
 
-      // Detect Take Profit: stopOrderType="UNKNOWN" + createType="CreateByUser" + closedSize > 0
-      const closedSize = parseFloat(execData.closedSize ?? '0');
-      const isTakeProfit =
-        execData.stopOrderType === 'UNKNOWN' &&
-        execData.createType === 'CreateByUser' &&
-        closedSize > 0;
+      // Detect execution type using domain service
+      const result = this.orderExecutionDetector.detectExecution(execData);
 
-      // Detect Stop Loss: stopOrderType="StopLoss" or "Stop" (Bybit uses both)
-      const isStopLoss = execData.stopOrderType === 'StopLoss' || execData.stopOrderType === 'Stop';
+      // Handle based on execution type
+      switch (result.type) {
+        case 'TAKE_PROFIT': {
+          // Check for duplicate event
+          const eventKey = `${result.orderId ?? 'unknown'}_${result.execPrice ?? '0'}_${result.closedSize}`;
+          if (this.isDuplicateEvent('TP', eventKey, Date.now())) {
+            break;
+          }
 
-      // Detect Trailing Stop: stopOrderType="TrailingStop" (should not happen in execution, but just in case)
-      const isTrailingStop = execData.stopOrderType === 'TrailingStop';
+          this.logger.info(`🎯 TP${result.tpLevel} execution detected from WebSocket`, {
+            tpLevel: result.tpLevel,
+            orderId: result.orderId,
+            execPrice: result.execPrice,
+            execQty: result.execQty,
+            closedSize: result.closedSize,
+          });
 
-      if (isTakeProfit) {
-        // Check for duplicate event
-        const eventKey = `${execData.orderId ?? 'unknown'}_${execData.execPrice ?? '0'}_${closedSize}`;
-        if (this.isDuplicateEvent('TP', eventKey, Date.now())) {
-          continue; // Skip duplicate
+          this.emit('takeProfitFilled', {
+            orderId: result.orderId ?? '',
+            symbol: this.symbol,
+            side: result.side,
+            avgPrice: result.execPrice.toString(),
+            qty: result.execQty,
+            cumExecQty: result.closedSizeStr ?? result.execQty,
+          });
+          break;
         }
 
-        // Increment TP counter
-        this.tpCounter++;
+        case 'STOP_LOSS': {
+          // Check for duplicate event
+          const eventKey = `${result.orderId ?? 'unknown'}_${result.execPrice ?? '0'}`;
+          if (this.isDuplicateEvent('SL', eventKey, Date.now())) {
+            break;
+          }
 
-        this.logger.info(`🎯 TP${this.tpCounter} execution detected from WebSocket`, {
-          tpLevel: this.tpCounter,
-          orderId: execData.orderId,
-          execPrice: execData.execPrice,
-          execQty: execData.execQty,
-          closedSize: execData.closedSize,
-        });
+          this.logger.info('🛑 Stop Loss execution detected from WebSocket', {
+            orderId: result.orderId,
+            execPrice: result.execPrice,
+            execQty: result.execQty,
+          });
 
-        // Track close reason for journal
-        this.lastCloseReason = 'TP';
-
-        this.emit('takeProfitFilled', {
-          orderId: execData.orderId ?? '',
-          symbol: this.symbol,
-          side: execData.side ?? '',
-          avgPrice: execData.execPrice ?? '0',
-          qty: execData.execQty ?? '0',
-          cumExecQty: execData.closedSize ?? execData.execQty ?? '0',
-        });
-      } else if (isStopLoss) {
-        // Check for duplicate event
-        const eventKey = `${execData.orderId ?? 'unknown'}_${execData.execPrice ?? '0'}`;
-        if (this.isDuplicateEvent('SL', eventKey, Date.now())) {
-          continue; // Skip duplicate
+          this.emit('stopLossFilled', {
+            orderId: result.orderId ?? '',
+            symbol: this.symbol,
+            side: result.side,
+            avgPrice: result.execPrice.toString(),
+            qty: result.execQty,
+            cumExecQty: result.closedSizeStr ?? result.execQty,
+          });
+          break;
         }
 
-        this.logger.info('🛑 Stop Loss execution detected from WebSocket', {
-          orderId: execData.orderId,
-          execPrice: execData.execPrice,
-          execQty: execData.execQty,
-        });
+        case 'TRAILING_STOP': {
+          // Check for duplicate event
+          const eventKey = `${result.orderId ?? 'unknown'}_${result.execPrice ?? '0'}`;
+          if (this.isDuplicateEvent('TRAILING', eventKey, Date.now())) {
+            break;
+          }
 
-        // Reset TP counter
-        this.logger.debug('Stop Loss hit - resetting TP counter', { previousCounter: this.tpCounter });
-        this.tpCounter = 0;
+          this.logger.info('📉 Trailing Stop execution detected from WebSocket', {
+            orderId: result.orderId,
+            execPrice: result.execPrice,
+            execQty: result.execQty,
+          });
 
-        // Track close reason for journal
-        this.lastCloseReason = 'SL';
-
-        this.emit('stopLossFilled', {
-          orderId: execData.orderId ?? '',
-          symbol: this.symbol,
-          side: execData.side ?? '',
-          avgPrice: execData.execPrice ?? '0',
-          qty: execData.execQty ?? '0',
-          cumExecQty: execData.closedSize ?? execData.execQty ?? '0',
-        });
-      } else if (isTrailingStop) {
-        // Check for duplicate event
-        const eventKey = `${execData.orderId ?? 'unknown'}_${execData.execPrice ?? '0'}`;
-        if (this.isDuplicateEvent('TRAILING', eventKey, Date.now())) {
-          continue; // Skip duplicate
+          this.emit('stopLossFilled', {
+            orderId: result.orderId ?? '',
+            symbol: this.symbol,
+            side: result.side,
+            avgPrice: result.execPrice.toString(),
+            qty: result.execQty,
+            cumExecQty: result.closedSizeStr ?? result.execQty,
+          });
+          break;
         }
 
-        this.logger.info('📉 Trailing Stop execution detected from WebSocket', {
-          orderId: execData.orderId,
-          execPrice: execData.execPrice,
-          execQty: execData.execQty,
-        });
+        case 'ENTRY': {
+          this.emit('orderFilled', {
+            orderId: result.orderId ?? '',
+            symbol: this.symbol,
+            side: result.side,
+            execQty: result.execQty,
+            execPrice: result.execPrice.toString(),
+          });
+          break;
+        }
 
-        // Reset TP counter
-        this.logger.debug('Trailing Stop hit - resetting TP counter', { previousCounter: this.tpCounter });
-        this.tpCounter = 0;
-
-        // Track close reason for journal
-        this.lastCloseReason = 'TRAILING';
-
-        this.emit('stopLossFilled', {
-          orderId: execData.orderId ?? '',
-          symbol: this.symbol,
-          side: execData.side ?? '',
-          avgPrice: execData.execPrice ?? '0',
-          qty: execData.execQty ?? '0',
-          cumExecQty: execData.closedSize ?? execData.execQty ?? '0',
-        });
-      } else {
-        // Regular order fill (market/limit entry) - reset TP counter for new position
-        this.logger.debug('Position entry execution - resetting TP counter', { previousCounter: this.tpCounter });
-        this.tpCounter = 0;
-
-        this.emit('orderFilled', {
-          orderId: execData.orderId ?? '',
-          symbol: this.symbol,
-          side: execData.side ?? '',
-          execQty: execData.execQty ?? '0',
-          execPrice: execData.execPrice ?? '0',
-        });
+        // UNKNOWN or other types - emit generic event
+        default:
+          break;
       }
     }
   }

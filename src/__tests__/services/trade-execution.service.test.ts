@@ -122,7 +122,7 @@ describe('TradeExecutionService', () => {
         fundingRateFilter: { enabled: true },
         retestEntry: { enabled: true },
         positionSizeUsdt: 10,
-      },
+      } as any,
       undefined, // rsiAnalyzer
       undefined, // emaAnalyzer
       undefined, // liquidityDetector

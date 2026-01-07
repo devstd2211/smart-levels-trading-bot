@@ -25,6 +25,7 @@ import {
   PositionExitingService,
 } from './index';
 import { RiskManager } from './risk-manager.service';
+import { OrderExecutionDetectorService } from './order-execution-detector.service';
 import { PositionEventHandler, WebSocketEventHandler } from './handlers';
 import { CompoundInterestCalculatorService } from './compound-interest-calculator.service';
 import { PublicWebSocketService } from './public-websocket.service';
@@ -284,10 +285,12 @@ export class BotServices {
     );
 
     // 9. Initialize WebSocket managers
+    const orderExecutionDetector = new OrderExecutionDetectorService(this.logger);
     this.webSocketManager = new WebSocketManagerService(
       config.exchange,
       config.exchange.symbol,
       this.logger,
+      orderExecutionDetector,
     );
 
     this.publicWebSocket = new PublicWebSocketService(
