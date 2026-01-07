@@ -27,6 +27,7 @@ import {
 } from '../types';
 import { OrderExecutionDetectorService } from './order-execution-detector.service';
 import { WebSocketAuthenticationService } from './websocket-authentication.service';
+import { EventDeduplicationService } from './event-deduplication.service';
 
 // ============================================================================
 // CONSTANTS
@@ -83,17 +84,13 @@ export class WebSocketManagerService extends EventEmitter {
   private isConnecting: boolean = false;
   private shouldReconnect: boolean = true;
 
-  // Event deduplication
-  private processedEvents = new Map<string, number>(); // eventKey → timestamp
-  private readonly EVENT_CACHE_SIZE = INTEGER_MULTIPLIERS.ONE_HUNDRED;
-  private readonly EVENT_CACHE_TTL_MS = TIME_UNITS.MINUTE; // 1 minute
-
   constructor(
     private readonly config: ExchangeConfig,
     private readonly symbol: string,
     private readonly logger: LoggerService,
     private readonly orderExecutionDetector: OrderExecutionDetectorService,
     private readonly authService: WebSocketAuthenticationService,
+    private readonly deduplicationService: EventDeduplicationService,
   ) {
     super();
   }
@@ -172,7 +169,7 @@ export class WebSocketManagerService extends EventEmitter {
   disconnect(): void {
     this.shouldReconnect = false;
     this.stopPing();
-    this.processedEvents.clear();
+    this.deduplicationService.clear();
 
     if (this.ws !== null) {
       this.ws.close();
@@ -207,33 +204,10 @@ export class WebSocketManagerService extends EventEmitter {
 
   /**
    * Check if event is duplicate (already processed)
-   * @param eventType - Type of event (TP, SL, POSITION)
-   * @param orderId - Order ID
-   * @param timestamp - Event timestamp
-   * @returns true if duplicate, false if new event
+   * Delegates to EventDeduplicationService
    */
-  private isDuplicateEvent(eventType: string, orderId: string, timestamp: number): boolean {
-    const eventKey = `${eventType}_${orderId}_${timestamp}`;
-
-    if (this.processedEvents.has(eventKey)) {
-      this.logger.debug('Duplicate event ignored', { eventKey });
-      return true;
-    }
-
-    // Store event
-    this.processedEvents.set(eventKey, Date.now());
-
-    // Cleanup old events if cache is too large
-    if (this.processedEvents.size > this.EVENT_CACHE_SIZE) {
-      const now = Date.now();
-      for (const [key, time] of this.processedEvents.entries()) {
-        if (now - time > this.EVENT_CACHE_TTL_MS) {
-          this.processedEvents.delete(key);
-        }
-      }
-    }
-
-    return false;
+  private isDuplicateEvent(eventType: string, eventId: string, timestamp: number): boolean {
+    return this.deduplicationService.isDuplicate(eventType, eventId, timestamp);
   }
 
   /**
