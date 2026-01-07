@@ -21,3 +21,4 @@ export * from './multi-timeframe-trend.service';
 export * from './timeframe-weighting.service';
 export * from './console-dashboard.service';
 export * from './dashboard-integration.service';
+export * from './orchestrator-initialization.service'; // TradingOrchestrator initialization (extracted from constructor)

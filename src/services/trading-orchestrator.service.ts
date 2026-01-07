@@ -76,6 +76,7 @@ import { TimeframeWeightingService } from './timeframe-weighting.service';
 import { IndicatorInitializationService } from './indicator-initialization.service';
 import { FilterInitializationService } from './filter-initialization.service';
 import { StrategyRegistrationService } from './strategy-registration.service';
+import { OrchestratorInitializationService, InitializedOrchestratorServices } from './orchestrator-initialization.service';
 import { MarketDataPreparationService } from './market-data-preparation.service';
 import { TradingContextService } from './trading-context.service';
 import { ExternalAnalysisService } from './external-analysis.service';
@@ -94,27 +95,27 @@ import { WhaleSignalDetectionService } from './whale-signal-detection.service';
 export class TradingOrchestrator {
   // PHASE 4: Removed contextAnalyzer (archived to phase4-integration)
   // Replaced by trendAnalyzer (passed in constructor)
-  private entryScanner: EntryScanner;
-  private strategyCoordinator: StrategyCoordinator;
-  private analyzerRegistry: AnalyzerRegistry;
-  private riskCalculator: RiskCalculator;
+  private entryScanner!: EntryScanner;
+  private strategyCoordinator!: StrategyCoordinator;
+  private analyzerRegistry!: AnalyzerRegistry;
+  private riskCalculator!: RiskCalculator;
   private currentContext: TradingContext | null = null;
 
   // Multi-timeframe analyzers
-  private rsiAnalyzer: MultiTimeframeRSIAnalyzer;
-  private emaAnalyzer: MultiTimeframeEMAAnalyzer;
+  private rsiAnalyzer!: MultiTimeframeRSIAnalyzer;
+  private emaAnalyzer!: MultiTimeframeEMAAnalyzer;
 
   // PHASE 6c: Price momentum analyzer for real-time momentum validation
-  private priceMomentumAnalyzer: PriceMomentumAnalyzer;
+  private priceMomentumAnalyzer!: PriceMomentumAnalyzer;
 
   // Single-timeframe indicators (still needed for specific tasks)
-  private atrIndicator: ATRIndicator;
-  private zigzagNRIndicator: ZigZagNRIndicator;
+  private atrIndicator!: ATRIndicator;
+  private zigzagNRIndicator!: ZigZagNRIndicator;
   private stochasticIndicator?: StochasticIndicator;
   private bollingerIndicator?: BollingerBandsIndicator;
-  private liquidityDetector: LiquidityDetector;
-  private divergenceDetector: DivergenceDetector;
-  private breakoutPredictor: BreakoutPredictor;
+  private liquidityDetector!: LiquidityDetector;
+  private divergenceDetector!: DivergenceDetector;
+  private breakoutPredictor!: BreakoutPredictor;
 
   // BTC confirmation
   private btcAnalyzer: BTCAnalyzer | null = null;
@@ -214,379 +215,28 @@ export class TradingOrchestrator {
     private tradingJournal?: TradingJournalService,  // For PositionExitingService (Session 68)
     private sessionStats?: SessionStatsService,  // For PositionExitingService (Session 68)
   ) {
-    // Week 13 Phase 5b: Use IndicatorInitializationService for all indicator initialization
-    const indicatorInit = new IndicatorInitializationService(config, candleProvider, timeframeProvider, logger);
-    const indicators = indicatorInit.initializeAllIndicators();
-
-    // Assign initialized indicators to class properties
-    this.entryScanner = indicators.entryScanner;
-    this.rsiAnalyzer = indicators.rsiAnalyzer;
-    this.emaAnalyzer = indicators.emaAnalyzer;
-    this.atrIndicator = indicators.atrIndicator;
-    this.zigzagNRIndicator = indicators.zigzagNRIndicator;
-    this.liquidityDetector = indicators.liquidityDetector;
-    this.divergenceDetector = indicators.divergenceDetector;
-    this.breakoutPredictor = indicators.breakoutPredictor;
-    this.stochasticIndicator = indicators.stochasticIndicator;
-    this.bollingerIndicator = indicators.bollingerIndicator;
-
-    // PHASE 6c: Initialize PriceMomentumAnalyzer
-    this.priceMomentumAnalyzer = new PriceMomentumAnalyzer();
-    logger.info('✅ PriceMomentumAnalyzer initialized for real-time momentum validation');
-
-    // Initialize Strategy Coordinator
-    this.strategyCoordinator = new StrategyCoordinator(logger);
-
-    // Initialize Analyzer Registry (for unified signal collection and weighting)
-    this.analyzerRegistry = new AnalyzerRegistry(logger);
-    logger.info('✅ Analyzer Registry initialized for unified weighted voting system');
-
-    // Initialize Risk Calculator (for SL/TP calculation)
-    this.riskCalculator = new RiskCalculator(logger);
-    logger.info('✅ Risk Calculator initialized for consistent SL/TP calculation');
-
-    // Week 13 Phase 5c: Initialize filters BEFORE analyzer registration
-    // (BTCAnalyzer needed for BTC_CORRELATION analyzer in AnalyzerRegistrationService)
-    const filterInit = new FilterInitializationService(config, candleProvider, bybitService, logger);
-    const filters = filterInit.initializeAllFilters();
-
-    // Assign initialized filters to class properties
-    this.btcAnalyzer = filters.btcAnalyzer;
-    this.fundingRateFilter = filters.fundingRateFilter;
-    this.flatMarketDetector = filters.flatMarketDetector;
-    this.trendConfirmationService = filters.trendConfirmationService;
-
-    // Register all analyzers into the registry (45+ analyzers)
-    this.analyzerRegistration = new AnalyzerRegistrationService(
-      this.analyzerRegistry,
-      logger,
-      config,
-      this.rsiAnalyzer,
-      this.emaAnalyzer,
-      this.priceMomentumAnalyzer, // PHASE 6c: Added momentum analyzer
-      this.atrIndicator,
-      this.liquidityDetector,
-      this.divergenceDetector,
-      this.breakoutPredictor,
-      this.btcAnalyzer,
-      this.stochasticIndicator,
-      this.bollingerIndicator,
-      this.flatMarketDetector,
-      this.deltaAnalyzerService,
-      this.orderbookImbalanceService,
-    );
-    this.analyzerRegistration.registerAllAnalyzers();
-
-    // Week 13 Phase 5a: Use StrategyRegistrationService for all strategy registration
-    const strategyRegistration = new StrategyRegistrationService(
-      this.strategyCoordinator,
-      config,
-      bybitService,
-      logger,
-    );
-    strategyRegistration.registerAllStrategies();
-
-    // Initialize Phase 1 services (Smart Entry & Breakeven)
-    // Services are passed from bot.ts to ensure single instance shared with PositionManager
-    this.retestEntryService = retestEntryService || null;
-
-    // Phase 4: Market Data Enhancement services
-    this.deltaAnalyzerService = deltaAnalyzerService || null;
-    this.orderbookImbalanceService = orderbookImbalanceService || null;
-
-    // Initialize Volume Profile Service (PHASE 4 Feature 3)
-    if (config.volumeProfile?.enabled) {
-      this.volumeProfileService = new VolumeProfileService(config.volumeProfile, logger);
-      this.logger.info('📊 Volume Profile Service initialized', {
-        lookbackCandles: config.volumeProfile.lookbackCandles,
-        valueAreaPercent: config.volumeProfile.valueAreaPercent,
-        priceTickSize: config.volumeProfile.priceTickSize,
-      });
-    }
-
-
-    if (this.retestEntryService) {
-      this.logger.info('🎯 Retest Entry Service enabled', {
-        minImpulsePercent: config.retestEntry?.minImpulsePercent,
-        retestZone: config.retestEntry ? `${config.retestEntry.retestZoneFibStart}%-${config.retestEntry.retestZoneFibEnd}%` : 'N/A',
-        maxRetestWaitMs: config.retestEntry?.maxRetestWaitMs,
-      });
-    }
-
-    if (this.deltaAnalyzerService) {
-      this.logger.info('📊 Delta Analyzer Service enabled (PHASE 4)', {
-        windowSizeMs: config.delta?.windowSizeMs,
-        minDeltaThreshold: config.delta?.minDeltaThreshold,
-      });
-    }
-
-
-    // PHASE 4: Initialize Market Structure Analyzer (dependency for TrendAnalyzer)
-    this.marketStructureAnalyzer = new MarketStructureAnalyzer(
-      config.analysisConfig?.marketStructure || {
-        chochAlignedBoost: 1.3,
-        chochAgainstPenalty: 0.5,
-        bosAlignedBoost: 1.1,
-        bosAgainstPenalty: 0.8,
-        noModification: 1.0,
-      },
-      logger,
-    );
-    this.logger.info('✅ Market Structure Analyzer initialized (TrendAnalyzer dependency)');
-
-    // PHASE 4: Initialize TrendAnalyzer (PRIMARY - runs FIRST in pipeline)
-    if (trendAnalyzer) {
-      this.trendAnalyzer = trendAnalyzer;
-    } else if (this.marketStructureAnalyzer) {
-      // Create SwingPointDetectorService for trend analysis
-      const swingPointDetector = new SwingPointDetectorService(logger, 2); // lookback=2 candles
-
-      // Session 73: Add multi-timeframe services for comprehensive trend analysis
-      const multiTimeframeTrendService = new MultiTimeframeTrendService(logger, swingPointDetector);
-      const timeframeWeightingService = new TimeframeWeightingService(logger);
-
-      this.trendAnalyzer = new TrendAnalyzer(
-        this.marketStructureAnalyzer,
-        logger,
-        swingPointDetector,
-        multiTimeframeTrendService, // Session 73 addition
-        timeframeWeightingService, // Session 73 addition
-      );
-    }
-
-    if (this.trendAnalyzer) {
-      this.logger.info('✅ TrendAnalyzer initialized (PHASE 4 PRIMARY)', {
-        role: 'Global trend detection - runs FIRST in pipeline',
-        blocks: ['LONG in BEARISH trend', 'SHORT in BULLISH trend'],
-      });
-    }
-
-    // PHASE 4: RiskManager is now REQUIRED (no longer optional!)
-    // Note: RiskManager requires RiskManagerConfig structure (not the Config.riskManagement structure)
-    // It must be passed as a constructor parameter from BotServices
-    this.logger.info('✅ RiskManager initialized (PHASE 4 PRIMARY)', {
-      role: 'Unified atomic risk decision point',
-      checks: ['Daily loss limits', 'Loss streak penalties', 'Concurrent risk', 'Position sizing'],
-    });
-
-    // PHASE 4: Initialize EntryOrchestrator (PRIMARY - single entry decision point - Week 2)
-    // PHASE 4.1: Create NEUTRAL trend strength filter (optimization for SHORT entries)
-    // Blocks SHORT entries with 65-70% confidence on weak NEUTRAL trends (strength < 40%)
-    // Root cause: SHORT win rate was 50% (vs LONG 90%), losing -47 USDT in session
-    const neutralTrendFilter = new NeutralTrendStrengthFilter(logger, 0.70); // 70% min confidence
-
-    this.entryOrchestrator = new EntryOrchestrator(this.riskManager, logger, neutralTrendFilter);
-    this.logger.info('✅ EntryOrchestrator initialized (PHASE 4 PRIMARY Week 2)', {
-      role: 'Single atomic entry decision point',
-      consolidates: ['EntryScanner', 'FastEntryService', 'EntryConfirmationManager', 'StrategyCoordinator entry logic'],
-      logic: ['Signal ranking by confidence', 'Trend alignment check', 'NEUTRAL trend strength check', 'RiskManager approval'],
-      optimization: 'SHORT entries filtered on weak NEUTRAL trends (strength < 40%)',
-    });
-
-    // PHASE 4: Initialize ExitOrchestrator (PRIMARY - position exit state machine - Week 3)
-    this.exitOrchestrator = new ExitOrchestrator(logger);
-    this.logger.info('✅ ExitOrchestrator initialized (PHASE 4 PRIMARY Week 3)', {
-      role: 'Position exit state machine',
-      consolidates: ['SmartBreakevenService', 'SmartTrailingV2Service', 'AdaptiveTP3Service', 'PositionLifecycleService exit logic'],
-      states: ['OPEN', 'TP1_HIT', 'TP2_HIT', 'TP3_HIT', 'CLOSED'],
-      logic: ['State transitions', 'SL priority', 'Breakeven lock-in', 'Trailing stop activation'],
-    });
-
-    // PHASE 4: Initialize PositionExitingService (PRIMARY - position exit execution - Week 3)
-    // Session 70: Full integration (ACTIVE since Dec 23, 2025)
-    if (this.tradingJournal && this.bybitService) {
-      // Create minimal config objects for PositionExitingService
-      const tradingConfigForExit: any = {
-        leverage: (config as any).leverage || 10,
-        riskPercent: (config as any).riskPercent || 2,
-        maxPositions: (config as any).maxPositions || 1,
-        tradingCycleIntervalMs: 1000,
-        orderType: 'LIMIT',
-      };
-
-      // Use riskManagement config - fail fast if not configured
-      const rm = this.config.riskManagement;
-      if (!rm) {
-        throw new Error('riskManagement config is required but not provided');
-      }
-      const riskConfigForExit: any = {
-        takeProfits: rm.takeProfits,
-        stopLossPercent: rm.stopLossPercent,
-        breakevenOffsetPercent: rm.breakevenOffsetPercent,
-        trailingStopEnabled: rm.trailingStopEnabled,
-        trailingStopPercent: rm.trailingStopPercent,
-        trailingStopActivationLevel: rm.trailingStopActivationLevel,
-        positionSizeUsdt: rm.positionSizeUsdt,
-      };
-
-      const fullConfigForExit: any = {
-        trading: tradingConfigForExit,
-        riskManagement: riskConfigForExit,
-        exchange: { symbol: 'APEXUSDT' },
-        timeframes: {},
-        strategies: {},
-        strategy: {},
-        indicators: {},
-        logging: {},
-        system: {},
-        dataSubscriptions: { candles: { enabled: true, calculateIndicators: true }, orderbook: { enabled: false, updateIntervalMs: 5000 }, ticks: { enabled: false, calculateDelta: false } },
-        entryConfirmation: {},
-      };
-
-      // For read-only mode, create a dummy TelegramService if not available
-      const telegramForExit = this.telegram || {
-        sendAlert: () => Promise.resolve(),
-        notifyPositionOpened: () => Promise.resolve(),
-        notifyTakeProfitHit: () => Promise.resolve(),
-      } as any;
-
-      this.positionExitingService = new PositionExitingService(
-        this.bybitService,
-        telegramForExit,
-        logger,
-        this.tradingJournal,
-        tradingConfigForExit,
-        riskConfigForExit,
-        fullConfigForExit,
-        this.sessionStats,
-        this.positionManager, // For accessing TakeProfitManager
-      );
-      this.logger.info('✅ PositionExitingService initialized (PHASE 4 Week 3, ACTIVE)', {
-        role: 'Position exit execution',
-        mode: 'ACTIVE - handling all position exits',
-        consolidates: ['PositionLifecycleService.closeFullPosition()', 'PositionLifecycleService.closePartialPosition()', 'SL updates', 'Trailing stops'],
-      });
-    } else {
-      this.logger.warn('⚠️  PositionExitingService NOT initialized - missing dependencies', {
-        hasTradingJournal: !!this.tradingJournal,
-        hasBybitService: !!this.bybitService,
-      });
-    }
-
-    // Week 13: Initialize MarketDataPreparationService (extracted market data aggregation)
-    this.marketDataPreparationService = new MarketDataPreparationService(
+    // Initialize all orchestrator services via OrchestratorInitializationService
+    const initializer = new OrchestratorInitializationService(
       config,
       candleProvider,
       timeframeProvider,
       bybitService,
+      positionManager,
+      telegram,
       logger,
-      this.rsiAnalyzer,
-      this.emaAnalyzer,
-      this.atrIndicator,
-      this.zigzagNRIndicator,
-      this.liquidityDetector,
-      this.divergenceDetector,
-      this.breakoutPredictor,
-      this.stochasticIndicator,
-      this.bollingerIndicator,
+      riskManager,
+      retestEntryService,
       deltaAnalyzerService,
       orderbookImbalanceService,
+      trendAnalyzer,
+      this.tradingJournal,
+      this.sessionStats,
     );
-    this.logger.info('✅ MarketDataPreparationService initialized (Week 13)', {
-      role: 'Market data aggregation and indicator calculation',
-      responsibility: ['Fetch and organize candles', 'Calculate technical indicators', 'Prepare strategy data'],
-    });
 
-    // Week 13: Initialize TradingContextService (extracted trend analysis)
-    this.tradingContextService = new TradingContextService(
-      candleProvider,
-      this.trendAnalyzer,
-      logger,
-    );
-    this.logger.info('✅ TradingContextService initialized (Week 13)', {
-      role: 'Trend analysis and signal filtering',
-      responsibility: ['Update trend analysis on PRIMARY candle close', 'Filter signals by trend alignment'],
-    });
+    const services = initializer.initializeOrchestrator();
 
-    // CRITICAL: Trend analysis will be initialized in initializeAfterConstruction()
-    // This prevents the ~5 minute wait for first PRIMARY candle close
-
-    // Week 13: Initialize ExternalAnalysisService (extracted external data analysis)
-    this.externalAnalysisService = new ExternalAnalysisService(
-      this.bybitService,
-      candleProvider,
-      this.btcAnalyzer,
-      this.fundingRateFilter,
-      this.flatMarketDetector,
-      logger,
-      this.config.btcConfirmation,
-      this.config.fundingRateFilter,
-      this.config.flatMarketDetection,
-    );
-    this.logger.info('✅ ExternalAnalysisService initialized (Week 13)', {
-      role: 'External data analysis and filtering',
-      responsibility: ['Analyze BTC correlation', 'Check funding rates', 'Detect flat market conditions'],
-    });
-
-    // Week 13: Initialize SignalProcessingService (extracted signal processing pipeline)
-    this.signalProcessingService = new SignalProcessingService(
-      this.strategyCoordinator,
-      this.trendConfirmationService,
-      this.riskCalculator,
-      logger,
-      this.config,
-    );
-    this.logger.info('✅ SignalProcessingService initialized (Week 13)', {
-      role: 'Signal collection, filtering, and aggregation',
-      responsibility: ['Collect and filter signals', 'Apply trend confirmation', 'Generate entry signals'],
-    });
-
-    // Week 13: Initialize TradeExecutionService (extracted trade execution pipeline)
-    this.tradeExecutionService = new TradeExecutionService(
-      this.bybitService,
-      this.positionManager,
-      candleProvider,
-      this.riskManager,
-      this.retestEntryService,
-      this.externalAnalysisService,
-      this.telegram,
-      logger,
-      this.config,
-      this.rsiAnalyzer,
-      this.emaAnalyzer,
-      this.liquidityDetector,
-      this.entryOrchestrator, // PHASE 6: EntryOrchestrator for atomic entry decisions
-    );
-    this.logger.info('✅ TradeExecutionService initialized (Week 13)', {
-      role: 'Pre-trade checks and position opening',
-      responsibility: ['Risk management', 'BTC/funding checks', 'Position execution'],
-    });
-
-    // Week 13 Phase 5d: Initialize EntryLogicService (extracted entry scanning pipeline)
-    this.entryLogicService = new EntryLogicService(
-      config,
-      this.positionManager,
-      this.bollingerIndicator,
-      candleProvider,
-      this.emaAnalyzer,
-      this.tradingContextService,
-      this.retestEntryService,
-      this.marketDataPreparationService,
-      this.externalAnalysisService,
-      this.analyzerRegistry,
-      this.strategyCoordinator,
-      this.signalProcessingService,
-      this.tradeExecutionService,
-      bybitService,
-      logger,
-    );
-    this.logger.info('✅ EntryLogicService initialized (Week 13 Phase 5d)', {
-      role: 'ENTRY candle scanning pipeline',
-      responsibility: ['Signal collection', 'Strategy evaluation', 'Entry confirmation', 'Trade execution'],
-    });
-
-    // Week 13 Phase 5e: Initialize WhaleSignalDetectionService (extracted whale signal detection)
-    this.whaleSignalDetectionService = new WhaleSignalDetectionService(
-      this.strategyCoordinator,
-      this.positionManager,
-      this.marketDataPreparationService,
-      this.tradeExecutionService,
-      logger,
-    );
-    this.logger.info('✅ WhaleSignalDetectionService initialized (Week 13 Phase 5e)', {
-      role: 'Real-time whale signal detection',
-      responsibility: ['Whale strategy evaluation', 'Real-time signal processing', 'Immediate trade execution'],
-    });
+    // Assign all initialized services to class properties
+    Object.assign(this, services);
 
     // Initialize context on startup (async)
     void this.initializeContext();
