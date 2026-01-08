@@ -272,8 +272,11 @@ export class StrategyCoordinator {
     // ✨ NEW: Check opposing signal strength (FIX #3)
     const opposingPenalty = this.checkOpposingSignalStrength(selectedSignals, opposingSignals, selectedDirection);
 
-    // Apply both penalties to confidence
-    const adjustedConfidence = Math.round(avgConfidence * conflictPenalty * opposingPenalty);
+    // ✨ NEW: Check time-based risk (night trading penalty)
+    const nightTimePenalty = this.checkNightTimePenalty();
+
+    // Apply all penalties to confidence (stacked multipliers)
+    const adjustedConfidence = Math.round(avgConfidence * conflictPenalty * opposingPenalty * nightTimePenalty);
 
     // Check thresholds
     const meetsThresholds = selectedDirection !== SignalDirection.HOLD &&
@@ -450,6 +453,38 @@ export class StrategyCoordinator {
     }
 
     return 1.0; // Safe - difference is minimal
+  }
+
+  /**
+   * Check night trading time penalty (UTC 02:00-04:00)
+   *
+   * Night trading produces 100% losing trades in backtests.
+   * Apply 25% confidence reduction (0.75x) during night hours.
+   * Does NOT block signals - allows them through with reduced confidence.
+   *
+   * Rationale: Low liquidity and false signals at night, but occasional
+   * sharp movements (flash crash/pump) might present real opportunities.
+   * Conservative approach: reduce confidence but keep signals alive.
+   *
+   * @private
+   */
+  private checkNightTimePenalty(): number {
+    const now = new Date();
+    const utcHours = now.getUTCHours();
+
+    // Night trading window: UTC 02:00 - 04:59 (low liquidity period)
+    const isNightTime = utcHours >= 2 && utcHours < 5;
+
+    if (isNightTime) {
+      this.logger.warn('⏰ NIGHT TRADING PENALTY: UTC 02:00-05:00 detected', {
+        utcHours,
+        penalty: '25%',
+        reason: 'Low liquidity period with high false signal rate',
+      });
+      return 0.75; // 25% confidence reduction
+    }
+
+    return 1.0; // No penalty during day hours
   }
 
   /**

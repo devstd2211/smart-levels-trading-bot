@@ -114,11 +114,12 @@ describe('WebSocketManagerService', () => {
 
       // Verify cache management is working by adding another event
       // This should trigger cleanup internally in the deduplication service
-      const newEventResult = isDuplicateEvent('TP', 'new-order', Date.now());
+      const timestamp = Date.now(); // Use fixed timestamp for duplicate detection test
+      const newEventResult = isDuplicateEvent('TP', 'new-order', timestamp);
       expect(newEventResult).toBe(false); // New event should not be duplicate
 
-      // Duplicate event should still be detected
-      const duplicateResult = isDuplicateEvent('TP', 'new-order', Date.now());
+      // Duplicate event should still be detected (same timestamp)
+      const duplicateResult = isDuplicateEvent('TP', 'new-order', timestamp);
       expect(duplicateResult).toBe(true); // Same event should be duplicate
     });
 
