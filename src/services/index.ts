@@ -25,3 +25,5 @@ export * from './timeframe-weighting.service';
 export * from './console-dashboard.service';
 export * from './dashboard-integration.service';
 export * from './orchestrator-initialization.service'; // TradingOrchestrator initialization (extracted from constructor)
+export * from './signal-filtering.service'; // Filters signals by trend alignment and applies confidence adjustments
+export * from './market-condition-analyzer.service'; // Adjusts take profits based on market conditions

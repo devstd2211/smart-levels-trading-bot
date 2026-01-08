@@ -28,10 +28,11 @@ import { StrategyCoordinator } from './strategy-coordinator.service';
 import { TrendConfirmationService } from './trend-confirmation.service';
 import { RiskCalculator, RiskCalculationResult } from './risk-calculator.service';
 import { AntiFlipService } from './anti-flip.service';
+import { SignalFilteringService } from './signal-filtering.service';
+import { MarketConditionAnalyzerService } from './market-condition-analyzer.service';
 import {
   DECIMAL_PLACES,
   INTEGER_MULTIPLIERS,
-  FIXED_EXIT_PERCENTAGES,
 } from '../constants';
 
 /**
@@ -75,6 +76,8 @@ interface AggregatedSignalResult {
  */
 export class SignalProcessingService {
   private antiFlipService: AntiFlipService;
+  private signalFilteringService: SignalFilteringService;
+  private marketConditionAnalyzer: MarketConditionAnalyzerService;
 
   constructor(
     private strategyCoordinator: StrategyCoordinator,
@@ -93,6 +96,17 @@ export class SignalProcessingService {
       overrideConfidenceThreshold: antiFlipConfig.overrideConfidenceThreshold ?? 85,
       strongReversalRsiThreshold: antiFlipConfig.strongReversalRsiThreshold ?? 25,
     });
+
+    // Initialize SignalFilteringService
+    this.signalFilteringService = new SignalFilteringService(
+      this.strategyCoordinator,
+      this.trendConfirmationService,
+      this.logger,
+      this.config,
+    );
+
+    // Initialize MarketConditionAnalyzerService
+    this.marketConditionAnalyzer = new MarketConditionAnalyzerService(this.logger);
   }
 
   /**
@@ -132,7 +146,7 @@ export class SignalProcessingService {
       }
 
       // PHASE 4: Filter analyzer signals by trend alignment BEFORE aggregation
-      const trendFilteredSignals = this.filterSignalsByTrend(analyzerSignals, trendAnalysis);
+      const trendFilteredSignals = this.signalFilteringService.filterSignalsByTrend(analyzerSignals, trendAnalysis);
 
       if (trendFilteredSignals.length === 0) {
         this.logger.warn('⚠️ All analyzer signals filtered out by trend alignment', {
@@ -185,7 +199,7 @@ export class SignalProcessingService {
       // Apply trend confirmation filtering
       let finalConfidence = aggregatedResult.confidence;
       if (this.trendConfirmationService && this.config?.trendConfirmation?.filterMode !== 'DISABLED') {
-        const confirmResult = await this.applyTrendConfirmationFilter(
+        const confirmResult = await this.signalFilteringService.applyTrendConfirmationFilter(
           aggregatedResult.direction,
           finalConfidence,
         );
@@ -196,7 +210,7 @@ export class SignalProcessingService {
       }
 
       // PHASE 6c: Detect timeframe conflicts and adjust confidence accordingly
-      const conflictMultiplier = this.detectTimeframeConflict(trendAnalysis, aggregatedResult.direction);
+      const conflictMultiplier = this.signalFilteringService.detectTimeframeConflict(trendAnalysis, aggregatedResult.direction);
       if (conflictMultiplier < 1.0) {
         finalConfidence *= conflictMultiplier;
         this.logger.info('📊 Confidence adjusted for timeframe conflict', {
@@ -274,7 +288,7 @@ export class SignalProcessingService {
       });
 
       // Adjust TPs based on market conditions
-      const finalTakeProfits = this.adjustTakeProfitsForMarketCondition(riskResult.takeProfits, flatResult);
+      const finalTakeProfits = this.marketConditionAnalyzer.adjustTakeProfitsForMarketCondition(riskResult.takeProfits, flatResult);
 
       // Generate entry signal
       const entrySignal: EntrySignal = {
@@ -301,229 +315,6 @@ export class SignalProcessingService {
     }
   }
 
-  /**
-   * Filter analyzer signals by trend alignment
-   * @param signals - Array of analyzer signals
-   * @param trendAnalysis - Current trend analysis
-   * @returns Filtered signals
-   */
-  private filterSignalsByTrend(
-    signals: AnalyzerSignal[],
-    trendAnalysis: TrendAnalysis | null,
-  ): AnalyzerSignal[] {
-    if (!trendAnalysis) {
-      return signals;
-    }
-
-    const { restrictedDirections } = trendAnalysis;
-
-    if (restrictedDirections.length === 0) {
-      return signals;
-    }
-
-    const filtered = signals.filter((signal) => {
-      const isRestricted = restrictedDirections.includes(signal.direction as SignalDirection);
-      if (isRestricted) {
-        this.logger.warn('🚫 Signal BLOCKED by trend alignment', {
-          signal: signal.direction,
-          trend: trendAnalysis.bias,
-          reason: `${signal.direction} blocked in ${trendAnalysis.bias} trend`,
-        });
-      }
-      return !isRestricted;
-    });
-
-    if (filtered.length < signals.length) {
-      this.logger.info('🔀 Trend Alignment Filtering', {
-        total: signals.length,
-        filtered: filtered.length,
-        blocked: signals.length - filtered.length,
-        trend: trendAnalysis.bias,
-      });
-    }
-
-    return filtered;
-  }
-
-  /**
-   * Apply trend confirmation filtering to adjust confidence
-   * @param direction - Signal direction
-   * @param originalConfidence - Original confidence level
-   * @returns Adjusted confidence or null if blocked
-   */
-  private async applyTrendConfirmationFilter(
-    direction: SignalDirection,
-    originalConfidence: number,
-  ): Promise<number | null> {
-    if (!this.trendConfirmationService) {
-      return originalConfidence;
-    }
-
-    try {
-      const trendConfirmation = await this.trendConfirmationService.confirmTrend(direction);
-      const criticalScore = this.config?.trendConfirmation?.criticalMisalignmentScore ?? 30;
-      const warningScore = this.config?.trendConfirmation?.warningMisalignmentScore ?? 60;
-
-      this.logger.info('🔄 Trend Confirmation Analysis', {
-        direction,
-        alignmentScore: trendConfirmation.alignmentScore,
-        reason: trendConfirmation.reason,
-      });
-
-      // BLOCK: Critical misalignment
-      if (trendConfirmation.alignmentScore < criticalScore) {
-        this.logger.error('❌ Signal BLOCKED by TrendConfirmation: Critical misalignment', {
-          signal: direction,
-          alignmentScore: trendConfirmation.alignmentScore,
-          threshold: criticalScore,
-          reason: trendConfirmation.reason,
-        });
-        return null;
-      }
-
-      // REDUCE: Warning misalignment
-      if (trendConfirmation.alignmentScore < warningScore) {
-        const reducedConfidence = Math.round(
-          originalConfidence * (trendConfirmation.alignmentScore / INTEGER_MULTIPLIERS.ONE_HUNDRED)
-        );
-
-        this.logger.warn('⚠️ Signal confidence reduced by TrendConfirmation: Trend misalignment', {
-          signal: direction,
-          originalConfidence: originalConfidence.toFixed(0) + '%',
-          reducedConfidence: reducedConfidence + '%',
-          alignmentScore: trendConfirmation.alignmentScore,
-          reason: trendConfirmation.reason,
-        });
-
-        // Check if reduced confidence still meets threshold
-        if (reducedConfidence < this.strategyCoordinator.getMinConfidence()) {
-          this.logger.info('❌ Signal REJECTED after TrendConfirmation reduction: Below confidence threshold', {
-            signal: direction,
-            reducedConfidence: reducedConfidence + '%',
-            minRequired: this.strategyCoordinator.getMinConfidence() + '%',
-          });
-          return null;
-        }
-
-        return reducedConfidence;
-      }
-
-      // BOOST: Full alignment
-      if (trendConfirmation.isAligned && trendConfirmation.confidenceBoost > 0) {
-        const boostedConfidence = Math.min(
-          INTEGER_MULTIPLIERS.ONE_HUNDRED,
-          Math.round(originalConfidence + trendConfirmation.confidenceBoost),
-        );
-
-        this.logger.info('✅ Signal confidence BOOSTED by TrendConfirmation: Excellent trend alignment', {
-          signal: direction,
-          originalConfidence: originalConfidence.toFixed(0) + '%',
-          boostedConfidence: boostedConfidence + '%',
-          boost: trendConfirmation.confidenceBoost,
-          alignmentScore: trendConfirmation.alignmentScore,
-        });
-
-        return boostedConfidence;
-      }
-
-      return originalConfidence;
-    } catch (error) {
-      this.logger.warn('Trend confirmation filtering failed', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-      return originalConfidence;
-    }
-  }
-
-  /**
-   * Adjust take profits based on market condition
-   * @param takeProfits - Original take profit levels
-   * @param flatResult - Flat market detection result
-   * @returns Adjusted take profit levels
-   */
-  private adjustTakeProfitsForMarketCondition(
-    takeProfits: TakeProfit[],
-    flatResult: { isFlat: boolean; confidence: number } | null,
-  ): TakeProfit[] {
-    if (!flatResult) {
-      return takeProfits;
-    }
-
-    if (flatResult.isFlat) {
-      // FLAT MARKET: Adjust to single TP (100% close at TP1 price)
-      const firstTP = takeProfits[0];
-      const adjustedTP: TakeProfit[] = [{
-        level: 1,
-        price: firstTP.price,
-        sizePercent: FIXED_EXIT_PERCENTAGES.FULL, // Close 100% on TP1
-        percent: firstTP.percent,
-        hit: false,
-      }];
-
-      this.logger.info('⚡ FLAT market - adjusted to single TP', {
-        confidence: flatResult.confidence.toFixed(1) + '%',
-        tpPrice: firstTP.price.toFixed(DECIMAL_PLACES.PRICE),
-        tpPercent: firstTP.percent.toFixed(DECIMAL_PLACES.PERCENT) + '%',
-      });
-
-      return adjustedTP;
-    }
-
-    // TRENDING MARKET: Keep multi-TP strategy
-    this.logger.info('📈 TRENDING market - keeping multi-TP strategy', {
-      confidence: flatResult.confidence.toFixed(1) + '%',
-      tpCount: takeProfits.length,
-    });
-
-    return takeProfits;
-  }
-
-  /**
-   * PHASE 6c: Detect timeframe conflicts and adjust confidence
-   * Check if lower timeframes conflict with higher timeframes
-   * @param trendAnalysis - Trend analysis from multiple timeframes
-   * @param direction - Current signal direction
-   * @returns Confidence adjustment multiplier (0.7 = 30% reduction for conflict)
-   */
-  private detectTimeframeConflict(
-    trendAnalysis: TrendAnalysis | null,
-    direction: SignalDirection,
-  ): number {
-    if (!trendAnalysis) {
-      return 1.0; // No conflict possible without trend analysis
-    }
-
-    // Extract bias from different timeframes
-    // Note: TrendAnalysis structure has .bias field at root level
-    // For multi-timeframe, we check if single-timeframe trend conflicts with direction
-
-    const bias = trendAnalysis.bias; // BULLISH/BEARISH/NEUTRAL
-
-    // No conflict if trend is neutral
-    if (bias === 'NEUTRAL') {
-      return 1.0;
-    }
-
-    // Check for directional mismatch
-    // BULLISH trend + SHORT signal = conflicting (entering short in uptrend)
-    // BEARISH trend + LONG signal = conflicting (entering long in downtrend)
-    const isConflicting =
-      (bias === 'BULLISH' && direction === SignalDirection.SHORT) ||
-      (bias === 'BEARISH' && direction === SignalDirection.LONG);
-
-    if (isConflicting) {
-      this.logger.warn('⚠️ Timeframe conflict detected', {
-        trendBias: bias,
-        signalDirection: direction,
-        action: 'Reducing confidence by 30%',
-        confidence: 'Before adjustment: will be multiplied by 0.7',
-      });
-      return 0.7; // Reduce confidence by 30%
-    }
-
-    // No conflict - signal aligns with trend
-    return 1.0;
-  }
 
   /**
    * Notify anti-flip service of new candle (call on each candle close)
