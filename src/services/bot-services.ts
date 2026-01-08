@@ -378,6 +378,8 @@ export class BotServices {
       analysisConfig: config.analysisConfig,
       volatilityRegime: config.volatilityRegime,
       riskManagement: config.riskManagement,
+      indicators: config.indicators,
+      analyzers: config.analyzers,
     };
 
     this.logger.info('🔗 OrchestratorConfig prepared', {

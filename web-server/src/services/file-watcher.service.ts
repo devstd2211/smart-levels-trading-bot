@@ -140,7 +140,7 @@ export class FileWatcherService extends EventEmitter {
     try {
       const sessions = await this.readSessions();
       this.emit('session:updated', sessions);
-      console.log(`Sessions updated: ${sessions.length} sessions`);
+      console.log(`Sessions updated: ${sessions?.length ?? 0} sessions`);
     } catch (error) {
       console.error('Error reading sessions:', error);
     }
@@ -167,7 +167,9 @@ export class FileWatcherService extends EventEmitter {
   async readSessions(): Promise<SessionStats[]> {
     try {
       const data = await fs.readFile(this.sessionsPath, 'utf-8');
-      return JSON.parse(data) || [];
+      const parsed = JSON.parse(data);
+      // Handle both formats: { sessions: [...] } and [...]
+      return (parsed?.sessions || parsed) || [];
     } catch (error) {
       if ((error as any).code === 'ENOENT') {
         return [];

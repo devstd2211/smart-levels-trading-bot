@@ -822,6 +822,7 @@ export interface Config {
   strategies: StrategiesConfig; // Individual strategy configurations
   strategy: StrategyConfig; // Legacy strategy config
   indicators: IndicatorsConfig;
+  analyzers?: Record<string, any>; // Analyzer configurations
   riskManagement: RiskManagementConfig;
   logging: LoggingConfig;
   system: SystemConfig;
@@ -3355,6 +3356,8 @@ export interface OrchestratorConfig {
   trendConfirmation?: TrendConfirmationConfig;
   // Indicators config (for Stochastic and Bollinger Bands)
   indicators?: IndicatorsConfig;
+  // Analyzers config (for all registered analyzers)
+  analyzers?: Record<string, any>;
   // Phase 1: Smart Entry & Breakeven config
   fastEntry?: FastEntryConfig;
   smartBreakeven?: SmartBreakevenConfig;
