@@ -25,7 +25,7 @@ export class SmcAnalysisRegistration implements AnalyzerRegistrationModule {
       name: 'FOOTPRINT',
       weight: 0.18,
       priority: 9,
-      enabled: footprintEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         return this.footprintSignalAnalyzer.evaluate(data);
       },
@@ -37,7 +37,7 @@ export class SmcAnalysisRegistration implements AnalyzerRegistrationModule {
       name: 'ORDER_BLOCK',
       weight: 0.18,
       priority: 8,
-      enabled: orderBlockEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         if (!data.candles || data.candles.length < 3) {
           return null;
@@ -104,7 +104,7 @@ export class SmcAnalysisRegistration implements AnalyzerRegistrationModule {
       name: 'FAIR_VALUE_GAP',
       weight: 0.2,
       priority: 8,
-      enabled: fvgEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         if (!data.candles || data.candles.length < 2) {
           return null;

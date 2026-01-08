@@ -34,7 +34,7 @@ export class TechnicalIndicatorsRegistration implements AnalyzerRegistrationModu
 
   register(analyzerRegistry: AnalyzerRegistry, logger: LoggerService, config: any): void {
     // ===== FIX #1: RSI_ANALYZER - Dynamic SHORT Threshold =====
-    const rsiEnabled = config?.strategicWeights?.technicalIndicators?.rsi?.enabled ?? true;
+    const rsiEnabled = config?.indicators?.rsi?.enabled ?? false;
     analyzerRegistry.register('RSI_ANALYZER', {
       name: 'RSI_ANALYZER',
       weight: 0.15,
@@ -46,19 +46,20 @@ export class TechnicalIndicatorsRegistration implements AnalyzerRegistrationModu
     });
 
     // EMA Analyzer (priority 5, weight 0.12)
-    const emaEnabled = config?.strategicWeights?.technicalIndicators?.ema?.enabled ?? true;
+    const emaEnabled = config?.indicators?.ema?.enabled ?? false;
+    const emaAnalyzerConfig = config?.analyzers?.ema;
     analyzerRegistry.register('EMA_ANALYZER', {
       name: 'EMA_ANALYZER',
-      weight: 0.12,
-      priority: 5,
+      weight: emaAnalyzerConfig?.weight ?? 0.3,
+      priority: emaAnalyzerConfig?.priority ?? 5,
       enabled: emaEnabled,
       evaluate: async (data: StrategyMarketData) => {
         if (!data.ema) return null;
         const { fast, slow } = data.ema;
         const emaDiff = Math.abs(fast - slow);
         const emaDiffPercent = (emaDiff / slow) * (PERCENT_MULTIPLIER as number);
-        const baseConfidence = config?.analyzerConstants?.ema?.baseConfidence ?? EMA_BASE_CONFIDENCE;
-        const strengthMultiplier = config?.analyzerConstants?.ema?.strengthConfidenceMultiplier ?? EMA_STRENGTH_CONFIDENCE_MULTIPLIER;
+        const baseConfidence = config?.indicators?.ema?.baseConfidence ?? EMA_BASE_CONFIDENCE;
+        const strengthMultiplier = config?.indicators?.ema?.strengthMultiplier ?? EMA_STRENGTH_CONFIDENCE_MULTIPLIER;
 
         if (fast > slow) {
           const strength = Math.min(emaDiffPercent, PERCENT_MULTIPLIER as number);

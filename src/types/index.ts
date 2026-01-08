@@ -58,20 +58,33 @@ export type {
   DirectionStats,
 } from './strategy';
 
-// Re-export config types
+// Re-export config types - NEW SIMPLIFIED STRUCTURE
+export type {
+  BotConfig,
+  ConfigMeta,
+  ExchangeConfig,
+  TradingConfig,
+  RiskManagementConfig,
+  TimeframesConfig,
+  IndicatorsConfig,
+  AnalyzersConfig,
+  FiltersConfig,
+  ConfidenceConfig,
+  StrategiesConfig,
+  ServicesConfig,
+  MonitoringConfig,
+} from './config.types';
+
+// Re-export old config types (deprecated - for backward compatibility)
 export type {
   LoggingConfig,
   SystemConfig,
   TelegramConfig,
-  TimeframeConfig,
-  ExchangeConfig,
-  TradingConfig,
   StochasticConfig,
   ATRFilterConfig,
   TakeProfitConfig,
   SmartTP3Config,
   BBTrailingStopConfig,
-  DataSubscriptionsConfig,
   BTCConfirmationConfig,
   OrderBookConfig,
   VolumeConfig,
@@ -92,14 +105,12 @@ export type {
   VolumeProfileConfig,
   VolumeProfileIntegrationConfig,
   AdaptiveTP3Config,
-  DataCollectionConfig,
   MaxConcurrentRiskConfig,
   MicroWallDetectorConfig,
   LimitOrderExecutorConfig,
   LadderTpManagerConfig,
   TickDeltaAnalyzerConfig,
   OrderFlowAnalyzerConfig,
-  IndicatorsConfig,
   PatternAnalyzerConfig,
   SweepDetectorConfig,
   FastEntryConfig,
@@ -108,7 +119,6 @@ export type {
   OrderBlockConfig,
   FVGConfig,
   FractalConfig,
-  EntryConfirmationConfig,
   SMCMicrostructureConfig,
   DynamicTPConfig,
   TFAlignmentConfig,

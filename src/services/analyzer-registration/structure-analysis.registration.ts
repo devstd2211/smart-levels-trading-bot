@@ -20,16 +20,17 @@ export class StructureAnalysisRegistration implements AnalyzerRegistrationModule
 
   register(analyzerRegistry: AnalyzerRegistry, logger: LoggerService, config: any): void {
     // Trend Detector (priority 5, weight 0.15)
-    const trendEnabled = config?.strategicWeights?.structureAnalysis?.trendDetector?.enabled ?? true;
+    const trendEnabled = config?.analyzers?.trendDetector?.enabled ?? false;
+    const trendAnalyzerConfig = config?.analyzers?.trendDetector;
     analyzerRegistry.register('TREND_DETECTOR', {
       name: 'TREND_DETECTOR',
-      weight: 0.15,
-      priority: 5,
+      weight: trendAnalyzerConfig?.weight ?? 0.35,
+      priority: trendAnalyzerConfig?.priority ?? 7,
       enabled: trendEnabled,
       evaluate: async (data: StrategyMarketData) => {
         if (!data.trend) return null;
         const direction = data.trend === 'BULLISH' ? SignalDirection.LONG : SignalDirection.SHORT;
-        const confidence = config?.analyzerConstants?.trend?.defaultConfidence ?? TREND_DETECTOR_DEFAULT_CONFIDENCE;
+        const confidence = trendAnalyzerConfig?.minConfidence ?? TREND_DETECTOR_DEFAULT_CONFIDENCE;
         return {
           source: 'TREND_DETECTOR',
           direction,
@@ -41,7 +42,7 @@ export class StructureAnalysisRegistration implements AnalyzerRegistrationModule
     });
 
     // ===== FIX #2: CHOCH_BOS_DETECTOR - Full Implementation =====
-    const chochEnabled = config?.strategicWeights?.structureAnalysis?.chochBos?.enabled ?? true;
+    const chochEnabled = false; // DISABLED - not in new config structure
     analyzerRegistry.register('CHOCH_BOS_DETECTOR', {
       name: 'CHOCH_BOS_DETECTOR',
       weight: 0.2,
@@ -53,7 +54,7 @@ export class StructureAnalysisRegistration implements AnalyzerRegistrationModule
     });
 
     // Swing Detector (priority 8, weight 0.18)
-    const swingEnabled = config?.strategicWeights?.structureAnalysis?.swingDetector?.enabled ?? true;
+    const swingEnabled = false; // DISABLED - not in new config structure
     analyzerRegistry.register('SWING_DETECTOR', {
       name: 'SWING_DETECTOR',
       weight: 0.18,
@@ -70,7 +71,7 @@ export class StructureAnalysisRegistration implements AnalyzerRegistrationModule
     });
 
     // ===== FIX #6: TREND_CONFLICT_DETECTOR - Detects conflicting signals indicating reversals =====
-    const trendConflictEnabled = config?.analyzerStrategic?.trendConflictDetector?.enabled ?? true;
+    const trendConflictEnabled = false; // DISABLED - not in new config structure
     analyzerRegistry.register('TREND_CONFLICT', {
       name: 'TREND_CONFLICT',
       weight: 0.1,

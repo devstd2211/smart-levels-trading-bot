@@ -75,7 +75,7 @@ export class LevelAnalysisRegistration implements AnalyzerRegistrationModule {
     });
 
     // Volume Profile Analyzer (priority 7, weight 0.18)
-    const volumeProfileEnabled = config?.volumeProfile?.enabled ?? true;
+    const volumeProfileEnabled = false; // DISABLED - not in new config structure
     analyzerRegistry.register('VOLUME_PROFILE', {
       name: 'VOLUME_PROFILE',
       weight: 0.18,

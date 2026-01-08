@@ -15,7 +15,7 @@ export class LiquidityAnalysisRegistration implements AnalyzerRegistrationModule
       name: 'LIQUIDITY_SWEEP',
       weight: 0.18,
       priority: 8,
-      enabled: liquiditySweepEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         if (!data.swingPoints || data.swingPoints.length < 3) {
           logger.debug('⛔ LIQUIDITY_SWEEP | Insufficient swing points');
@@ -99,7 +99,7 @@ export class LiquidityAnalysisRegistration implements AnalyzerRegistrationModule
       name: 'LIQUIDITY_ZONE',
       weight: 0.15,
       priority: 6,
-      enabled: liquidityZoneEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         if (!data.swingPoints || data.swingPoints.length < 4) {
           logger.debug('⛔ LIQUIDITY_ZONE | Insufficient swing points for zone detection');
@@ -175,7 +175,7 @@ export class LiquidityAnalysisRegistration implements AnalyzerRegistrationModule
       name: 'PRICE_ACTION',
       weight: 0.16,
       priority: 7,
-      enabled: priceActionEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         if (!data.candles || data.candles.length < 2) {
           logger.debug('⛔ PRICE_ACTION | Insufficient candles for PA analysis');

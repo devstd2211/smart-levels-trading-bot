@@ -28,7 +28,7 @@ export class AdvancedAnalysisRegistration implements AnalyzerRegistrationModule 
       name: 'DIVERGENCE_ANALYZER',
       weight: 0.15,
       priority: 7,
-      enabled: divergenceEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         // First check regular divergence
         const divConfig = config?.analyzerStrategic?.divergenceAnalyzer;
@@ -69,7 +69,7 @@ export class AdvancedAnalysisRegistration implements AnalyzerRegistrationModule 
       name: 'BREAKOUT_PREDICTOR',
       weight: 0.14,
       priority: 6,
-      enabled: breakoutEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         if (!data.breakoutPrediction || !data.breakoutPrediction.direction || data.breakoutPrediction.direction === 'NEUTRAL') {
           logger.debug('⛔ BREAKOUT_PREDICTOR | No clear breakout direction');
@@ -92,18 +92,19 @@ export class AdvancedAnalysisRegistration implements AnalyzerRegistrationModule 
       name: 'WICK_ANALYZER',
       weight: 0.12,
       priority: 7,
-      enabled: wickEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         return this.wickSignalAnalyzer.evaluate(data);
       },
     });
 
     // Price Momentum Analyzer (priority 9, weight 0.20)
-    const priceMomentumEnabled = config?.strategicWeights?.technicalIndicators?.priceMomentum?.enabled ?? true;
+    const priceMomentumEnabled = config?.indicators?.priceMomentum?.enabled ?? false;
+    const priceMomentumAnalyzerConfig = config?.analyzers?.priceMomentum;
     analyzerRegistry.register('PRICE_MOMENTUM', {
       name: 'PRICE_MOMENTUM',
-      weight: 0.20,
-      priority: 9,
+      weight: priceMomentumAnalyzerConfig?.weight ?? 0.35,
+      priority: priceMomentumAnalyzerConfig?.priority ?? 6,
       enabled: priceMomentumEnabled,
       evaluate: async (data: StrategyMarketData) => {
         if (!data.candles || data.candles.length < 5) {

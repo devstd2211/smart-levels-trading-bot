@@ -22,7 +22,7 @@ export class DeltaScalpingRegistration implements AnalyzerRegistrationModule {
       name: 'DELTA_ANALYZER',
       weight: 0.15,
       priority: 6,
-      enabled: deltaEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         if (!this.deltaAnalyzerService) {
           return null;

@@ -21,7 +21,7 @@ export class FiltersProtectionRegistration implements AnalyzerRegistrationModule
       name: 'ATH_PROTECTION',
       weight: 0.1,
       priority: 4,
-      enabled: athEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         const ath = (data as any).ath;
         if (!ath || ath <= 0) return null;
@@ -47,7 +47,7 @@ export class FiltersProtectionRegistration implements AnalyzerRegistrationModule
       name: 'EMA_FILTER',
       weight: 0.1,
       priority: 4,
-      enabled: emaFilterEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         return null;
       },
@@ -59,7 +59,7 @@ export class FiltersProtectionRegistration implements AnalyzerRegistrationModule
       name: 'RSI_FILTER',
       weight: 0.09,
       priority: 5,
-      enabled: rsiFilterEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         return null;
       },
@@ -71,7 +71,7 @@ export class FiltersProtectionRegistration implements AnalyzerRegistrationModule
       name: 'VOLUME_FILTER',
       weight: 0.09,
       priority: 5,
-      enabled: volumeFilterEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         return null;
       },
@@ -93,7 +93,7 @@ export class FiltersProtectionRegistration implements AnalyzerRegistrationModule
     };
 
     logger.info('📊 Registering BTC_CORRELATION analyzer', {
-      enabled: isBtcConfirmationEnabled,
+      enabled: false,
       weight: btcAnalyzerConfig.weight,
       priority: btcAnalyzerConfig.priority,
     });
@@ -102,7 +102,7 @@ export class FiltersProtectionRegistration implements AnalyzerRegistrationModule
       name: 'BTC_CORRELATION',
       weight: btcAnalyzerConfig.weight,
       priority: btcAnalyzerConfig.priority,
-      enabled: isBtcConfirmationEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         if (!this.btcAnalyzer || !this.btcCandlesStore || this.btcCandlesStore.btcCandles1m.length === 0) {
           return null;
@@ -156,7 +156,7 @@ export class FiltersProtectionRegistration implements AnalyzerRegistrationModule
       name: 'SESSION_FILTER',
       weight: 0.08,
       priority: 3,
-      enabled: sessionFilterEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         return null;
       },
@@ -168,7 +168,7 @@ export class FiltersProtectionRegistration implements AnalyzerRegistrationModule
       name: 'FUNDING_RATE_FILTER',
       weight: 0.08,
       priority: 3,
-      enabled: fundingFilterEnabled,
+      enabled: false,
       evaluate: async (data: StrategyMarketData) => {
         return null;
       },
