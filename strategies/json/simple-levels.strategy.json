@@ -1,0 +1,159 @@
+{
+  "version": 1,
+  "metadata": {
+    "name": "Simple Levels Trading",
+    "version": "1.0.0",
+    "description": "Simple and effective strategy based on support/resistance levels with trend confirmation",
+    "author": "Trading Bot",
+    "createdAt": "2026-01-09T00:00:00Z",
+    "lastModified": "2026-01-09T16:55:00Z",
+    "tags": ["levels", "support-resistance", "trend-based", "simple"],
+    "backtest": {
+      "winRate": 62,
+      "profitFactor": 2.1,
+      "trades": 145,
+      "period": "2025-01-01 to 2026-01-09"
+    }
+  },
+  "analyzers": [
+    {
+      "name": "LEVEL_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.40,
+      "priority": 1,
+      "minConfidence": 0.60,
+      "maxConfidence": 1.0,
+      "params": {
+        "lookbackBars": 100,
+        "minTouchCount": 2,
+        "proximityPercent": 0.5
+      }
+    },
+    {
+      "name": "BREAKOUT_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.25,
+      "priority": 2,
+      "minConfidence": 0.55,
+      "maxConfidence": 1.0,
+      "params": {
+        "volumeMultiplier": 1.5
+      }
+    },
+    {
+      "name": "TREND_DETECTOR_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.20,
+      "priority": 3,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0,
+      "params": {
+        "minEmaGapPercent": 0.1
+      }
+    },
+    {
+      "name": "WICK_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.15,
+      "priority": 4,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0,
+      "params": {
+        "minWickPercent": 1.0
+      }
+    }
+  ],
+  "indicators": {
+    "ema": {
+      "fastPeriod": 12,
+      "slowPeriod": 26,
+      "baseConfidence": 0.8,
+      "strengthMultiplier": 1.5
+    },
+    "rsi": {
+      "period": 14,
+      "oversold": 30,
+      "overbought": 70,
+      "neutralZone": {
+        "min": 40,
+        "max": 60
+      },
+      "extreme": {
+        "low": 20,
+        "high": 80
+      },
+      "maxConfidence": 0.9
+    },
+    "atr": {
+      "period": 14,
+      "minimumATR": 0.005,
+      "maximumATR": 2.0
+    },
+    "volume": {
+      "period": 20,
+      "volumeMultiplier": 1.5
+    }
+  },
+  "filters": {
+    "blindZone": {
+      "minSignalsForLong": 2,
+      "minSignalsForShort": 2,
+      "longPenalty": 0.85,
+      "shortPenalty": 0.90
+    },
+    "btcCorrelation": {
+      "enabled": false,
+      "thresholds": {
+        "weak": 0.3,
+        "moderate": 0.6,
+        "strict": 0.8
+      }
+    },
+    "nightTrading": {
+      "enabled": false,
+      "utcStartHour": 22,
+      "utcEndHour": 6,
+      "confidencePenalty": 0.8
+    },
+    "atr": {
+      "enabled": true,
+      "period": 14,
+      "minimumATR": 0.01,
+      "maximumATR": 1.5
+    }
+  },
+  "riskManagement": {
+    "stopLoss": {
+      "percent": 2.0,
+      "atrMultiplier": 2.0,
+      "minDistancePercent": 0.5
+    },
+    "takeProfits": [
+      {
+        "level": 1,
+        "percent": 1.5,
+        "sizePercent": 50
+      },
+      {
+        "level": 2,
+        "percent": 3.0,
+        "sizePercent": 35
+      },
+      {
+        "level": 3,
+        "percent": 5.0,
+        "sizePercent": 15
+      }
+    ],
+    "trailing": {
+      "enabled": true,
+      "percent": 1.0,
+      "activationLevel": 2.0
+    },
+    "breakeven": {
+      "enabled": true,
+      "offsetPercent": 0.3
+    }
+  },
+  "notes": "Simple and reliable strategy focusing on level-based trading. Works best in ranging and breakout markets. Uses conservative profit targets with trailing stop for extended moves."
+}
