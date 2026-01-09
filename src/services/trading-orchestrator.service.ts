@@ -334,6 +334,13 @@ export class TradingOrchestrator {
       }
     }
 
+    // Normalize confidence from 0-100 scale (from analyzers) to 0-1 scale (for internal use)
+    signals.forEach(s => {
+      s.confidence = s.confidence / 100;
+      // Recalculate score based on normalized confidence
+      s.score = s.confidence * s.weight;
+    });
+
     return signals;
   }
 

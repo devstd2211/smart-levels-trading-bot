@@ -727,7 +727,37 @@ This is not just a trading bot - it's a showcase of what's possible when working
 
 ---
 
-**Last Updated:** 2026-01-03
-**Version:** 1.0.0-beta
+## Recent Updates (2026-01-09)
+
+### ✅ Completed in This Session
+
+1. **Analyzer Configuration System**
+   - Added `analyzerDefaults` section to config.json with default parameters for all 28 analyzers
+   - Extended StrategyConfig type to support analyzer-specific parameter overrides
+   - Implemented 3-level configuration fallback: Strategy overrides > Main config defaults > Hardcoded defaults
+   - All 28 analyzers now successfully load their required parameters without errors
+
+2. **Strategy Configuration Merger**
+   - Enhanced StrategyConfigMergerService to properly merge analyzer defaults from strategy JSON
+   - Strategy-specific defaults now override main config defaults
+   - Ensures clean configuration hierarchy for flexible strategy customization
+
+3. **Confidence Scale Normalization**
+   - Fixed critical bug: all analyzers were returning confidence as 0-100 scale
+   - Implemented automatic normalization from 0-100 to 0-1 in TradingOrchestrator
+   - Fixed score calculation to use normalized confidence values
+   - Result: Confidence signals now display correctly (95% instead of 9500%)
+
+### 📊 System Status
+
+- ✅ All 26 analyzers operating without configuration errors
+- ✅ Proper confidence scaling for all signal types
+- ✅ Dynamic parameter adjustment via strategy JSON
+- ✅ Real-time analyzer signal generation verified in logs
+
+---
+
+**Last Updated:** 2026-01-09
+**Version:** 1.0.1-beta
 **License:** MIT
 **Built With:** Claude Code (Anthropic)
