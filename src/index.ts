@@ -84,7 +84,7 @@ async function main(): Promise<void> {
 
     // Initialize trading bot using BotFactory (DI Container)
     console.log('\n[Main] Initializing Trading Bot via BotFactory...');
-    const bot = BotFactory.create({ config });
+    const bot = await BotFactory.create({ config });
 
     // Initialize web server (lazy import to avoid rootDir issues)
     let webServer: any = null;

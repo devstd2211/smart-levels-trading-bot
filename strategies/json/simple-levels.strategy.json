@@ -9,7 +9,7 @@
     "lastModified": "2026-01-09T16:55:00Z",
     "tags": ["levels", "support-resistance", "trend-based", "simple"],
     "backtest": {
-      "winRate": 62,
+      "winRate": 0.62,
       "profitFactor": 2.1,
       "trades": 145,
       "period": "2025-01-01 to 2026-01-09"

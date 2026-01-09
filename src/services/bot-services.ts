@@ -115,6 +115,67 @@ export class BotServices {
       this.logger.info('📝 Log file', { path: logFilePath });
     }
 
+    // Log strategy analyzer information
+    if (config.analyzers && config.analyzers.length > 0) {
+      const enabledAnalyzers = config.analyzers.filter((a: any) => a.enabled);
+      this.logger.info(`📊 Strategy Analyzers loaded: ${enabledAnalyzers.length}/${config.analyzers.length} enabled`, {
+        enabled: enabledAnalyzers.length,
+        disabled: config.analyzers.length - enabledAnalyzers.length,
+        total: config.analyzers.length,
+      });
+
+      // Group analyzers by weight
+      const byWeight = enabledAnalyzers.reduce(
+        (acc: Record<string, string[]>, a: any) => {
+          const key = `${(a.weight * 100).toFixed(1)}%`;
+          if (!acc[key]) acc[key] = [];
+          acc[key].push(a.name);
+          return acc;
+        },
+        {} as Record<string, string[]>,
+      );
+
+      // Log weight distribution
+      Object.entries(byWeight)
+        .sort(([w1], [w2]) => parseFloat(w2) - parseFloat(w1))
+        .forEach(([weight, names]) => {
+          const nameList = names as string[];
+          this.logger.info(`   ${weight}: ${nameList.length} analyzers`);
+        });
+
+      // Log top 5 analyzers by weight
+      const topAnalyzers = [...enabledAnalyzers]
+        .sort((a: any, b: any) => (b.weight || 0) - (a.weight || 0))
+        .slice(0, 5);
+      if (topAnalyzers.length > 0) {
+        this.logger.info(`   Top 5 analyzers:`);
+        topAnalyzers.forEach((a: any) => {
+          this.logger.info(`     • ${a.name}: ${(a.weight * 100).toFixed(2)}% weight, priority=${a.priority}`);
+        });
+      }
+    }
+
+    // Log indicator configuration
+    if (config.indicators) {
+      const indicatorNames = Object.keys(config.indicators);
+      this.logger.info(`📈 Indicators configured: ${indicatorNames.length}`, {
+        indicators: indicatorNames.join(', '),
+      });
+
+      // Log specific indicator parameters
+      Object.entries(config.indicators).forEach(([name, cfg]) => {
+        const details: string[] = [];
+        const indCfg = cfg as any;
+        if (indCfg.period) details.push(`period=${indCfg.period}`);
+        if (indCfg.fastPeriod) details.push(`fast=${indCfg.fastPeriod}, slow=${indCfg.slowPeriod}`);
+        if (indCfg.kPeriod) details.push(`k=${indCfg.kPeriod}, d=${indCfg.dPeriod}`);
+        if (indCfg.stdDev) details.push(`stdDev=${indCfg.stdDev}`);
+        if (details.length > 0) {
+          this.logger.info(`   ${name}: ${details.join(', ')}`);
+        }
+      });
+    }
+
     // 1.5 Initialize event bus (depends on logger)
     this.eventBus = new BotEventBus(this.logger);
 

@@ -816,6 +816,12 @@ export interface StrategiesConfig {
 }
 
 export interface Config {
+  meta?: {
+    description?: string;
+    lastUpdated?: string;
+    strategy?: string; // Strategy name from JSON (e.g., "simple-levels")
+    notes?: string;
+  };
   exchange: ExchangeConfig;
   timeframes: Record<string, TimeframeConfig>; // Key: 'entry' | 'primary' | 'trend1' | 'trend2' | 'context'
   trading: TradingConfig;

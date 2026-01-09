@@ -21,6 +21,7 @@ import { ConfigNew } from '../types/config-new.types';
 export class StrategyManagerService {
   private strategy: StrategyConfig | null = null;
   private mergedConfig: ConfigNew | null = null;
+  private mergedConfigGeneric: any = null; // Generic config that can be Config or ConfigNew
 
   constructor(
     private loader: StrategyLoaderService,
@@ -34,14 +35,14 @@ export class StrategyManagerService {
    * @param strategyName - Name of strategy to load (e.g., "level-trading")
    * @param mainConfig - Main config from config-new.json
    */
-  async initialize(strategyName: string, mainConfig: ConfigNew): Promise<void> {
+  async initialize(strategyName: string, mainConfig: ConfigNew | any): Promise<void> {
     console.log(`[StrategyManager] Loading strategy: ${strategyName}`);
 
     // Load strategy from JSON
     this.strategy = await this.loader.loadStrategy(strategyName);
 
-    // Merge with main config
-    this.mergedConfig = this.merger.mergeConfigs(mainConfig, this.strategy);
+    // Merge with main config (supports both Config and ConfigNew types)
+    this.mergedConfigGeneric = this.merger.mergeConfigs(mainConfig, this.strategy);
 
     // Log what changed
     const changeReport = this.merger.getChangeReport(mainConfig, this.strategy);
@@ -76,14 +77,15 @@ export class StrategyManagerService {
   /**
    * Get merged config (strategy overrides applied)
    * Used by services that need the final config
+   * Returns either Config or ConfigNew depending on what was passed
    */
-  getMergedConfig(): ConfigNew {
-    if (!this.mergedConfig) {
+  getMergedConfig(): any {
+    if (!this.mergedConfigGeneric) {
       throw new Error(
         '[StrategyManager] Config not merged. Call initialize() first.',
       );
     }
-    return this.mergedConfig;
+    return this.mergedConfigGeneric;
   }
 
   /**
@@ -129,6 +131,6 @@ export class StrategyManagerService {
    * Check if strategy is ready
    */
   isReady(): boolean {
-    return this.strategy !== null && this.mergedConfig !== null;
+    return this.strategy !== null && this.mergedConfigGeneric !== null;
   }
 }

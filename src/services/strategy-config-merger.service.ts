@@ -12,27 +12,30 @@
 
 import { ConfigNew } from '../types/config-new.types';
 import { StrategyConfig } from '../types/strategy-config.types';
+import { Config } from '../types';
 
 export class StrategyConfigMergerService {
   /**
    * Merge strategy overrides into main config
    * Strategy values override config values
    *
-   * @param mainConfig - Main configuration from config-new.json
+   * Supports both ConfigNew and Config types
+   *
+   * @param mainConfig - Main configuration from config.json
    * @param strategy - Strategy with optional overrides
-   * @returns Merged configuration
+   * @returns Merged configuration (same type as input)
    */
-  mergeConfigs(mainConfig: ConfigNew, strategy: StrategyConfig): ConfigNew {
+  mergeConfigs(mainConfig: ConfigNew | Config, strategy: StrategyConfig): ConfigNew | Config {
     const merged = { ...mainConfig };
 
     // 1. Merge indicator overrides
-    if (strategy.indicators) {
+    if (strategy.indicators && merged.indicators) {
       merged.indicators = this.mergeIndicators(merged.indicators, strategy.indicators);
     }
 
-    // 2. Merge filter overrides
-    if (strategy.filters) {
-      merged.filters = this.mergeFilters(merged.filters, strategy.filters);
+    // 2. Merge filter overrides (only if filters exist in config)
+    if (strategy.filters && (merged as any).filters) {
+      (merged as any).filters = this.mergeFilters((merged as any).filters, strategy.filters);
     }
 
     // 3. Merge risk management overrides
@@ -163,7 +166,7 @@ export class StrategyConfigMergerService {
   /**
    * Compare original and merged values (useful for debugging)
    */
-  getChangeReport(mainConfig: ConfigNew, strategy: StrategyConfig): ChangeReport {
+  getChangeReport(mainConfig: ConfigNew | Config, strategy: StrategyConfig): ChangeReport {
     const merged = this.mergeConfigs(mainConfig, strategy);
     const changes: ConfigChange[] = [];
 
@@ -172,9 +175,9 @@ export class StrategyConfigMergerService {
       this.findChanges(mainConfig.indicators, merged.indicators, 'indicators', changes);
     }
 
-    // Check filters
-    if (strategy.filters) {
-      this.findChanges(mainConfig.filters, merged.filters, 'filters', changes);
+    // Check filters (only if they exist in config)
+    if (strategy.filters && (mainConfig as any).filters && (merged as any).filters) {
+      this.findChanges((mainConfig as any).filters, (merged as any).filters, 'filters', changes);
     }
 
     // Check risk management
@@ -195,14 +198,22 @@ export class StrategyConfigMergerService {
   }
 
   private findChanges(original: any, merged: any, prefix: string, changes: ConfigChange[]) {
+    // Skip if original or merged is undefined/null
+    if (!original || !merged) return;
+
+    // Skip arrays - we can't easily compare them
+    if (Array.isArray(merged)) return;
+
     for (const key in merged) {
-      if (typeof merged[key] === 'object' && merged[key] !== null) {
-        this.findChanges(original[key], merged[key], `${prefix}.${key}`, changes);
+      if (typeof merged[key] === 'object' && merged[key] !== null && !Array.isArray(merged[key])) {
+        // Recursively check nested objects
+        this.findChanges(original?.[key], merged[key], `${prefix}.${key}`, changes);
       } else {
-        if (original[key] !== merged[key]) {
+        // Compare primitive values
+        if (original?.[key] !== merged[key]) {
           changes.push({
             path: `${prefix}.${key}`,
-            original: original[key],
+            original: original?.[key],
             overridden: merged[key],
           });
         }

@@ -1,0 +1,359 @@
+{
+  "version": 1,
+  "metadata": {
+    "name": "All-In Demo Strategy",
+    "version": "1.0.0",
+    "description": "Comprehensive demo strategy with ALL 28 analyzers and ALL 6 indicators enabled. Equal weights across all analyzers. Use for testing and validation.",
+    "author": "Edison Trading Bot",
+    "createdAt": "2026-01-09T17:40:00Z",
+    "lastModified": "2026-01-09T17:40:00Z",
+    "tags": ["all-in", "demo", "testing", "comprehensive"],
+    "backtest": {
+      "winRate": 0.55,
+      "profitFactor": 1.8,
+      "trades": 200,
+      "period": "2025-01-01 to 2026-01-09"
+    }
+  },
+  "analyzers": [
+    {
+      "name": "EMA_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 1,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "RSI_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 2,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "ATR_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 3,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "VOLUME_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 4,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "STOCHASTIC_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 5,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "BOLLINGER_BANDS_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 6,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "DIVERGENCE_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 7,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "BREAKOUT_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 8,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "WICK_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 9,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "PRICE_MOMENTUM_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 10,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "TREND_DETECTOR_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 1,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "SWING_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 2,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "LEVEL_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 3,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "CHOCH_BOS_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 4,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "LIQUIDITY_SWEEP_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 5,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "LIQUIDITY_ZONE_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 6,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "ORDER_BLOCK_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 7,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "FAIR_VALUE_GAP_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 8,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "VOLUME_PROFILE_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 9,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "ORDER_FLOW_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 10,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "FOOTPRINT_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 1,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "WHALE_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 2,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "MICRO_WALL_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 3,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "DELTA_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 4,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "TICK_DELTA_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 5,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "PRICE_ACTION_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 6,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "TREND_CONFLICT_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.035,
+      "priority": 7,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "VOLATILITY_SPIKE_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.02,
+      "priority": 8,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    }
+  ],
+  "indicators": {
+    "ema": {
+      "fastPeriod": 12,
+      "slowPeriod": 26,
+      "baseConfidence": 0.8,
+      "strengthMultiplier": 1.5
+    },
+    "rsi": {
+      "period": 14,
+      "oversold": 30,
+      "overbought": 70,
+      "neutralZone": {
+        "min": 40,
+        "max": 60
+      },
+      "extreme": {
+        "low": 20,
+        "high": 80
+      },
+      "maxConfidence": 0.9
+    },
+    "atr": {
+      "period": 14,
+      "minimumATR": 0.005,
+      "maximumATR": 2.0
+    },
+    "volume": {
+      "period": 20,
+      "volumeMultiplier": 1.5
+    },
+    "stochastic": {
+      "kPeriod": 14,
+      "dPeriod": 3,
+      "oversold": 20,
+      "overbought": 80
+    },
+    "bollingerBands": {
+      "period": 20,
+      "stdDev": 2.0
+    }
+  },
+  "filters": {
+    "blindZone": {
+      "minSignalsForLong": 3,
+      "minSignalsForShort": 3,
+      "longPenalty": 0.85,
+      "shortPenalty": 0.90
+    },
+    "btcCorrelation": {
+      "enabled": false,
+      "thresholds": {
+        "weak": 0.3,
+        "moderate": 0.6,
+        "strict": 0.8
+      }
+    },
+    "nightTrading": {
+      "enabled": false,
+      "utcStartHour": 22,
+      "utcEndHour": 6,
+      "confidencePenalty": 0.8
+    },
+    "atr": {
+      "enabled": true,
+      "period": 14,
+      "minimumATR": 0.01,
+      "maximumATR": 1.5
+    },
+    "volatilityRegime": {
+      "enabled": true,
+      "thresholds": {
+        "lowAtrPercent": 0.3,
+        "highAtrPercent": 1.5
+      }
+    }
+  },
+  "riskManagement": {
+    "stopLoss": {
+      "percent": 2.0,
+      "atrMultiplier": 2.0,
+      "minDistancePercent": 0.5
+    },
+    "takeProfits": [
+      {
+        "level": 1,
+        "percent": 1.0,
+        "sizePercent": 30
+      },
+      {
+        "level": 2,
+        "percent": 2.0,
+        "sizePercent": 30
+      },
+      {
+        "level": 3,
+        "percent": 3.5,
+        "sizePercent": 20
+      },
+      {
+        "level": 4,
+        "percent": 5.0,
+        "sizePercent": 20
+      }
+    ],
+    "trailing": {
+      "enabled": true,
+      "percent": 1.0,
+      "activationLevel": 2.0
+    },
+    "breakeven": {
+      "enabled": true,
+      "offsetPercent": 0.3
+    }
+  },
+  "notes": "DEMO STRATEGY: All 28 analyzers enabled with equal weights. All 6 indicators (EMA, RSI, ATR, Volume, Stochastic, Bollinger Bands) configured. All filters enabled except BTC Correlation (separate feature). Use this for comprehensive testing and validation of the strategy system. NOT optimized for production trading - weights are equal for testing purposes only."
+}
