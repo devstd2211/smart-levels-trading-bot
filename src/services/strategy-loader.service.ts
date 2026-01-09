@@ -329,6 +329,7 @@ export class StrategyLoaderService {
       'nightTrading',
       'atr',
       'volatilityRegime',
+      'emaFilter',
     ];
 
     for (const [key, value] of Object.entries(overrides)) {
