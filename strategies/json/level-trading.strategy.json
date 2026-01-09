@@ -84,6 +84,10 @@
         "moderate": 0.4,
         "strict": 0.7
       }
+    },
+    "emaFilter": {
+      "rsiThreshold": 55,
+      "emaDiffThreshold": 0.5
     }
   },
   "riskManagement": {
