@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "metadata": {
+    "name": "Liquidity-Based Smart Money Strategy",
+    "version": "1.0.0",
+    "description": "Follow whale activity and liquidity sweeps for high-conviction trades. Identifies smart money positions using order flow and volume analysis.",
+    "author": "Trading Team",
+    "createdAt": "2026-01-09T00:00:00Z",
+    "lastModified": "2026-01-09T00:00:00Z",
+    "tags": ["smart-money", "whale-tracking", "liquidity", "swing-trading"],
+    "backtest": {
+      "winRate": 0.65,
+      "profitFactor": 2.45,
+      "trades": 85,
+      "period": "2024-01-01 to 2024-12-31"
+    }
+  },
+  "analyzers": [
+    {
+      "name": "WHALE_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.30,
+      "priority": 1,
+      "minConfidence": 60,
+      "maxConfidence": 100
+    },
+    {
+      "name": "LIQUIDITY_SWEEP_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.25,
+      "priority": 2,
+      "minConfidence": 55,
+      "maxConfidence": 100
+    },
+    {
+      "name": "ORDER_BLOCK_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.20,
+      "priority": 3,
+      "minConfidence": 50,
+      "maxConfidence": 100
+    },
+    {
+      "name": "FAIR_VALUE_GAP_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.15,
+      "priority": 4,
+      "minConfidence": 45,
+      "maxConfidence": 100
+    },
+    {
+      "name": "EMA_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.10,
+      "priority": 5,
+      "minConfidence": 40,
+      "maxConfidence": 100
+    }
+  ],
+  "indicators": {
+    "ema": {
+      "fastPeriod": 9,
+      "slowPeriod": 21,
+      "baseConfidence": 0.5,
+      "strengthMultiplier": 0.2
+    },
+    "volume": {
+      "period": 20
+    }
+  },
+  "filters": {
+    "blindZone": {
+      "minSignalsForLong": 3,
+      "minSignalsForShort": 3,
+      "longPenalty": 0.85,
+      "shortPenalty": 0.90
+    },
+    "btcCorrelation": {
+      "enabled": true,
+      "thresholds": {
+        "weak": 0.15,
+        "moderate": 0.4,
+        "strict": 0.7
+      }
+    }
+  },
+  "riskManagement": {
+    "stopLoss": {
+      "percent": 2.5,
+      "atrMultiplier": 1.5,
+      "minDistancePercent": 2.0
+    },
+    "takeProfits": [
+      {
+        "level": 1,
+        "percent": 2.0,
+        "sizePercent": 50
+      },
+      {
+        "level": 2,
+        "percent": 4.0,
+        "sizePercent": 50
+      }
+    ],
+    "breakeven": {
+      "enabled": true,
+      "offsetPercent": 0.5
+    }
+  },
+  "notes": "Wait for clear whale/liquidity patterns. Better for swing trades than scalps. Requires at least 3 supporting signals. Minimum 2:1 RR ratio."
+}

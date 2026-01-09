@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "metadata": {
+    "name": "Momentum Scalping Strategy",
+    "version": "1.0.0",
+    "description": "Catch momentum with RSI and Stochastic oscillators in low-volatility regimes. Quick entries and exits for high-frequency trading.",
+    "author": "Trading Team",
+    "createdAt": "2026-01-09T00:00:00Z",
+    "lastModified": "2026-01-09T00:00:00Z",
+    "tags": ["scalping", "momentum", "high-frequency", "oscillators"],
+    "backtest": {
+      "winRate": 0.62,
+      "profitFactor": 2.15,
+      "trades": 320,
+      "period": "2024-01-01 to 2024-06-30"
+    }
+  },
+  "analyzers": [
+    {
+      "name": "RSI_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.30,
+      "priority": 1,
+      "minConfidence": 55,
+      "maxConfidence": 100
+    },
+    {
+      "name": "STOCHASTIC_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.30,
+      "priority": 2,
+      "minConfidence": 50,
+      "maxConfidence": 100
+    },
+    {
+      "name": "PRICE_MOMENTUM_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.25,
+      "priority": 3,
+      "minConfidence": 45,
+      "maxConfidence": 100
+    },
+    {
+      "name": "VOLUME_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.15,
+      "priority": 4,
+      "minConfidence": 40,
+      "maxConfidence": 100
+    }
+  ],
+  "indicators": {
+    "rsi": {
+      "period": 14,
+      "oversold": 30,
+      "overbought": 70,
+      "neutralZone": {
+        "min": 45,
+        "max": 55
+      }
+    },
+    "stochastic": {
+      "kPeriod": 14,
+      "dPeriod": 3
+    },
+    "volume": {
+      "period": 20
+    }
+  },
+  "filters": {
+    "blindZone": {
+      "minSignalsForLong": 2,
+      "minSignalsForShort": 2,
+      "longPenalty": 0.85,
+      "shortPenalty": 0.90
+    },
+    "nightTrading": {
+      "enabled": true,
+      "utcStartHour": 2,
+      "utcEndHour": 5,
+      "confidencePenalty": 0.25
+    },
+    "volatilityRegime": {
+      "enabled": true,
+      "thresholds": {
+        "lowAtrPercent": 0.3,
+        "highAtrPercent": 1.5
+      }
+    }
+  },
+  "riskManagement": {
+    "stopLoss": {
+      "percent": 1.0,
+      "atrMultiplier": 1.0,
+      "minDistancePercent": 0.8
+    },
+    "takeProfits": [
+      {
+        "level": 1,
+        "percent": 0.5,
+        "sizePercent": 40
+      },
+      {
+        "level": 2,
+        "percent": 1.0,
+        "sizePercent": 40
+      },
+      {
+        "level": 3,
+        "percent": 1.5,
+        "sizePercent": 20
+      }
+    ],
+    "trailing": {
+      "enabled": true,
+      "percent": 0.3,
+      "activationLevel": 2
+    },
+    "breakeven": {
+      "enabled": true,
+      "offsetPercent": 0.2
+    }
+  },
+  "notes": "Works best in 1m and 5m timeframes during active trading hours (08:00-20:00 UTC). Avoid night trading window (02:00-05:00 UTC)."
+}

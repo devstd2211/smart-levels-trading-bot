@@ -1,0 +1,113 @@
+{
+  "version": 1,
+  "metadata": {
+    "name": "Level Trading Strategy",
+    "version": "1.0.0",
+    "description": "Trade support/resistance levels with trend confirmation. Focuses on structural price levels and EMA alignment.",
+    "author": "Trading Team",
+    "createdAt": "2026-01-09T00:00:00Z",
+    "lastModified": "2026-01-09T00:00:00Z",
+    "tags": ["level-trading", "structural-analysis", "medium-volatility", "swing-trading"],
+    "backtest": {
+      "winRate": 0.58,
+      "profitFactor": 1.92,
+      "trades": 150,
+      "period": "2024-01-01 to 2024-12-31"
+    }
+  },
+  "analyzers": [
+    {
+      "name": "LEVEL_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.35,
+      "priority": 1,
+      "minConfidence": 50,
+      "maxConfidence": 95
+    },
+    {
+      "name": "EMA_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.30,
+      "priority": 2,
+      "minConfidence": 40,
+      "maxConfidence": 100
+    },
+    {
+      "name": "TREND_DETECTOR_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.20,
+      "priority": 3,
+      "minConfidence": 45,
+      "maxConfidence": 100
+    },
+    {
+      "name": "RSI_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.15,
+      "priority": 4,
+      "minConfidence": 35,
+      "maxConfidence": 100
+    }
+  ],
+  "indicators": {
+    "ema": {
+      "fastPeriod": 9,
+      "slowPeriod": 21,
+      "baseConfidence": 0.5,
+      "strengthMultiplier": 0.2
+    },
+    "rsi": {
+      "period": 14,
+      "oversold": 30,
+      "overbought": 70,
+      "neutralZone": {
+        "min": 45,
+        "max": 55
+      },
+      "extreme": {
+        "low": 20,
+        "high": 80
+      }
+    }
+  },
+  "filters": {
+    "blindZone": {
+      "minSignalsForLong": 2,
+      "minSignalsForShort": 2,
+      "longPenalty": 0.85,
+      "shortPenalty": 0.90
+    },
+    "btcCorrelation": {
+      "enabled": true,
+      "thresholds": {
+        "weak": 0.15,
+        "moderate": 0.4,
+        "strict": 0.7
+      }
+    }
+  },
+  "riskManagement": {
+    "stopLoss": {
+      "percent": 2.0,
+      "atrMultiplier": 1.5,
+      "minDistancePercent": 1.5
+    },
+    "takeProfits": [
+      {
+        "level": 1,
+        "percent": 1.5,
+        "sizePercent": 50
+      },
+      {
+        "level": 2,
+        "percent": 3.0,
+        "sizePercent": 50
+      }
+    ],
+    "breakeven": {
+      "enabled": true,
+      "offsetPercent": 0.4
+    }
+  },
+  "notes": "Best used in 4-hour and higher timeframes with clear structural levels. Requires at least 3 touches for level confirmation."
+}
