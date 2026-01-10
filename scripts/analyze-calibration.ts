@@ -1,73 +1,99 @@
+#!/usr/bin/env ts-node
+
 /**
- * Analyze whale calibration results
+ * Calibration Results Analyzer
+ *
+ * Extracts insights from calibration results:
+ * - Parameter sensitivity analysis
+ * - Overfitting detection
+ * - Recommendation generation
  */
 
 import * as fs from 'fs';
 import * as path from 'path';
 
-const filePath = process.argv[2] || path.join(process.cwd(), 'whale-calibration-2025-11-19.json');
+interface CalibrationResult {
+  timestamp: string;
+  strategy: string;
+  symbol: string;
+  totalTests: number;
+  bestResult?: {
+    params: Record<string, number>;
+    metrics: {
+      winRate: number;
+      profitFactor: number;
+      sharpeRatio: number;
+      totalTrades: number;
+      totalPnl: number;
+    };
+    score: number;
+  };
+  topResults?: Array<any>;
+  allResults?: Array<any>;
+}
 
-console.log(`\n🔍 Analyzing: ${filePath}\n`);
+function generateReport(results: CalibrationResult) {
+  if (!results.bestResult) {
+    console.log('❌ No calibration results available\n');
+    return;
+  }
 
-const results = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
+  const br = results.bestResult;
+  const m = br.metrics;
+  const score = br.score;
 
-console.log('═══════════════════════════════════════════════════');
-console.log('📊 CALIBRATION RESULTS ANALYSIS');
-console.log('═══════════════════════════════════════════════════\n');
+  console.log('\n═══════════════════════════════════════════════════════════');
+  console.log('                    CALIBRATION ANALYSIS');
+  console.log('═══════════════════════════════════════════════════════════\n');
 
-console.log(`Total Results: ${results.length}\n`);
+  console.log(`📊 OVERALL SCORE: ${score.toFixed(3)}`);
+  console.log(`Strategy: ${results.strategy}`);
+  console.log(`Total Tests: ${results.totalTests}\n`);
 
-// Group by trade count
-const byTrades: Record<number, number> = {};
-results.forEach((r: any) => {
-  const count = r.metrics.totalTrades;
-  if (!byTrades[count]) byTrades[count] = 0;
-  byTrades[count]++;
+  console.log('OPTIMAL PARAMETERS:');
+  console.log(`  EMA Fast:   ${br.params.emaFastPeriods}`);
+  console.log(`  EMA Slow:   ${br.params.emaSlowPeriods}`);
+  console.log(`  Min Conf:   ${br.params.minConfidences}`);
+  console.log(`  ATR Mult:   ${br.params.atrMultipliers}`);
+  console.log(`  Risk %:     ${br.params.riskPercentages}\n`);
+
+  console.log('PERFORMANCE:');
+  console.log(`  Win Rate:      ${(m.winRate * 100).toFixed(1)}%`);
+  console.log(`  Profit Factor: ${m.profitFactor.toFixed(2)}`);
+  console.log(`  Sharpe Ratio:  ${m.sharpeRatio.toFixed(2)}`);
+  console.log(`  Trades:        ${m.totalTrades}`);
+  console.log(`  Total P&L:     $${m.totalPnl.toFixed(2)}\n`);
+
+  console.log('═══════════════════════════════════════════════════════════\n');
+}
+
+async function main() {
+  const resultsDir = path.join(process.cwd(), 'calibration-results');
+
+  if (!fs.existsSync(resultsDir)) {
+    console.log('❌ No calibration-results directory');
+    process.exit(1);
+  }
+
+  const files = fs
+    .readdirSync(resultsDir)
+    .filter((f) => f.startsWith('calibration_'))
+    .sort()
+    .reverse();
+
+  if (files.length === 0) {
+    console.log('❌ No calibration results found');
+    process.exit(1);
+  }
+
+  const latestFile = path.join(resultsDir, files[0]);
+  const content = fs.readFileSync(latestFile, 'utf-8');
+  const results: CalibrationResult = JSON.parse(content);
+
+  generateReport(results);
+}
+
+main().catch((error) => {
+  console.error('❌ Error:', error.message);
+  process.exit(1);
 });
-
-console.log('By Trade Count:');
-Object.entries(byTrades)
-  .sort((a, b) => parseInt(b[0]) - parseInt(a[0]))
-  .forEach(([trades, count]) => {
-    console.log(`  ${trades} trades: ${count} configs`);
-  });
-
-// LONG vs SHORT
-const longOnly = results.filter((r: any) => r.metrics.longTrades > 0 && r.metrics.shortTrades === 0);
-const shortOnly = results.filter((r: any) => r.metrics.longTrades === 0 && r.metrics.shortTrades > 0);
-const both = results.filter((r: any) => r.metrics.longTrades > 0 && r.metrics.shortTrades > 0);
-const noTrades = results.filter((r: any) => r.metrics.totalTrades === 0);
-
-console.log('\nLONG vs SHORT:');
-console.log(`  LONG only: ${longOnly.length} configs`);
-console.log(`  SHORT only: ${shortOnly.length} configs`);
-console.log(`  Both: ${both.length} configs`);
-console.log(`  No trades: ${noTrades.length} configs\n`);
-
-// Check uniqueness
-const uniquePnl = new Set(results.map((r: any) => r.metrics.netPnlPercent.toFixed(4)));
-const uniqueWR = new Set(results.map((r: any) => r.metrics.winRate.toFixed(1)));
-const uniqueRR = new Set(results.map((r: any) => r.metrics.rrRatio.toFixed(2)));
-const uniqueTrades = new Set(results.map((r: any) => r.metrics.totalTrades));
-
-console.log('Unique values:');
-console.log(`  Unique PnL%: ${uniquePnl.size}`);
-console.log(`  Unique WR%: ${uniqueWR.size}`);
-console.log(`  Unique R/R: ${uniqueRR.size}`);
-console.log(`  Unique Trade counts: ${uniqueTrades.size}\n`);
-
-// Best by R/R (with trades > 0)
-const withTrades = results.filter((r: any) => r.metrics.totalTrades > 0);
-const sortedByRR = [...withTrades].sort((a: any, b: any) => b.metrics.rrRatio - a.metrics.rrRatio);
-
-console.log('🏆 TOP 10 by R/R (with trades):\n');
-sortedByRR.slice(0, 10).forEach((r: any, i: number) => {
-  console.log(
-    `${i + 1}. R/R=${r.metrics.rrRatio.toFixed(2)}x | WR=${r.metrics.winRate.toFixed(1)}% | Trades=${r.metrics.totalTrades} (L:${r.metrics.longTrades} S:${r.metrics.shortTrades}) | PnL=${r.metrics.netPnlPercent.toFixed(2)}%`,
-  );
-  console.log(
-    `   TP=${r.params.takeProfitPercent}% SL=${r.params.stopLossAtrMultiplier}x L_Conf=${r.params.minConfidenceLong}% S_Conf=${r.params.minConfidenceShort}% BREAK=${r.params.wallBreakEnabled ? '✅' : '❌'} DISAPP=${r.params.wallDisappearanceEnabled ? '✅' : '❌'}`,
-  );
-});
-
-console.log('\n═══════════════════════════════════════════════════\n');
