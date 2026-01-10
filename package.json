@@ -43,6 +43,8 @@
     "backtest": "ts-node scripts/run-backtest.ts",
     "backtest-v5": "ts-node scripts/run-backtest-v5.ts",
     "calibrate-v5": "ts-node scripts/run-calibrator.ts",
+    "calibrate-v2": "ts-node scripts/calibrate-v2-strategy.ts",
+    "calibrate-v2:quick": "ts-node scripts/calibrate-v2-strategy.ts --quick",
     "backtest:json": "ts-node scripts/run-backtest.ts --source json",
     "backtest:sqlite": "ts-node scripts/run-backtest.ts --source sqlite",
     "backtest:v4": "ts-node scripts/run-backtest-v4.ts",

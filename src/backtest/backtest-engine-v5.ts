@@ -22,6 +22,7 @@ import { ExitOrchestrator } from '../orchestrators/exit.orchestrator';
 import { RiskManager } from '../services/risk-manager.service';
 import { IDataProvider, TimeframeData } from './data-providers/base.provider';
 import { JsonDataProvider } from './data-providers/json.provider';
+import { SqliteDataProvider } from './data-providers/sqlite.provider';
 import { Candle, Signal, Position } from '../types';
 import { SignalDirection, EntryDecision } from '../types/enums';
 import { StrategyConfig } from '../types/strategy-config.types';
@@ -156,7 +157,7 @@ export class BacktestEngineV5 {
     // Initialize data provider
     this.dataProvider = this.config.dataProvider === 'json'
       ? new JsonDataProvider()
-      : new JsonDataProvider(); // TODO: add sqlite provider
+      : new SqliteDataProvider();
 
     this.logger.info('🎯 BacktestEngineV5 initialized', {
       strategy: this.strategyConfig.metadata.name,

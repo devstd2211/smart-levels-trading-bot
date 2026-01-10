@@ -131,6 +131,21 @@ notes/
 *.note
 
 # =============================================================================
+# OPTIMIZED STRATEGIES & LOCAL EXPERIMENTS (NOT FOR PRODUCTION COMMIT)
+# =============================================================================
+
+# Local strategy experiments (keep locally, don't commit)
+strategies/json/*-optimized.strategy.json
+strategies/json/level-trading-v*.strategy.json
+
+# Calibration results (local analysis only)
+calibration-results/
+*-calibration.json
+
+# Backtest results (local testing only)
+backtest-results/
+
+# =============================================================================
 # MARKDOWN FILES (DOCUMENTATION)
 # =============================================================================
 
