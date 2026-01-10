@@ -405,6 +405,18 @@
       "longPenalty": 0.85,
       "shortPenalty": 0.90
     },
+    "flatMarket": {
+      "enabled": true,
+      "flatThreshold": 70,
+      "emaThreshold": 0.5,
+      "atrThreshold": 0.15
+    },
+    "fundingRate": {
+      "enabled": true,
+      "blockLongAbove": 0.0005,
+      "blockShortBelow": -0.0005,
+      "cacheTimeMs": 60000
+    },
     "btcCorrelation": {
       "enabled": false,
       "thresholds": {
@@ -413,17 +425,23 @@
         "strict": 0.8
       }
     },
-    "nightTrading": {
-      "enabled": false,
-      "utcStartHour": 22,
-      "utcEndHour": 6,
-      "confidencePenalty": 0.8
-    },
-    "atr": {
+    "trendAlignment": {
       "enabled": true,
-      "period": 14,
-      "minimumATR": 0.01,
-      "maximumATR": 1.5
+      "blockLongInDowntrend": true,
+      "blockShortInUptrend": true,
+      "blockInNeutral": false
+    },
+    "postTpFilter": {
+      "enabled": true,
+      "blockDurationSeconds": 300,
+      "requireConfidencePercent": 75
+    },
+    "timeBasedFilter": {
+      "enabled": false,
+      "blockStartHourUTC": 22,
+      "blockEndHourUTC": 6,
+      "timezone": "UTC",
+      "confidencePenalty": 0.8
     },
     "volatilityRegime": {
       "enabled": true,
@@ -471,5 +489,5 @@
       "offsetPercent": 0.3
     }
   },
-  "notes": "DEMO STRATEGY: All 28 analyzers enabled with equal weights. All 6 indicators (EMA, RSI, ATR, Volume, Stochastic, Bollinger Bands) configured. All filters enabled except BTC Correlation (separate feature). Use this for comprehensive testing and validation of the strategy system. NOT optimized for production trading - weights are equal for testing purposes only."
+  "notes": "DEMO STRATEGY: All 28 analyzers enabled with equal weights. All 6 indicators (EMA, RSI, ATR, Volume, Stochastic, Bollinger Bands) configured. ALL 8 SIGNAL FILTERS configured and demonstrated: BlindZone (min signals), FlatMarket (market structure), FundingRate (perpetual), BtcCorrelation (disabled for demo), TrendAlignment (directional bias), PostTpFilter (FOMO prevention), TimeBasedFilter (disabled for demo), VolatilityRegime (ATR constraints). Use for comprehensive testing of JSON-configurable trading system. NOT optimized for production - weights equal for testing."
 }

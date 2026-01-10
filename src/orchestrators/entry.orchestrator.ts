@@ -36,6 +36,7 @@ import {
   RiskManager,
 } from '../types';
 import { NeutralTrendStrengthFilter } from '../filters/neutral-trend-strength.filter';
+import { FilterOrchestrator } from './filter.orchestrator';
 
 // ============================================================================
 // CONSTANTS (PHASE 4: NO FALLBACKS RULE)
@@ -62,6 +63,7 @@ export class EntryOrchestrator {
     private riskManager: RiskManager,
     private logger: LoggerService,
     private neutralTrendFilter?: NeutralTrendStrengthFilter,
+    private filterOrchestrator?: FilterOrchestrator,
   ) {
     this.logger.info('🎯 EntryOrchestrator initialized (PHASE 4)');
   }
@@ -214,6 +216,41 @@ export class EntryOrchestrator {
         this.logger.debug('✅ Signal passed NEUTRAL trend strength filter', {
           signal: topSignal.type,
           reason: neutralCheck.reason,
+        });
+      }
+
+      // =====================================================================
+      // STEP 3.6: Check centralized FilterOrchestrator (NEW PHASE 2)
+      // =====================================================================
+      if (this.filterOrchestrator) {
+        const filterContext = {
+          signal: topSignal,
+          accountBalance,
+          openPositions,
+          marketData: { flatMarketAnalysis },
+          fundingRate: undefined, // TODO: Add funding rate from market data
+          lastTPTimestamp: undefined, // TODO: Add TP timestamp from position manager
+        };
+
+        const filterResult = this.filterOrchestrator.evaluateFilters(filterContext);
+
+        if (!filterResult.allowed) {
+          this.logger.info('🚫 Signal blocked by FilterOrchestrator', {
+            signal: topSignal.type,
+            direction: topSignal.direction,
+            blockedBy: filterResult.blockedBy,
+            reason: filterResult.reason,
+            appliedFilters: filterResult.appliedFilters.join(', '),
+          });
+          return {
+            decision: EntryDecision.SKIP,
+            reason: `Filter blocked: ${filterResult.reason || filterResult.blockedBy}`,
+          };
+        }
+
+        this.logger.debug('✅ Signal passed all FilterOrchestrator checks', {
+          signal: topSignal.type,
+          appliedFilters: filterResult.appliedFilters.join(', '),
         });
       }
 
