@@ -101,11 +101,20 @@ export class EmaAnalyzerNew {
     this.minConfidence = config.minConfidence;
     this.maxConfidence = config.maxConfidence;
 
-    // Create EMA indicator with standard periods (9 fast, 21 slow)
+    // Create EMA indicator with periods from config (or defaults if not provided)
+    const fastPeriod = (config as any).fastPeriod || 9;
+    const slowPeriod = (config as any).slowPeriod || 21;
+
+    this.logger?.info('[EMA_ANALYZER] Initializing with periods', {
+      fastPeriod,
+      slowPeriod,
+      configKeys: Object.keys(config as any),
+    });
+
     this.indicator = new EMAIndicatorNew({
       enabled: true,
-      fastPeriod: 9,
-      slowPeriod: 21,
+      fastPeriod,
+      slowPeriod,
       baseConfidence: 0,
       strengthMultiplier: 0,
     });

@@ -55,8 +55,10 @@ export interface BacktestTrade {
   entrySignal: string;
   direction: 'LONG' | 'SHORT';
   size: number;
+  originalSize?: number; // Track original size (before partial closes)
   stopLoss: number;
   takeProfits: { level: number; price: number; size: number; hit?: boolean }[];
+  cumulativePnl?: number; // Track P&L from partial closes during the trade
   exitTime?: number;
   exitPrice?: number;
   exitReason?: string;
@@ -129,33 +131,15 @@ export class BacktestEngineV5 {
     this.analyzerRegistry = new AnalyzerRegistryService(this.logger);
     this.strategyCoordinator = new StrategyCoordinator(this.strategyConfig, this.logger);
 
-    // Initialize RiskManager with config
-    const riskConfig: any = {
-      dailyLimits: {
-        maxDailyLossPercent: 5,
-        maxDailyProfitPercent: 50,
-        emergencyStopOnLimit: true,
-      },
-      lossStreak: {
-        reductions: {
-          after2Losses: 0.85,
-          after3Losses: 0.70,
-          after4Losses: 0.50,
-        },
-        stopAfterLosses: 5,
-      },
-      concurrentRisk: {
-        enabled: false, // Disable for backtest - use simple position sizing instead
-        maxPositions: config.maxOpenPositions,
-        maxRiskPerPosition: 2.0,
-        maxTotalExposurePercent: 1000.0, // Effectively unlimited
-      },
-      positionSizing: {
-        riskPerTradePercent: 0.5, // 0.5% risk per trade
-        minPositionSizeUSDT: 10,
-      },
-    };
-    this.riskManager = new RiskManager(riskConfig, this.logger);
+    // For BACKTEST: Use dummy RiskManager that always approves (no risk constraints)
+    // This allows backtest to use its own position sizing logic without restrictions
+    const dummyRiskManager = {
+      async canTrade() {
+        return { allowed: true, reason: 'Backtest mode - no risk constraints' };
+      }
+    } as any;
+
+    this.riskManager = dummyRiskManager;
     this.filterOrchestrator = new FilterOrchestrator(this.logger, this.strategyConfig.filters);
     this.entryOrchestrator = new EntryOrchestrator(this.riskManager, this.logger, this.filterOrchestrator);
     this.exitOrchestrator = new ExitOrchestrator(this.logger);
@@ -421,12 +405,15 @@ export class BacktestEngineV5 {
               price: tp.price.toFixed(8),
             });
 
-            // Partial close
-            if (position.direction === 'SHORT') {
-              this.currentBalance += (position.entryPrice - tp.price) * tp.size;
-            } else {
-              this.currentBalance += (tp.price - position.entryPrice) * tp.size;
-            }
+            // Calculate P&L for this partial close
+            const partialPnl = position.direction === 'SHORT'
+              ? (position.entryPrice - tp.price) * tp.size
+              : (tp.price - position.entryPrice) * tp.size;
+
+            // Update balance and track cumulative P&L
+            this.currentBalance += partialPnl;
+            if (!position.cumulativePnl) position.cumulativePnl = 0;
+            position.cumulativePnl += partialPnl;
 
             tp.hit = true;
             position.size -= tp.size;
@@ -538,6 +525,15 @@ export class BacktestEngineV5 {
       ? candle.close - (atr * slMultiplier)
       : candle.close + (atr * slMultiplier);
 
+    this.logger.debug('[ExecuteEntry] ATR and SL calculation', {
+      signal: signal.source,
+      direction: signal.direction,
+      close: candle.close.toFixed(8),
+      atr: atr.toFixed(8),
+      slMultiplier,
+      stopLoss: stopLoss.toFixed(8),
+    });
+
     // Calculate position size constrained by BOTH risk and exposure limits
     // Risk constraint: 0.5% risk per trade
     // Exposure constraint: 5% max notional exposure per RiskManager
@@ -551,6 +547,17 @@ export class BacktestEngineV5 {
 
     // Take the smaller of the two constraints
     const size = Math.min(sizeForRisk, sizeForExposure);
+
+    this.logger.debug('[PositionSizing]', {
+      balance: this.currentBalance.toFixed(2),
+      close: candle.close.toFixed(8),
+      stopLoss: stopLoss.toFixed(8),
+      priceDelta: priceDelta.toFixed(8),
+      riskAmount: riskAmount.toFixed(2),
+      sizeForRisk: sizeForRisk.toFixed(4),
+      sizeForExposure: sizeForExposure.toFixed(4),
+      finalSize: size.toFixed(4),
+    });
 
     // Calculate TP levels
     const tpConfig = this.strategyConfig.riskManagement?.takeProfits || [
@@ -573,6 +580,8 @@ export class BacktestEngineV5 {
       entrySignal: signal.source,
       direction: isLong ? 'LONG' : 'SHORT',
       size,
+      originalSize: size, // Store original size before partial closes
+      cumulativePnl: 0, // Track P&L from partial closes
       stopLoss,
       takeProfits,
     };
@@ -601,11 +610,16 @@ export class BacktestEngineV5 {
     position.exitReason = reason;
     position.duration = exitTime - position.entryTime;
 
-    // Calculate PnL
-    const pnl = position.direction === 'LONG'
+    // Calculate P&L for remaining position
+    const remainingPnl = position.direction === 'LONG'
       ? (exitPrice - position.entryPrice) * position.size
       : (position.entryPrice - exitPrice) * position.size;
 
+    // Total P&L = cumulative (from TPs) + remaining (from SL/exit)
+    const totalPnl = (position.cumulativePnl || 0) + remainingPnl;
+
+    // P&L percent based on original position size and price movement
+    const originalSize = position.originalSize || position.size;
     const pnlPercent = ((exitPrice - position.entryPrice) / position.entryPrice) * 100;
     if (position.direction === 'SHORT') {
       position.pnlPercent = -pnlPercent;
@@ -613,8 +627,9 @@ export class BacktestEngineV5 {
       position.pnlPercent = pnlPercent;
     }
 
-    position.pnl = pnl;
-    this.currentBalance += pnl;
+    position.pnl = totalPnl;
+    position.size = originalSize; // Reset size to original for reporting
+    this.currentBalance += remainingPnl;
 
     // Move from open to closed
     this.openPositions = this.openPositions.filter((p) => p !== position);
@@ -622,7 +637,7 @@ export class BacktestEngineV5 {
 
     this.logger.debug(`📊 Position closed: ${reason}`, {
       direction: position.direction,
-      pnl: pnl.toFixed(2),
+      pnl: totalPnl.toFixed(2),
       pnlPercent: position.pnlPercent.toFixed(2),
       balance: this.currentBalance.toFixed(2),
     });
