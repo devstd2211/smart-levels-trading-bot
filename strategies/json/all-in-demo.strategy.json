@@ -449,6 +449,11 @@
         "lowAtrPercent": 0.3,
         "highAtrPercent": 1.5
       }
+    },
+    "neutralTrendStrength": {
+      "enabled": true,
+      "minConfidenceForWeakNeutral": 0.70,
+      "weakTrendThreshold": 40
     }
   },
   "riskManagement": {
@@ -489,5 +494,5 @@
       "offsetPercent": 0.3
     }
   },
-  "notes": "DEMO STRATEGY: All 28 analyzers enabled with equal weights. All 6 indicators (EMA, RSI, ATR, Volume, Stochastic, Bollinger Bands) configured. ALL 8 SIGNAL FILTERS configured and demonstrated: BlindZone (min signals), FlatMarket (market structure), FundingRate (perpetual), BtcCorrelation (disabled for demo), TrendAlignment (directional bias), PostTpFilter (FOMO prevention), TimeBasedFilter (disabled for demo), VolatilityRegime (ATR constraints). Use for comprehensive testing of JSON-configurable trading system. NOT optimized for production - weights equal for testing."
+  "notes": "DEMO STRATEGY: All 28 analyzers enabled with equal weights. All 6 indicators (EMA, RSI, ATR, Volume, Stochastic, Bollinger Bands) configured. ALL 9 SIGNAL FILTERS configured and demonstrated: BlindZone (min signals), FlatMarket (market structure), FundingRate (perpetual), BtcCorrelation (disabled for demo), TrendAlignment (directional bias), PostTpFilter (FOMO prevention), TimeBasedFilter (disabled for demo), VolatilityRegime (ATR constraints), NeutralTrendStrength (confidence boost on weak NEUTRAL trends). Use for comprehensive testing of JSON-configurable trading system. NOT optimized for production - weights equal for testing."
 }

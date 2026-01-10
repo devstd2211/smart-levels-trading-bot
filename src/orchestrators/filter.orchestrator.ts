@@ -11,6 +11,7 @@
  * 6. Post-TP Filter (FOMO prevention)
  * 7. Time-Based Filter (session restrictions)
  * 8. Volatility Regime Filter (ATR constraints)
+ * 9. Neutral Trend Strength Filter (confidence boost on weak trends)
  *
  * All filters are JSON-configurable via strategy.filters section
  */
@@ -42,6 +43,7 @@ export class FilterOrchestrator {
     marketData: any; // flat market analysis, BTC correlation, etc
     fundingRate?: number;
     lastTPTimestamp?: number; // timestamp of last TP
+    trend?: any; // current trend analysis (bias, strength)
   }): FilterResult {
     const appliedFilters: string[] = [];
 
@@ -114,6 +116,15 @@ export class FilterOrchestrator {
       appliedFilters.push('VolatilityRegime');
       if (!volResult.allowed) {
         return { ...volResult, appliedFilters, blockedBy: 'VolatilityRegime' };
+      }
+    }
+
+    // FILTER 9: Neutral Trend Strength
+    if (this.filterConfig.neutralTrendStrength?.enabled !== false) {
+      const neutralResult = this.evaluateNeutralTrendStrength(context);
+      appliedFilters.push('NeutralTrendStrength');
+      if (!neutralResult.allowed) {
+        return { ...neutralResult, appliedFilters, blockedBy: 'NeutralTrendStrength' };
       }
     }
 
@@ -284,6 +295,55 @@ export class FilterOrchestrator {
 
     // To be implemented in Phase 3
     // Requires ATR analysis
+    return { allowed: true, appliedFilters: [] };
+  }
+
+  /**
+   * FILTER 9: Neutral Trend Strength - require higher confidence on weak NEUTRAL trends
+   *
+   * Problem: SHORT entries with 65-70% confidence on weak NEUTRAL trends (< 40% strength)
+   * have 50% win rate and are losing money.
+   * Root cause: Weak NEUTRAL trends lack directional bias, creating high risk of chop.
+   *
+   * Solution: On weak NEUTRAL trends, require higher confidence (70%+) to ensure
+   * entries are made only when signal quality is very high.
+   */
+  private evaluateNeutralTrendStrength(context: any): FilterResult {
+    const config = this.filterConfig.neutralTrendStrength;
+    if (!config?.enabled && config?.enabled !== undefined) {
+      return { allowed: true, appliedFilters: [] };
+    }
+
+    const trend = context.trend;
+    if (!trend || trend.bias !== 'NEUTRAL') {
+      // Filter doesn't apply if not on NEUTRAL trend
+      return { allowed: true, appliedFilters: [] };
+    }
+
+    const minConfidence = config?.minConfidenceForWeakNeutral ?? 0.70; // 70%
+    const weakThreshold = config?.weakTrendThreshold ?? 40; // 40% strength
+
+    // NEUTRAL trend with good strength (>= 40%) = allow all signals
+    if (trend.strength >= weakThreshold) {
+      return { allowed: true, appliedFilters: [] };
+    }
+
+    // Weak NEUTRAL trend (< 40%) = require high confidence
+    const signalConfidence = context.signal.confidence / 100; // Convert 0-100 to 0-1
+    if (signalConfidence < minConfidence) {
+      this.logger.warn('🚫 Entry blocked: Weak NEUTRAL trend requires higher confidence', {
+        trendStrength: trend.strength.toFixed(1) + '%',
+        signalConfidence: (signalConfidence * 100).toFixed(0) + '%',
+        requiredConfidence: (minConfidence * 100).toFixed(0) + '%',
+        reason: 'Weak NEUTRAL trends lack directional bias - high risk of chop',
+      });
+      return {
+        allowed: false,
+        reason: `Weak NEUTRAL trend (${trend.strength.toFixed(0)}% strength) requires ${(minConfidence * 100).toFixed(0)}% confidence, signal has only ${(signalConfidence * 100).toFixed(0)}%`,
+        appliedFilters: [],
+      };
+    }
+
     return { allowed: true, appliedFilters: [] };
   }
 

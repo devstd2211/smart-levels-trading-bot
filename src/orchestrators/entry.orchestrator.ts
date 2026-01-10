@@ -35,7 +35,6 @@ import {
   FlatMarketResult,
   RiskManager,
 } from '../types';
-import { NeutralTrendStrengthFilter } from '../filters/neutral-trend-strength.filter';
 import { FilterOrchestrator } from './filter.orchestrator';
 
 // ============================================================================
@@ -62,7 +61,6 @@ export class EntryOrchestrator {
   constructor(
     private riskManager: RiskManager,
     private logger: LoggerService,
-    private neutralTrendFilter?: NeutralTrendStrengthFilter,
     private filterOrchestrator?: FilterOrchestrator,
   ) {
     this.logger.info('🎯 EntryOrchestrator initialized (PHASE 4)');
@@ -197,30 +195,7 @@ export class EntryOrchestrator {
       });
 
       // =====================================================================
-      // STEP 3.5: Check NEUTRAL trend strength (via filter class)
-      // =====================================================================
-      if (this.neutralTrendFilter) {
-        const neutralCheck = this.neutralTrendFilter.evaluate(topSignal, globalTrendBias);
-        if (!neutralCheck.allowed) {
-          this.logger.info('❌ Signal blocked by NEUTRAL trend strength filter', {
-            signal: topSignal.type,
-            direction: topSignal.direction,
-            reason: neutralCheck.reason,
-          });
-          return {
-            decision: EntryDecision.SKIP,
-            reason: `NEUTRAL trend filter: ${neutralCheck.reason}`,
-          };
-        }
-
-        this.logger.debug('✅ Signal passed NEUTRAL trend strength filter', {
-          signal: topSignal.type,
-          reason: neutralCheck.reason,
-        });
-      }
-
-      // =====================================================================
-      // STEP 3.6: Check centralized FilterOrchestrator (NEW PHASE 2)
+      // STEP 3.5: Check centralized FilterOrchestrator (NEW PHASE 2)
       // =====================================================================
       if (this.filterOrchestrator) {
         const filterContext = {
@@ -230,6 +205,7 @@ export class EntryOrchestrator {
           marketData: { flatMarketAnalysis },
           fundingRate: undefined, // TODO: Add funding rate from market data
           lastTPTimestamp: undefined, // TODO: Add TP timestamp from position manager
+          trend: globalTrendBias, // Pass trend data for NeutralTrendStrength filter
         };
 
         const filterResult = this.filterOrchestrator.evaluateFilters(filterContext);

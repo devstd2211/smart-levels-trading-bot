@@ -173,6 +173,7 @@ export interface FilterOverrides {
   volatilityRegime?: VolatilityRegimeFilterOverride;
   postTpFilter?: PostTpFilterOverride;
   timeBasedFilter?: TimeBasedFilterOverride;
+  neutralTrendStrength?: NeutralTrendStrengthFilterOverride;
 }
 
 export interface BlindZoneFilterOverride {
@@ -246,6 +247,12 @@ export interface VolatilityRegimeFilterOverride {
     lowAtrPercent?: number;
     highAtrPercent?: number;
   };
+}
+
+export interface NeutralTrendStrengthFilterOverride {
+  enabled?: boolean;
+  minConfidenceForWeakNeutral?: number; // 0.0-1.0, confidence required on weak NEUTRAL trends
+  weakTrendThreshold?: number; // trend strength % below which trend is considered weak
 }
 
 // ============================================================================

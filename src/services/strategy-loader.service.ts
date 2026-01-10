@@ -332,6 +332,7 @@ export class StrategyLoaderService {
       'postTpFilter',
       'timeBasedFilter',
       'volatilityRegime',
+      'neutralTrendStrength',
       // Legacy filters
       'nightTrading',
       'atr',

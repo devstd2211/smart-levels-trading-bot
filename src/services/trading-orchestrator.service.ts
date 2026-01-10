@@ -32,7 +32,6 @@ import { PositionLifecycleService } from './position-lifecycle.service';
 import { TelegramService } from './telegram.service';
 import { TimeframeProvider } from '../providers/timeframe.provider';
 import { RiskManager } from './risk-manager.service';
-import { NeutralTrendStrengthFilter } from '../filters/neutral-trend-strength.filter';
 import { ExitOrchestrator } from '../orchestrators/exit.orchestrator';
 import { EntryOrchestrator } from '../orchestrators/entry.orchestrator';
 import { PositionExitingService } from './position-exiting.service';
@@ -83,7 +82,6 @@ export class TradingOrchestrator {
     this.entryOrchestrator = new EntryOrchestrator(
       riskManager,
       this.logger,
-      undefined, // NeutralTrendFilter not passed yet
       this.filterOrchestrator,
     );
 
