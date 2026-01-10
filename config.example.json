@@ -1,783 +1,628 @@
 {
   "version": 2,
-  "thresholds": {
-    "defaults": {
-      "confidence": {
-        "min": 0.60,
-        "clampMin": 0.30,
-        "clampMax": 1.0
+  "_version_comment": "Configuration schema version",
+
+  "meta": {
+    "_meta_comment": "Metadata about this configuration",
+    "description": "Trading Bot Configuration - Strategy-Driven Architecture",
+    "lastUpdated": "2026-01-10",
+    "strategy": "level-trading-v2",
+    "_strategy_comment": "Which strategy JSON file to use (e.g., level-trading-v2, level-trading-v1, etc.)",
+    "notes": "V2 Strategy (Momentum + Levels + EMA) with optimized parameters. EMA 9/19 from calibration. Expected: 45-55% WR, PF 2.0-3.0"
+  },
+
+  "system": {
+    "_system_comment": "System-level configuration",
+    "timeSyncIntervalMs": 60000,
+    "_timeSyncIntervalMs_comment": "How often to sync time with exchange (milliseconds)",
+    "timeSyncMaxFailures": 5,
+    "_timeSyncMaxFailures_comment": "Max failed sync attempts before warning"
+  },
+
+  "exchange": {
+    "_exchange_comment": "Exchange connection settings",
+    "name": "bybit",
+    "_name_comment": "Exchange name: bybit, binance, etc.",
+    "symbol": "XRPUSDT",
+    "_symbol_comment": "Trading pair symbol",
+    "demo": true,
+    "_demo_comment": "Use demo/paper trading (true) or live (false)",
+    "testnet": false,
+    "_testnet_comment": "Use exchange testnet (only some exchanges support it)",
+    "apiKey": "",
+    "_apiKey_comment": "API key (leave empty if using demo mode)",
+    "apiSecret": "",
+    "_apiSecret_comment": "API secret (leave empty if using demo mode)"
+  },
+
+  "trading": {
+    "_trading_comment": "Trading execution parameters",
+    "leverage": 10,
+    "_leverage_comment": "Leverage multiplier for position size (10 = 10x)",
+    "positionSizeUsdt": 10,
+    "_positionSizeUsdt_comment": "Base position size in USDT per trade",
+    "maxPositions": 1,
+    "_maxPositions_comment": "Maximum concurrent open positions",
+    "orderType": "MARKET",
+    "_orderType_comment": "Order type: MARKET (fast execution) or LIMIT (better price)",
+    "tradingCycleIntervalMs": 10000,
+    "_tradingCycleIntervalMs_comment": "How often to check for new trading signals (milliseconds)",
+    "favourableMovementThresholdPercent": 0.1,
+    "_favourableMovementThresholdPercent_comment": "Price movement threshold to consider favorable (percentage)"
+  },
+
+  "riskManagement": {
+    "_riskManagement_comment": "Risk management and position exit settings",
+    "stopLossPercent": 2.0,
+    "_stopLossPercent_comment": "Deprecated - use stopLoss.percent instead",
+    "positionSizeUsdt": 10,
+    "_positionSizeUsdt_comment": "Deprecated - use trading.positionSizeUsdt instead",
+    "stopLoss": {
+      "_stopLoss_comment": "Stop loss configuration",
+      "percent": 2.0,
+      "_percent_comment": "SL as percentage of entry price",
+      "atrMultiplier": 1.5,
+      "_atrMultiplier_comment": "SL distance = ATR × this value (1.5 = 1.5 ATR)",
+      "minDistancePercent": 0.5,
+      "_minDistancePercent_comment": "Minimum SL distance from entry (percentage)"
+    },
+    "takeProfits": [
+      {
+        "_comment": "Take profit level 1 (30% of position)",
+        "level": 1,
+        "percent": 1.5,
+        "_percent_comment": "Close 30% at 1.5% profit",
+        "sizePercent": 50,
+        "_sizePercent_comment": "Close 50% of position at this level"
       },
-      "rsi": {
-        "oversold": 30,
-        "overbought": 70,
-        "extreme": { "low": 20, "high": 80 },
-        "neutralZone": { "min": 45, "max": 55 }
-      },
-      "stopLoss": {
-        "percent": 2.5,
-        "atrMultiplier": 1.5,
-        "minDistancePercent": 1.5
-      },
-      "distance": {
-        "maxToLevel": 1.0,
-        "minFloor": 0.3
-      },
-      "touches": {
-        "min": 3,
-        "strong": 5
+      {
+        "_comment": "Take profit level 2 (40% of position)",
+        "level": 2,
+        "percent": 3.0,
+        "_percent_comment": "Close another 40% at 3.0% profit",
+        "sizePercent": 50,
+        "_sizePercent_comment": "Close another 50% of remaining position"
       }
+    ],
+    "trailing": {
+      "_trailing_comment": "Trailing stop: lock in profits when price moves favorably",
+      "enabled": true,
+      "_enabled_comment": "Enable trailing stop",
+      "percent": 1.0,
+      "_percent_comment": "Move SL up by 1% when price moves up by activationLevel%",
+      "activationLevel": 2.0,
+      "_activationLevel_comment": "Activate trailing when price is 2% above entry"
+    },
+    "breakeven": {
+      "_breakeven_comment": "Move SL to breakeven (entry price) after hitting TP",
+      "enabled": true,
+      "_enabled_comment": "Enable breakeven stop",
+      "offsetPercent": 0.3,
+      "_offsetPercent_comment": "Offset from entry price for safety (0.3% above entry)"
+    },
+    "timeBasedExit": {
+      "_timeBasedExit_comment": "Close position after X minutes regardless of profit/loss",
+      "enabled": false,
+      "_enabled_comment": "Enable time-based exit"
+    }
+  },
+
+  "timeframes": {
+    "_timeframes_comment": "Candle timeframes to fetch and analyze",
+    "entry": {
+      "_entry_comment": "Entry signal timeframe (fastest, most reactive)",
+      "interval": "1",
+      "_interval_comment": "1 minute candles",
+      "candleLimit": 1000,
+      "_candleLimit_comment": "Fetch last 1000 candles (1000 min = ~17 hours)"
+    },
+    "primary": {
+      "_primary_comment": "Primary analysis timeframe (main trading timeframe)",
+      "interval": "5",
+      "_interval_comment": "5 minute candles",
+      "candleLimit": 500,
+      "_candleLimit_comment": "Fetch last 500 candles (500 × 5 min = ~2.4 days)"
+    },
+    "trend1": {
+      "_trend1_comment": "Short-term trend context",
+      "interval": "15",
+      "_interval_comment": "15 minute candles",
+      "candleLimit": 500,
+      "_candleLimit_comment": "Fetch last 500 candles (500 × 15 min = ~5.2 days)"
+    },
+    "trend2": {
+      "_trend2_comment": "Medium-term trend context",
+      "interval": "30",
+      "_interval_comment": "30 minute candles",
+      "candleLimit": 250,
+      "_candleLimit_comment": "Fetch last 250 candles (250 × 30 min = ~5.2 days)"
+    },
+    "context": {
+      "_context_comment": "Long-term trend context (daily equivalent)",
+      "interval": "60",
+      "_interval_comment": "1 hour (60 minute) candles",
+      "candleLimit": 100,
+      "_candleLimit_comment": "Fetch last 100 candles (100 hours = ~4.2 days)"
+    }
+  },
+
+  "indicators": {
+    "_indicators_comment": "Technical indicator configurations used by analyzers",
+    "ema": {
+      "_ema_comment": "Exponential Moving Average: fast/slow line crossover for trend",
+      "enabled": true,
+      "fastPeriod": 9,
+      "_fastPeriod_comment": "Fast EMA period (9 is optimized, was 12)",
+      "slowPeriod": 19,
+      "_slowPeriod_comment": "Slow EMA period (19 is optimized, was 26)",
+      "baseConfidence": 0.8,
+      "_baseConfidence_comment": "Base confidence level for EMA signals",
+      "strengthMultiplier": 1.5,
+      "_strengthMultiplier_comment": "Multiply confidence by 1.5 for strong trend signals"
+    },
+    "rsi": {
+      "_rsi_comment": "Relative Strength Index: identifies overbought/oversold conditions",
+      "enabled": true,
+      "period": 14,
+      "_period_comment": "RSI period (standard 14)",
+      "oversold": 30,
+      "_oversold_comment": "RSI < 30 = oversold (potential LONG)",
+      "overbought": 70,
+      "_overbought_comment": "RSI > 70 = overbought (potential SHORT)",
+      "extreme": {
+        "low": 20,
+        "_low_comment": "Extreme low (very oversold)",
+        "high": 80,
+        "_high_comment": "Extreme high (very overbought)"
+      },
+      "neutralZone": {
+        "min": 40,
+        "_min_comment": "RSI > 40 is neutral/bullish",
+        "max": 60,
+        "_max_comment": "RSI < 60 is neutral/bearish"
+      },
+      "maxConfidence": 0.9,
+      "_maxConfidence_comment": "Cap RSI signal confidence at 90%"
+    },
+    "atr": {
+      "_atr_comment": "Average True Range: measures volatility",
+      "enabled": true,
+      "period": 14,
+      "_period_comment": "ATR period (standard 14)",
+      "minimumATR": 0.005,
+      "_minimumATR_comment": "Reject trades if ATR too low (not enough volatility)",
+      "maximumATR": 2.0,
+      "_maximumATR_comment": "Reject trades if ATR too high (extreme volatility)"
+    },
+    "volume": {
+      "_volume_comment": "Volume profile: analyzes trading volume distribution",
+      "enabled": true,
+      "period": 20,
+      "_period_comment": "Volume analysis period (20 candles)",
+      "volumeMultiplier": 1.5,
+      "_volumeMultiplier_comment": "Significant volume = average × 1.5"
+    },
+    "stochastic": {
+      "_stochastic_comment": "Stochastic Oscillator: momentum indicator similar to RSI",
+      "enabled": true,
+      "kPeriod": 14,
+      "_kPeriod_comment": "K% period (14)",
+      "dPeriod": 3,
+      "_dPeriod_comment": "D% period (3-period SMA of K%)",
+      "oversold": 20,
+      "_oversold_comment": "Stochastic < 20 = oversold",
+      "overbought": 80,
+      "_overbought_comment": "Stochastic > 80 = overbought"
+    },
+    "bollingerBands": {
+      "_bollingerBands_comment": "Bollinger Bands: volatility envelope around moving average",
+      "enabled": true,
+      "period": 20,
+      "_period_comment": "20-period moving average",
+      "stdDev": 2.0,
+      "_stdDev_comment": "Standard deviations for band width (2.0 = standard)"
+    }
+  },
+
+  "analyzerDefaults": {
+    "_analyzerDefaults_comment": "Default parameters for each analyzer type",
+    "EMA_ANALYZER_NEW": {
+      "_comment": "EMA crossover analyzer: fast EMA crosses slow EMA",
+      "baseConfidence": 0.8,
+      "strengthMultiplier": 1.5,
+      "maxConfidence": 0.95
+    },
+    "RSI_ANALYZER_NEW": {
+      "_comment": "RSI analyzer: overbought/oversold conditions",
+      "extremeThreshold": 5,
+      "maxConfidence": 0.9
+    },
+    "ATR_ANALYZER_NEW": {
+      "_comment": "ATR analyzer: volatility-based stop loss sizing",
+      "confidenceMultiplier": 2.0,
+      "maxConfidence": 0.95
+    },
+    "VOLUME_ANALYZER_NEW": {
+      "_comment": "Volume analyzer: unusual volume activity",
+      "neutralConfidence": 0.2,
+      "maxConfidence": 0.95
+    },
+    "STOCHASTIC_ANALYZER_NEW": {
+      "_comment": "Stochastic analyzer: momentum via stochastic oscillator",
+      "extremeThreshold": 5,
+      "maxConfidence": 0.9
+    },
+    "BOLLINGER_BANDS_ANALYZER_NEW": {
+      "_comment": "Bollinger Bands analyzer: band touches and breakouts",
+      "bandTouchConfidence": 0.5,
+      "maxConfidence": 0.9
+    },
+    "DIVERGENCE_ANALYZER_NEW": {
+      "_comment": "Divergence analyzer: price vs indicator mismatch (reversal signal)",
+      "minBars": 3,
+      "maxConfidence": 0.85
+    },
+    "BREAKOUT_ANALYZER_NEW": {
+      "_comment": "Breakout analyzer: price breaks support/resistance",
+      "minBars": 5,
+      "breakoutThresholdPercent": 0.1,
+      "maxConfidence": 0.9
+    },
+    "WICK_ANALYZER_NEW": {
+      "_comment": "Wick analyzer: candle wicks touch and bounce from levels",
+      "minWickPercent": 0.5,
+      "maxConfidence": 0.85
+    },
+    "PRICE_MOMENTUM_ANALYZER_NEW": {
+      "_comment": "Momentum analyzer: rapid price movement in direction",
+      "minMomentum": 0.1,
+      "maxConfidence": 0.9
+    },
+    "TREND_DETECTOR_ANALYZER_NEW": {
+      "_comment": "Trend detector: EMA gap indicates trend strength",
+      "minEmaGapPercent": 0.5,
+      "minConfidence": 0.3,
+      "maxConfidence": 0.95
+    },
+    "SWING_ANALYZER_NEW": {
+      "_comment": "Swing analyzer: higher highs/lows in direction",
+      "minSwingPercent": 0.5,
+      "maxConfidence": 0.85
+    },
+    "LEVEL_ANALYZER_NEW": {
+      "_comment": "Level analyzer: price bounces from structural levels",
+      "minTouches": 2,
+      "_minTouches_comment": "Level needs min 2 touches to be valid",
+      "maxConfidence": 0.9
+    },
+    "CHOCH_BOS_ANALYZER_NEW": {
+      "_comment": "CHOCH/BOS analyzer: Change of Character / Break of Structure",
+      "minSwingPercent": 0.5,
+      "maxConfidence": 0.85
+    },
+    "LIQUIDITY_SWEEP_ANALYZER_NEW": {
+      "_comment": "Liquidity sweep analyzer: high volume penetration",
+      "minVolumeMultiplier": 1.5,
+      "maxConfidence": 0.9
+    },
+    "LIQUIDITY_ZONE_ANALYZER_NEW": {
+      "_comment": "Liquidity zone analyzer: price trades near zones",
+      "zoneDepthPercent": 0.5,
+      "maxConfidence": 0.85
+    },
+    "ORDER_BLOCK_ANALYZER_NEW": {
+      "_comment": "Order block analyzer: institutional order clusters",
+      "minBars": 5,
+      "maxConfidence": 0.9
+    },
+    "FAIR_VALUE_GAP_ANALYZER_NEW": {
+      "_comment": "Fair value gap analyzer: unfilled price gaps",
+      "minGapPercent": 0.1,
+      "maxConfidence": 0.85
+    },
+    "VOLUME_PROFILE_ANALYZER_NEW": {
+      "_comment": "Volume profile analyzer: point of control (POC)",
+      "pocConfidence": 0.7,
+      "maxConfidence": 0.9
+    },
+    "ORDER_FLOW_ANALYZER_NEW": {
+      "_comment": "Order flow analyzer: buy/sell imbalance",
+      "minDeltaPercent": 5,
+      "maxConfidence": 0.9
+    },
+    "FOOTPRINT_ANALYZER_NEW": {
+      "_comment": "Footprint analyzer: detailed order activity pattern",
+      "minFootprintBars": 3,
+      "maxConfidence": 0.85
+    },
+    "WHALE_ANALYZER_NEW": {
+      "_comment": "Whale analyzer: large order detection",
+      "minOrderSizePercent": 1,
+      "maxConfidence": 0.9
+    },
+    "MICRO_WALL_ANALYZER_NEW": {
+      "_comment": "Micro wall analyzer: small order clusters at price",
+      "minWallSizePercent": 0.5,
+      "maxConfidence": 0.85
+    },
+    "DELTA_ANALYZER_NEW": {
+      "_comment": "Delta analyzer: buy volume vs sell volume ratio",
+      "minDeltaPercent": 10,
+      "maxConfidence": 0.9
+    },
+    "TICK_DELTA_ANALYZER_NEW": {
+      "_comment": "Tick delta analyzer: individual trade direction flow",
+      "minTickDelta": 5,
+      "maxConfidence": 0.85
+    },
+    "PRICE_ACTION_ANALYZER_NEW": {
+      "_comment": "Price action analyzer: candlestick patterns",
+      "minBars": 3,
+      "maxConfidence": 0.9
+    },
+    "TREND_CONFLICT_ANALYZER_NEW": {
+      "_comment": "Trend conflict analyzer: conflicting signals detection",
+      "minConflictPercent": 10,
+      "maxConfidence": 0.8
+    },
+    "VOLATILITY_SPIKE_ANALYZER_NEW": {
+      "_comment": "Volatility spike analyzer: sudden volatility increase",
+      "maxConfidence": 0.95
+    }
+  },
+
+  "filters": {
+    "_filters_comment": "Signal filters: block trades in certain conditions",
+    "btcCorrelation": {
+      "_btcCorrelation_comment": "Block trades when BTC moves against signal direction",
+      "enabled": false,
+      "symbol": "BTCUSDT",
+      "timeframe": "1",
+      "lookbackCandles": 100,
+      "correlationPeriod": 50,
+      "thresholds": {
+        "weak": 0.3,
+        "moderate": 0.6,
+        "strict": 0.8
+      }
+    },
+    "nightTrading": {
+      "_nightTrading_comment": "Block trades during low-volume night hours (UTC)",
+      "enabled": false,
+      "utcStartHour": 22,
+      "utcEndHour": 6,
+      "confidencePenalty": 0.8
+    },
+    "blindZone": {
+      "_blindZone_comment": "Block trades if not enough confirming signals (avoid conflicting entries)",
+      "enabled": true,
+      "minSignalsForLong": 2,
+      "_minSignalsForLong_comment": "Need min 2 analyzers confirming LONG",
+      "minSignalsForShort": 2,
+      "_minSignalsForShort_comment": "Need min 2 analyzers confirming SHORT",
+      "longPenalty": 0.85,
+      "_longPenalty_comment": "Reduce confidence by 15% if not enough signals",
+      "shortPenalty": 0.90,
+      "_shortPenalty_comment": "Reduce confidence by 10% if not enough signals"
+    },
+    "entryConfirmation": {
+      "_entryConfirmation_comment": "Wait for price confirmation before entering (avoid getting faked out)",
+      "enabled": true,
+      "long": {
+        "expirySeconds": 120,
+        "_expirySeconds_comment": "Confirmation valid for 120 seconds",
+        "tolerancePercent": 0.05,
+        "_tolerancePercent_comment": "Allow 0.05% slippage from signal price"
+      },
+      "short": {
+        "expirySeconds": 120,
+        "tolerancePercent": 0.05
+      }
+    },
+    "atr": {
+      "_atr_comment": "Block trades if volatility too low or too high",
+      "enabled": true,
+      "period": 14,
+      "minimumATR": 0.01,
+      "_minimumATR_comment": "Skip trades if ATR < 0.01 (no volatility)",
+      "maximumATR": 1.5,
+      "_maximumATR_comment": "Skip trades if ATR > 1.5 (extreme volatility)"
+    },
+    "volatilityRegime": {
+      "_volatilityRegime_comment": "Adjust parameters based on volatility environment",
+      "enabled": true,
+      "thresholds": {
+        "lowAtrPercent": 0.3,
+        "_lowAtrPercent_comment": "ATR < 0.3% = low volatility regime",
+        "highAtrPercent": 1.5,
+        "_highAtrPercent_comment": "ATR > 1.5% = high volatility regime"
+      }
+    }
+  },
+
+  "confidence": {
+    "_confidence_comment": "Minimum signal confidence thresholds by market regime",
+    "defaults": {
+      "min": 0.55,
+      "_min_comment": "Default minimum confidence: 55%",
+      "clampMin": 0.3,
+      "_clampMin_comment": "Never go below 30% confidence",
+      "clampMax": 1.0,
+      "_clampMax_comment": "Never exceed 100% confidence"
     },
     "regimes": {
       "LOW": {
-        "confidence": { "min": 0.65 },
-        "distance": { "maxToLevel": 0.3, "clusterThresholdPercent": 0.15 },
-        "touches": { "min": 4 }
+        "_LOW_comment": "Low volatility market: stricter requirements",
+        "confidence": {
+          "min": 0.65,
+          "_min_comment": "Require 65% confidence (higher threshold)"
+        },
+        "distance": {
+          "maxToLevel": 0.3,
+          "_maxToLevel_comment": "Price must be close to level (0.3%)"
+        },
+        "touches": {
+          "min": 4,
+          "_min_comment": "Level needs 4+ touches"
+        }
       },
       "MEDIUM": {
-        "confidence": { "min": 0.55 },
-        "distance": { "maxToLevel": 0.6, "clusterThresholdPercent": 0.25 },
-        "touches": { "min": 3 }
+        "_MEDIUM_comment": "Medium volatility market: normal requirements",
+        "confidence": {
+          "min": 0.55,
+          "_min_comment": "Require 55% confidence"
+        },
+        "distance": {
+          "maxToLevel": 0.6
+        },
+        "touches": {
+          "min": 3
+        }
       },
       "HIGH": {
-        "confidence": { "min": 0.50 },
-        "distance": { "maxToLevel": 1.2, "clusterThresholdPercent": 0.4 },
-        "touches": { "min": 2 }
+        "_HIGH_comment": "High volatility market: relaxed requirements",
+        "confidence": {
+          "min": 0.5,
+          "_min_comment": "Require 50% confidence (lower threshold)"
+        },
+        "distance": {
+          "maxToLevel": 1.2,
+          "_maxToLevel_comment": "Allow further from level (1.2%)"
+        },
+        "touches": {
+          "min": 2,
+          "_min_comment": "Level only needs 2 touches"
+        }
       }
     }
   },
-  "boosts": {
-    "liquiditySweep": 0.15,
-    "divergence": 0.10,
-    "choch": 0.10,
-    "bos": 0.05,
-    "trendAlignment": 0.15,
-    "htfConfirmation": 0.15,
-    "hvnMatch": 0.20,
-    "orderbookWall": 0.15
-  },
-  "exchange": {
-    "name": "bybit",
-    "symbol": "XRPUSDT",
-    "timeframe": "5",
-    "apiKey": "",
-    "apiSecret": "",
-    "testnet": false,
-    "demo": true
-  },
-  "timeframes": {
-    "entry": {
-      "interval": "1",
-      "candleLimit": 1000,
-      "enabled": true
-    },
-    "primary": {
-      "interval": "5",
-      "candleLimit": 500,
-      "enabled": true
-    },
-    "trend1": {
-      "interval": "15",
-      "candleLimit": 500,
-      "enabled": true
-    },
-    "trend2": {
-      "interval": "30",
-      "candleLimit": 250,
-      "enabled": true
-    },
-    "context": {
-      "interval": "60",
-      "candleLimit": 100,
-      "enabled": true
-    }
-  },
-  "trading": {
-    "leverage": 10,
-    "riskPercent": 1,
-    "maxPositions": 1,
-    "tradingCycleIntervalMs": 10000,
-    "orderType": "MARKET",
-    "tradingFeeRate": 0.0002,
-    "favorableMovementThresholdPercent": 0.1
-  },
-  "riskManagement": {
-    "positionSizeUsdt": 10,
-    "stopLossPercent": 1.5,
-    "minStopLossPercent": 1.0,
-    "breakevenOffsetPercent": 0.4,
-    "trailingStopEnabled": false,
-    "trailingStopPercent": 0.6,
-    "trailingStopActivationLevel": 2,
-    "takeProfits": [
-      { "level": 1, "percent": 1.0, "sizePercent": 50 },
-      { "level": 2, "percent": 2.0, "sizePercent": 50 }
-    ],
-    "timeBasedExitEnabled": false
-  },
-  "entryConfig": {
-    "priceAction": {
-      "enabled": true
-    },
-    "divergenceDetector": {
-      "minStrength": 0.3,
-      "priceDiffPercent": 0.2
-    },
-    "rsiPeriod": 14,
-    "rsiOversold": 30,
-    "rsiOverbought": 70,
-    "fastEmaPeriod": 9,
-    "slowEmaPeriod": 21,
-    "zigzagDepth": 2
-  },
-  "strategyConfidence": {
-    "priceAction": {
-      "baseConfidence": 0.75,
-      "conflictPenalty": 0.25
-    }
-  },
-  "analyzerThresholds": {
-    "liquidity": {
-      "priceTolerancePercent": 0.3,
-      "minTouchesForZone": 2,
-      "fakeoutReversalPercent": 0.3,
-      "oldTouchesWeight": 0.3
-    },
-    "divergence": {
-      "minStrength": 0.3,
-      "priceDiffThreshold": 0.2,
-      "rsiDiffThreshold": 2
-    },
-    "flatMarket": {
-      "maxRangeScore": 15,
-      "maxSlopeScore": 15,
-      "maxVolumeScore": 10
-    },
-    "btcCorrelation": {
-      "strict": 0.7,
-      "moderate": 0.5,
-      "weak": 0.15
-    }
-  },
-  "analyzer": {
-    "weight": 0.15,
-    "priority": 5,
-    "minConfidence": 25,
-    "maxConfidence": 85
-  },
-  "analyzerConstants": {
-    "rsi": {
-      "maxConfidence": 25
-    },
-    "ema": {
-      "baseConfidence": 0.5,
-      "strengthConfidenceMultiplier": 0.2
-    }
-  },
-  "analyzerStrategic": {
-    "_comment": "FIX #1-9: Strategic configuration for new analyzers and validators",
-    "rsiAnalyzer": {
-      "_comment": "FIX #1: Dynamic SHORT threshold with ATR adaptation",
-      "enabled": true,
-      "dynamicShortThresholdMode": "enabled",
-      "dynamicShortThreshold": 50,
-      "atrBasedAdaptation": true,
-      "dynamicMultiplier": 2,
-      "risingKnifePenalty": 0.6,
-      "bounceBonus": 1.1,
-      "minConfidenceAfterFallingKnife": 30,
-      "logValidations": true
-    },
-    "chochBosDetector": {
-      "_comment": "FIX #2: Full Break of Structure / Change of Character detection",
-      "enabled": true,
-      "baseConfidence": 75,
-      "bosDetectionStrength": 0.8,
-      "chochDetectionStrength": 0.85,
-      "logAllDetections": true
-    },
-    "footprintAnalyzer": {
-      "_comment": "FIX #3: Resistance rejection mode for SHORT",
-      "enabled": true,
-      "baseConfidence": 60,
-      "maxConfidence": 85,
-      "minClosePositionPercent": 70,
-      "minBodyToRangeRatio": 0.6,
-      "closePositionMultiplier": 0.15,
-      "resistanceRejectionMode": "enabled",
-      "resistanceRejectionConfidence": 70,
-      "requireRejectWickPercent": 95,
-      "blockLongInDowntrend": true,
-      "rsiDowntrendThreshold": 55,
-      "logDecisions": true
-    },
-    "hiddenDivergence": {
-      "_comment": "FIX #4: Hidden divergence detection (Price HH but RSI LH)",
-      "enabled": true,
-      "hiddenBearishConfidence": 65,
-      "hiddenBullishConfidence": 65,
-      "logDetections": true
-    },
-    "wickAnalyzer": {
-      "_comment": "FIX #5: Adaptive wick age handling",
-      "enabled": true,
-      "baseConfidence": 50,
-      "maxConfidence": 80,
-      "rejectionThresholdPercent": 40,
-      "adaptiveAging": "enabled",
-      "currentCandlePercent": 100,
-      "previousCandlePercent": 70,
-      "twoThreeCandlesPercent": 30,
-      "logWickAge": true
-    },
-    "trendConflictDetector": {
-      "_comment": "FIX #6: Detects conflicting signals indicating reversals",
-      "enabled": true,
-      "minConflictingSignals": 2,
-      "conflictConfidence": 60,
-      "weight": 0.1,
-      "priority": 8,
-      "logDetections": true
-    },
-    "postTPFilter": {
-      "_comment": "FIX #7: Anti-FOMO filter after take-profit",
-      "enabled": true,
-      "consolidationMinutes": 10,
-      "firstHalfMinutes": 5,
-      "firstHalfRequired": 0.75,
-      "secondHalfMinutes": 3,
-      "secondHalfRequired": 0.70,
-      "logDecisions": true
-    },
-    "shortEntryValidator": {
-      "_comment": "FIX #8: Stricter SHORT entry requirements",
-      "enabled": true,
-      "minConfidenceShort": 0.75,
-      "minConfidenceLong": 0.70,
-      "requireMomentumConfirmation": true,
-      "maxRsiForShort": 60,
-      "logValidations": true
-    },
-    "entryCostValidator": {
-      "_comment": "FIX #9: Ensures minimum analyzer consensus",
-      "enabled": true,
-      "minAnalyzersForShort": 2,
-      "minAnalyzersForLong": 2,
-      "maxSilentPercentShort": 40,
-      "maxSilentPercentLong": 50,
-      "logDecisions": true
-    },
-    "divergenceAnalyzer": {
-      "enabled": true,
-      "maxConfidence": 80,
-      "hiddenDivergenceMode": "enabled",
-      "hiddenBearishDivergenceConfidence": 65
-    }
-  },
-  "entryThresholds": {
-    "minTotalScore": 0.55
-  },
+
   "services": {
+    "_services_comment": "Background service configurations",
     "websocket": {
+      "_websocket_comment": "WebSocket connection parameters",
       "pingIntervalMs": 20000,
+      "_pingIntervalMs_comment": "Send ping every 20 seconds to keep connection alive",
       "reconnectDelayMs": 5000,
+      "_reconnectDelayMs_comment": "Wait 5 seconds before reconnecting",
       "maxReconnectAttempts": 10,
-      "authExpiresOffsetMs": 10000
+      "_maxReconnectAttempts_comment": "Give up after 10 failed reconnection attempts",
+      "authExpiresOffsetMs": 10000,
+      "_authExpiresOffsetMs_comment": "Re-auth 10 seconds before expiration"
     },
-    "limitOrder": {
-      "makerFeePercent": 0.01,
-      "takerFeePercent": 0.06,
-      "orderCheckIntervalMs": 200
-    },
-    "bot": {
-      "periodicIntervalMs": 30000,
-      "priceTolerance": 0.001
+    "logging": {
+      "_logging_comment": "Logging level and output",
+      "level": "DEBUG",
+      "_level_comment": "Log level: ERROR, WARNING, INFO, DEBUG, TRACE",
+      "toFile": true,
+      "_toFile_comment": "Write logs to file",
+      "toConsole": true,
+      "_toConsole_comment": "Print logs to console"
     }
   },
-  "strategies": {
-    "levelBased": {
-      "enabled": true,
-      "maxDistancePercent": 1.0,
-      "minDistanceFloorPercent": 0.3,
-      "minStrengthForNeutral": 0.25,
-      "minTouchesRequired": 3,
-      "minTouchesRequiredShort": 3,
-      "minTouchesRequiredLong": 3,
-      "minTouchesForStrong": 5,
-      "requireTrendAlignment": true,
-      "blockLongInDowntrend": true,
-      "blockShortInUptrend": true,
-      "stopLossAtrMultiplier": 1.5,
-      "rrRatio": 1.5,
-      "minConfidenceThreshold": 0.65,
-      "levelClustering": {
-        "clusterThresholdPercent": 0.3,
-        "minTouchesForStrong": 5,
-        "strengthBoost": 0.4,
-        "baseConfidence": 0.7,
-        "trendAlignmentBoost": 0.15,
-        "maxLevelAgeCandles": 150,
-        "candleIntervalMinutes": 1,
-        "trendAlignedDistanceMultiplier": 1.5,
-        "levelExhaustion": {
-          "enabled": true,
-          "penaltyPerBreakout": 0.15,
-          "maxPenalty": 0.6,
-          "breakoutThresholdPercent": 0.1,
-          "lookbackCandles": 50
-        },
-        "breakoutMode": {
-          "enabled": true,
-          "minEmaGapPercent": 1.5,
-          "rsiThresholdLong": 40,
-          "rsiThresholdShort": 60,
-          "minAtrPercent": 0.6,
-          "confidenceBoost": 0.1,
-          "useTrailingSL": true
-        },
-        "orderbookValidation": {
-          "enabled": true,
-          "minWallPercent": 5,
-          "strengthBoost": 0.15,
-          "maxDistancePercent": 0.3,
-          "requireConfirmation": false
-        },
-        "sweepDetection": {
-          "enabled": true,
-          "minWickPercent": 0.1,
-          "minRecoveryPercent": 50,
-          "volumeSpikeMultiplier": 1.5,
-          "lookbackCandles": 20,
-          "maxSweepAgeCandles": 3,
-          "trailSlOnSweep": true,
-          "trailSlBufferPercent": 0.1
-        },
-        "trendFilters": {
-          "minTrendGapPercent": 0.5,
-          "downtrend": {
-            "enabled": true,
-            "rsiThreshold": 55
-          },
-          "uptrend": {
-            "enabled": true,
-            "rsiThreshold": 45
-          }
-        }
-      },
-      "distanceModifier": {
-        "veryClosePercent": 0.5,
-        "veryClosePenalty": 1.1,
-        "farPercent": 1.2,
-        "farPenalty": 0.9
-      },
-      "longEntry": {
-        "enabled": true,
-        "minConfidence": 70
-      },
-      "shortEntry": {
-        "enabled": true,
-        "minConfidence": 70
-      },
-      "entryConfirmation": {
-        "enabled": true,
-        "longBodyRatioMin": 0.2,
-        "longWickRatioMax": 0.6,
-        "shortBodyRatioMin": 0.2,
-        "shortWickRatioMax": 0.6,
-        "hammerWickRatio": 0.6,
-        "shootingStarWickRatio": 0.6
-      },
-      "rsiFilters": {
-        "enabled": true,
-        "longMinThreshold": 30,
-        "longMaxThreshold": 70,
-        "shortMinThreshold": 30,
-        "shortMaxThreshold": 70,
-        "bypassOnStrongTrend": true,
-        "strongTrendEmaGapPercent": 1.5
-      },
-      "emaFilters": {
-        "enabled": true,
-        "downtrend": {
-          "rsiThreshold": 55,
-          "emaDiffThreshold": 0.5
-        }
-      },
-      "dynamicDistance": {
-        "enabled": true,
-        "atrMultiplier": 0.2,
-        "absoluteMinPercent": 0.15
-      },
-      "trendExistenceFilter": {
-        "enabled": true,
-        "minEmaGapPercent": 0.5,
-        "bypassOnStrongLevel": true,
-        "strongLevelThreshold": 0.7
-      },
-      "levelSelection": {
-        "tiebreakPreference": "NEAREST"
-      },
-      "timeWeightedStrength": {
-        "enabled": true,
-        "recentTouchBonusPercent": 20,
-        "recentPeriodHours": 24
-      },
-      "volumeProfileIntegration": {
-        "enabled": true,
-        "addVahValLevels": true,
-        "boostHvnMatch": true,
-        "hvnMatchThresholdPercent": 0.3,
-        "hvnStrengthBoost": 0.2,
-        "vahValStrength": 0.7
-      },
-      "multiTimeframeConfirmation": {
-        "enabled": true,
-        "htfLevelConfirmation": {
-          "enabled": true,
-          "alignmentThresholdPercent": 0.3,
-          "confidenceBoostPercent": 15
-        },
-        "trend2LevelConfirmation": {
-          "enabled": true,
-          "alignmentThresholdPercent": 0.4,
-          "confidenceBoostPercent": 10
-        },
-        "contextTrendFilter": {
-          "enabled": true,
-          "minEmaGapPercent": 0.5
-        }
-      },
-      "enhancedExit": {
-        "riskRewardGate": {
-          "enabled": true,
-          "minRR": 1.5,
-          "preferredRR": 2.0
-        },
-        "structureBasedTP": {
-          "enabled": true,
-          "mode": "LEVEL",
-          "offsetPercent": 0.1,
-          "fallbackPercent": 2.0,
-          "useNextLevelAsTP1": true,
-          "useSecondLevelAsTP2": false
-        },
-        "liquidityAwareSL": {
-          "enabled": true,
-          "extendBeyondLiquidity": true,
-          "extensionPercent": 0.15,
-          "useSwingPoints": true,
-          "swingLookback": 20
-        },
-        "atrBasedTP": {
-          "enabled": true,
-          "tp1AtrMultiplier": 1.5,
-          "tp2AtrMultiplier": 2.5,
-          "tp3AtrMultiplier": 4.0,
-          "minTPPercent": 0.5,
-          "maxTPPercent": 5.0
-        },
-        "sessionBasedTP": {
-          "enabled": true,
-          "asianMultiplier": 0.8,
-          "londonMultiplier": 1.0,
-          "nyMultiplier": 1.0,
-          "overlapMultiplier": 1.2
-        },
-        "dynamicBreakeven": {
-          "enabled": true,
-          "activationPercent": 1.0,
-          "offsetPercent": 0.4
-        },
-        "timeDecayTP": {
-          "enabled": true,
-          "decayStartMinutes": 30,
-          "decayRatePerHour": 0.5,
-          "minTPPercent": 0.5
-        },
-        "adaptiveTrailing": {
-          "enabled": true,
-          "activationPercent": 1.5,
-          "trailingDistancePercent": 0.3,
-          "useATRDistance": false
-        }
-      },
-      "mtfTPValidation": {
-        "enabled": true,
-        "htfTPValidation": {
-          "enabled": true,
-          "alignmentThresholdPercent": 0.3,
-          "confidenceBoostPercent": 10
-        },
-        "trend2TPValidation": {
-          "enabled": true,
-          "alignmentThresholdPercent": 0.4,
-          "confidenceBoostPercent": 5
-        },
-        "contextTPAdjustment": {
-          "enabled": true,
-          "minEmaGapPercent": 0.5,
-          "alignedScaleFactor": 1.15,
-          "opposedScaleFactor": 0.85
-        },
-        "scaling": {
-          "noConfirm": 0.9,
-          "htfConfirmed": 1.0,
-          "bothConfirmed": 1.1
-        }
-      },
-      "whaleWallTP": {
-        "enabled": true,
-        "minWallPercent": 5,
-        "maxDistancePercent": 2.0,
-        "minDistancePercent": 0.3,
-        "tpTargeting": {
-          "enabled": true,
-          "alignmentThresholdPercent": 0.5,
-          "scaleToWall": true,
-          "minWallSizeForTP": 8
-        },
-        "slProtection": {
-          "enabled": true,
-          "moveSlBehindWall": true,
-          "bufferPercent": 0.1,
-          "minWallSizeForSL": 10
-        },
-        "qualityValidation": {
-          "enabled": true,
-          "rejectSpoofing": true,
-          "boostIceberg": true,
-          "icebergBoostFactor": 1.2,
-          "minStrength": 0.3
-        }
-      }
-    }
-  },
-  "indicators": {
-    "rsiPeriod": 14,
-    "rsiOversold": 30,
-    "rsiOverbought": 70,
-    "fastEmaPeriod": 20,
-    "slowEmaPeriod": 50,
-    "atrPeriod": 14,
-    "zigzagDepth": 5
-  },
-  "atrFilter": {
-    "enabled": true,
-    "period": 14,
-    "minimumATR": 0.05,
-    "maximumATR": 5
-  },
-  "volatilityRegime": {
-    "enabled": true,
-    "thresholds": {
-      "lowAtrPercent": 0.3,
-      "highAtrPercent": 1.5
-    },
-    "sessionOverrides": {
-      "enabled": true,
-      "ASIAN": {
-        "lowAtrPercent": 0.2,
-        "highAtrPercent": 1.0
-      },
-      "LONDON": {
-        "lowAtrPercent": 0.4,
-        "highAtrPercent": 2.0
-      },
-      "NY": {
-        "lowAtrPercent": 0.4,
-        "highAtrPercent": 2.0
-      },
-      "OVERLAP": {
-        "lowAtrPercent": 0.5,
-        "highAtrPercent": 2.5
-      }
-    },
-    "hysteresis": {
-      "enabled": true,
-      "bufferPercent": 0.1
-    }
-  },
-  "strategicWeights": {
-    "levelAnalysis": {
-      "enabled": true,
-      "_comment": "DISABLED: Duplicates LevelBasedStrategy"
-    },
-    "filters": {
-      "btcCorrelation": { "enabled": false },
-      "sessionFilter": { "enabled": false },
-      "fundingRateFilter": { "enabled": false }
-    }
-  },
-  "volumeProfile": {
-    "enabled": true,
-    "_comment": "DISABLED: Already integrated into LevelAnalyzer"
-  },
-  "dataSubscriptions": {
-    "candles": {
-      "enabled": true,
-      "calculateIndicators": false
-    },
-    "orderbook": {
-      "enabled": true,
-      "updateIntervalMs": 1000
-    },
-    "ticks": {
-      "enabled": true,
-      "calculateDelta": true
-    }
-  },
+
   "logging": {
+    "_logging_comment": "Duplicate logging config (consolidation pending)",
     "level": "DEBUG",
+    "logDir": "logs",
+    "_logDir_comment": "Directory to write log files",
     "toFile": true,
     "toConsole": true
   },
-  "dataCollection": {
+
+  "monitoring": {
+    "_monitoring_comment": "Bot health monitoring and safety switches",
+    "marketHealth": {
+      "_marketHealth_comment": "Stop trading if performance drops below thresholds",
+      "enabled": true,
+      "minWinRate": 0.4,
+      "_minWinRate_comment": "Alert if win rate < 40%",
+      "minProfitFactor": 1.2,
+      "_minProfitFactor_comment": "Alert if profit factor < 1.2",
+      "maxConsecutiveLosses": 5,
+      "_maxConsecutiveLosses_comment": "Stop trading after 5 losses in a row",
+      "maxDrawdown": 0.15,
+      "_maxDrawdown_comment": "Stop trading if drawdown > 15%"
+    },
+    "antiFlip": {
+      "_antiFlip_comment": "Prevent rapid direction changes (LONG → SHORT → LONG)",
+      "enabled": true,
+      "cooldownCandles": 3,
+      "_cooldownCandles_comment": "Wait 3 candles before reversing",
+      "cooldownMs": 300000,
+      "_cooldownMs_comment": "Wait 5 minutes before reversing",
+      "requiredConfirmationCandles": 2,
+      "_requiredConfirmationCandles_comment": "Need 2 candles confirming reversal direction",
+      "overrideConfidenceThreshold": 85,
+      "_overrideConfidenceThreshold_comment": "Allow reversal if 85%+ confidence",
+      "strongReversalRsiThreshold": 25,
+      "_strongReversalRsiThreshold_comment": "RSI < 25 or > 75 = strong reversal signal"
+    }
+  },
+
+  "entryConfig": {
+    "_entryConfig_comment": "Entry signal detection configuration",
+    "divergenceDetector": {
+      "_divergenceDetector_comment": "Detect price/indicator divergences for reversals",
+      "enabled": false,
+      "lookbackCandles": 50,
+      "_lookbackCandles_comment": "Look back 50 candles for divergence pattern"
+    }
+  },
+
+  "btcConfirmation": {
+    "_btcConfirmation_comment": "Deprecated: moved to filters.btcCorrelation",
+    "enabled": false,
+    "symbol": "BTCUSDT",
+    "timeframe": "1",
+    "lookbackCandles": 100,
+    "correlationPeriod": 50,
+    "thresholds": {
+      "weak": 0.3,
+      "moderate": 0.6,
+      "strict": 0.8
+    }
+  },
+
+  "trendConfirmation": {
+    "_trendConfirmation_comment": "Confirm entries align with trend direction",
     "enabled": true,
-    "symbols": [
-      "APEXUSDT",
-      "SUIUSDT",
-      "STRKUSDT"
-    ],
-    "timeframes": [
-      "1m",
-      "5m",
-      "15m",
-      "30m"
-    ],
-    "collectOrderbook": true,
-    "orderbookInterval": 1,
-    "collectTradeTicks": true,
-    "database": {
-      "path": "./data/market-data-multi.db",
-      "compression": true
-    },
-    "websocket": {
-      "reconnectDelay": 5000,
-      "maxReconnectAttempts": 10
-    }
+    "_enabled_comment": "Block counter-trend entries",
+    "method": "ema",
+    "_method_comment": "Use EMA crossover for trend detection",
+    "minStrength": 0.5,
+    "_minStrength_comment": "Only trade if trend strength > 50%"
   },
-  "system": {
-    "timeSyncIntervalMs": 30000,
-    "timeSyncMaxFailures": 3
-  },
-  "entryConfirmation": {
-    "long": {
-      "enabled": true,
-      "expirySeconds": 120,
-      "tolerancePercent": 0.05
-    },
-    "short": {
-      "enabled": true,
-      "expirySeconds": 120,
-      "tolerancePercent": 0.05
-    }
-  },
-  "entryScanner": {
-    "minEntryCandles": 50,
-    "classicReversalBaseConfidence": 0.75,
-    "liquiditySweepBaseConfidence": 0.8,
-    "rsiLongConditionThreshold": 70,
-    "rsiShortConditionThreshold": 30,
-    "divergenceBoostDefault": 0.1,
-    "divergencePenaltyFactor": 0.5,
-    "chochBoostDefault": 0.1,
-    "liquiditySweepBoostDefault": 0.15,
-    "minConfidenceThreshold": 0.3,
-    "confidenceClampMin": 0.3,
-    "confidenceClampMax": 1
-  },
+
   "analysisConfig": {
-    "patternDetectors": {
-      "wedge": {
-        "baseConfidence": 65,
-        "minPatternBars": 25,
-        "maxPatternBars": 180,
-        "recentLookback": 12,
-        "exhaustionBonus": 15
-      },
-      "triangle": {
-        "baseConfidence": 65,
-        "minPatternBars": 30,
-        "maxPatternBars": 200,
-        "recentLookback": 12
-      },
-      "triplePattern": {
-        "baseConfidence": 70,
-        "peakTolerancePercent": 3.0,
-        "minPatternBars": 20,
-        "maxPatternBars": 150,
-        "stopLossMultiplier": 0.15,
-        "confidenceBonusFactor": 3.0,
-        "confidencePerPoint": 5,
-        "recentLookback": 10
-      },
-      "flag": {
-        "baseConfidence": 65,
-        "minConsolidationBars": 10,
-        "maxConsolidationBars": 100,
-        "minPoleHeightPercent": 2
-      }
-    },
-    "marketStructure": {
-      "chochAlignedBoost": 1.3,
-      "chochAgainstPenalty": 0.5,
-      "bosAlignedBoost": 1.1,
-      "noModification": 1.0
-    },
-    "flatMarketDetector": {
-      "hvnThreshold": 1.5,
-      "lvnThreshold": 0.7,
-      "maxEmaScore": 20,
-      "maxAtrScore": 20,
-      "maxRangeScore": 15,
-      "maxSlopeScore": 15,
-      "maxVolumeScore": 10
-    },
-    "liquidityDetector": {
-      "fakeoutReversalPercent": 0.3,
-      "recentTouchesWeight": 0.5,
-      "oldTouchesWeight": 0.3
-    }
-  },
-  "technicalThresholds": {
-    "chartPatterns": {
-      "minPointsHeadShoulders": 5,
-      "minPointsDouble": 3,
-      "minPointsTriple": 4,
-      "minPointsTriangle": 6,
-      "minPointsWedge": 6,
-      "minPointsFlag": 6,
-      "headTolerancePercent": 2,
-      "shoulderTolerancePercent": 3,
-      "necklineTolerancePercent": 2,
-      "minPatternBars": 20,
-      "maxPatternBars": 100
-    }
-  },
-  "volumeProfile": {
+    "_analysisConfig_comment": "Analysis depth and logging",
     "enabled": true,
-    "lookbackCandles": 200,
-    "valueAreaPercent": 70,
-    "priceTickSize": 0.001
+    "_enabled_comment": "Enable signal analysis",
+    "deepAnalysis": false,
+    "_deepAnalysis_comment": "Log detailed analysis (verbose, slows down bot)"
   },
-  "antiFlip": {
+
+  "strategicWeights": {
+    "_strategicWeights_comment": "Manual weight distribution (deprecated: use strategy JSON files)",
+    "trend": 0.4,
+    "_trend_comment": "40% weight on trend signals",
+    "support": 0.3,
+    "_support_comment": "30% weight on support/resistance signals",
+    "volume": 0.3,
+    "_volume_comment": "30% weight on volume signals"
+  },
+
+  "strategies": {
+    "_strategies_comment": "Strategy configuration",
     "enabled": true,
-    "cooldownCandles": 3,
-    "cooldownMs": 300000,
-    "requiredConfirmationCandles": 2,
-    "overrideConfidenceThreshold": 85,
-    "strongReversalRsiThreshold": 25
+    "_enabled_comment": "Enable strategy-driven analysis",
+    "default": "simple-levels",
+    "_default_comment": "Fallback strategy if not specified"
   },
-  "strategy": {
-    "type": "LEVEL_BASED",
-    "emaFlatThreshold": 0.001,
-    "emaDistanceThreshold": 5.5,
-    "contextFilteringMode": "WEIGHT_BASED"
-  },
-  "marketHealth": {
+
+  "analyzers": {
+    "_analyzers_comment": "Analyzer engine configuration",
     "enabled": true,
-    "minWinRate": 0.40,
-    "minProfitFactor": 1.2,
-    "maxConsecutiveLosses": 5,
-    "maxDrawdown": 0.15
+    "_enabled_comment": "Enable analyzer-based signal generation"
   }
 }
