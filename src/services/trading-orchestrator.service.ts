@@ -359,6 +359,9 @@ export class TradingOrchestrator {
       this.buildAnalyzerConfigForRegistry(),
     );
 
+    // Get current price from last candle
+    const currentPrice = entryCandles.length > 0 ? entryCandles[entryCandles.length - 1].close : undefined;
+
     // Run each enabled analyzer
     for (const [analyzerName, { instance }] of enabledAnalyzers) {
       try {
@@ -372,6 +375,7 @@ export class TradingOrchestrator {
             ...signal,
             weight: analyzerCfg.weight,
             priority: analyzerCfg.priority,
+            price: currentPrice,
           });
         }
       } catch (analyzerError) {

@@ -53,6 +53,7 @@ export interface AnalyzerSignal {
   confidence: number; // 0-100 (confidence percentage)
   weight: number; // 0.0-1.0 (importance multiplier)
   priority: number; // 1-10 (higher = more important)
+  price?: number; // Signal price (added by orchestrator, not by analyzer)
   blockingReasons?: string[]; // Why blocked (for logging, but ignored in scoring)
   score?: number; // Computed score (confidence * weight)
 }
