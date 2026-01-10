@@ -61,6 +61,9 @@ export class TradingOrchestrator {
   private exitOrchestrator: ExitOrchestrator | null = null;
   private positionExitingService: PositionExitingService | null = null;
 
+  // Entry decision tracking (for PRIMARY->ENTRY refinement)
+  private pendingEntryDecision: any = null;
+
 
   constructor(
     private config: OrchestratorConfig,
@@ -123,98 +126,26 @@ export class TradingOrchestrator {
    */
   async onCandleClosed(role: TimeframeRole, candle: Candle): Promise<void> {
     try {
-      // PRIMARY closed → Evaluate exits
+      // PRIMARY (5m) closed → MAIN ENTRY SIGNAL ANALYSIS
+      // This is the DECIDING timeframe where analyzers generate entry signals
       if (role === TimeframeRole.PRIMARY) {
-        this.logger.info('📊 PRIMARY candle closed - evaluating exits');
-
-        // PHASE 4 Week 3: Evaluate exit conditions with orchestrator
-        const currentPosition = this.positionManager.getCurrentPosition();
-        if (currentPosition && this.exitOrchestrator && this.positionExitingService) {
-          try {
-            // Gather indicators for advanced exit features (Smart Breakeven, SmartTrailingV2)
-            const indicators = {
-              ema20: undefined,  // EMA calculation handled by AnalyzerRegistry
-              currentVolume: candle.volume,
-              avgVolume: candle.volume, // TODO: Calculate proper average from recent candles
-              // ATRPercent: Will use default value if not provided (1.5%)
-            };
-
-            // Evaluate exit with orchestrator and full indicators
-            const exitResult = await this.exitOrchestrator.evaluateExit(
-              currentPosition,
-              candle.close,
-              indicators,
-            );
-
-            // Log the transition if any
-            if (exitResult.stateTransition) {
-              this.logger.debug('📊 Exit state machine', {
-                transition: exitResult.stateTransition,
-              });
-            }
-
-            // Execute exit actions if any
-            if (exitResult.actions && exitResult.actions.length > 0) {
-              this.logger.info('🚨 Exit orchestrator triggered actions', {
-                actionCount: exitResult.actions.length,
-                transition: exitResult.stateTransition,
-              });
-
-              for (const action of exitResult.actions) {
-                try {
-                  await this.positionExitingService.executeExitAction(
-                    currentPosition,
-                    action,
-                    candle.close,
-                    'Orchestrator decision',
-                    ExitType.MANUAL,
-                  );
-
-                  this.logger.info('✅ Exit action executed', {
-                    actionType: action.action,
-                  });
-                } catch (actionError) {
-                  this.logger.error('Failed to execute exit action', {
-                    actionType: action.action,
-                    error: actionError instanceof Error ? actionError.message : String(actionError),
-                  });
-                }
-              }
-            }
-
-            // Update position state if needed
-            if (exitResult.newState) {
-              this.logger.debug('📍 Position state updated', {
-                newState: exitResult.newState,
-              });
-            }
-          } catch (exitEvalError) {
-            this.logger.error('Failed to evaluate exit conditions', {
-              error: exitEvalError instanceof Error ? exitEvalError.message : String(exitEvalError),
-            });
-          }
-        }
-      }
-
-      // ENTRY closed → Run entry signal analysis
-      if (role === TimeframeRole.ENTRY) {
-        this.logger.info('🕯️ ENTRY candle closed - analyzing entry signals');
+        this.logger.info('📊 PRIMARY (5m) candle closed - ANALYZING ENTRY SIGNALS (main timeframe)');
 
         try {
-          // Get ENTRY candles for analysis
-          const entryCandles = await this.candleProvider.getCandles(TimeframeRole.ENTRY, 100);
-          if (!entryCandles || entryCandles.length < 20) {
-            this.logger.debug('Not enough candles for entry analysis', {
-              available: entryCandles?.length || 0,
+          // Get PRIMARY candles for analysis (this is the decision timeframe)
+          const primaryCandles = await this.candleProvider.getCandles(TimeframeRole.PRIMARY, 100);
+          if (!primaryCandles || primaryCandles.length < 20) {
+            this.logger.debug('Not enough PRIMARY candles for entry analysis', {
+              available: primaryCandles?.length || 0,
             });
             return;
           }
 
-          // Run strategy (black box - analyze all configured analyzers)
-          const signals = await this.runStrategyAnalysis(entryCandles);
+          // Run strategy analysis on PRIMARY timeframe (the deciding timeframe)
+          const signals = await this.runStrategyAnalysis(primaryCandles);
 
           if (signals && signals.length > 0) {
-            this.logger.info(`📊 Entry signals generated: ${signals.length}`, {
+            this.logger.info(`📊 Entry signals generated on PRIMARY (5m): ${signals.length}`, {
               signals: signals
                 .map((s) => `${s.source}(${s.direction}:${s.confidence.toFixed(0)}%)`)
                 .join(', '),
@@ -223,22 +154,47 @@ export class TradingOrchestrator {
             // Evaluate signals with EntryOrchestrator
             if (this.entryOrchestrator) {
               const currentPosition = this.positionManager.getCurrentPosition();
-              const currentBalance = 100; // TODO: Get actual account balance
+              // Get account balance (use configured position size as fallback)
+              const configBalance = (this.config as any)?.riskManager?.accountBalance || 1000;
+              const currentBalance = configBalance > 0 ? configBalance : 1000;
               const openPositions = currentPosition ? [currentPosition] : [];
 
               try {
+                // Get trend bias from context
+                // For now use neutral default - in production would use TrendAnalyzer or MultiTimeframeTrendService
+                const trendBias = this.currentContext?.trend || {
+                  bias: 'NEUTRAL',
+                  strength: 0.5,
+                };
+
                 const entryDecision = await this.entryOrchestrator.evaluateEntry(
                   signals,
                   currentBalance,
                   openPositions,
-                  { bias: 'UPTREND', strength: 0.5 } as any, // TODO: Get actual trend from context
+                  trendBias as any,
                 );
 
-                this.logger.info('📋 EntryOrchestrator decision', {
+                this.logger.info('📋 EntryOrchestrator decision (PRIMARY)', {
                   decision: entryDecision.decision,
                   reason: entryDecision.reason,
                   signal: entryDecision.signal?.type,
                 });
+
+                // Store decision for ENTRY timeframe to use for entry point refinement
+                if (entryDecision.decision === 'ENTER') {
+                  this.pendingEntryDecision = {
+                    decision: entryDecision.decision,
+                    signal: entryDecision.signal,
+                    timestamp: Date.now(),
+                    primaryCandle: primaryCandles[primaryCandles.length - 1],
+                  };
+                  this.logger.info('💾 Pending entry decision stored for ENTRY timeframe refinement', {
+                    signalType: entryDecision.signal?.type,
+                  });
+                } else if (entryDecision.decision === 'SKIP') {
+                  this.pendingEntryDecision = null;
+                  this.logger.debug('❌ Entry decision skipped - clearing pending decision');
+                }
               } catch (orchestratorError) {
                 this.logger.error('Error in EntryOrchestrator.evaluateEntry', {
                   error: orchestratorError instanceof Error ? orchestratorError.message : String(orchestratorError),
@@ -246,13 +202,130 @@ export class TradingOrchestrator {
               }
             }
           } else {
-            this.logger.debug('No entry signals generated');
+            this.logger.debug('No entry signals generated on PRIMARY (5m)');
           }
-        } catch (entryError) {
-          this.logger.error('Error analyzing entry signals', {
-            error: entryError instanceof Error ? entryError.message : String(entryError),
+
+          // ALSO evaluate exits on PRIMARY timeframe
+          this.logger.debug('📊 PRIMARY candle closed - also evaluating exits');
+          const currentPosition = this.positionManager.getCurrentPosition();
+          if (currentPosition && this.exitOrchestrator && this.positionExitingService) {
+            try {
+              const indicators = {
+                ema20: undefined,
+                currentVolume: candle.volume,
+                avgVolume: candle.volume,
+              };
+
+              const exitResult = await this.exitOrchestrator.evaluateExit(
+                currentPosition,
+                candle.close,
+                indicators,
+              );
+
+              if (exitResult.actions && exitResult.actions.length > 0) {
+                this.logger.info('🚨 Exit orchestrator triggered actions', {
+                  actionCount: exitResult.actions.length,
+                  transition: exitResult.stateTransition,
+                });
+
+                for (const action of exitResult.actions) {
+                  try {
+                    await this.positionExitingService.executeExitAction(
+                      currentPosition,
+                      action,
+                      candle.close,
+                      'Orchestrator decision',
+                      ExitType.MANUAL,
+                    );
+
+                    this.logger.info('✅ Exit action executed', {
+                      actionType: action.action,
+                    });
+                  } catch (actionError) {
+                    this.logger.error('Failed to execute exit action', {
+                      actionType: action.action,
+                      error: actionError instanceof Error ? actionError.message : String(actionError),
+                    });
+                  }
+                }
+              }
+            } catch (exitEvalError) {
+              this.logger.error('Failed to evaluate exit conditions', {
+                error: exitEvalError instanceof Error ? exitEvalError.message : String(exitEvalError),
+              });
+            }
+          }
+        } catch (primaryError) {
+          this.logger.error('Error analyzing PRIMARY candle', {
+            error: primaryError instanceof Error ? primaryError.message : String(primaryError),
           });
         }
+      }
+
+      // ENTRY (1m) closed → REFINE ENTRY POINT (only if already have signal from PRIMARY)
+      // This timeframe helps find the BEST ENTRY PRICE when PRIMARY already said "we can enter"
+      if (role === TimeframeRole.ENTRY) {
+        if (this.pendingEntryDecision && this.pendingEntryDecision.decision === 'ENTER') {
+          this.logger.info('🎯 ENTRY (1m): Refining entry point for pending PRIMARY decision');
+
+          try {
+            // Get latest 1-minute candles for entry point analysis
+            const entryCandles = await this.candleProvider.getCandles(TimeframeRole.ENTRY, 50);
+            if (!entryCandles || entryCandles.length < 5) {
+              this.logger.debug('Not enough ENTRY candles for refinement', {
+                available: entryCandles?.length || 0,
+              });
+              return;
+            }
+
+            const currentCandle = entryCandles[entryCandles.length - 1];
+            const previousCandle = entryCandles[entryCandles.length - 2];
+
+            // Check if current 1-minute candle is suitable for entry
+            // (not at extremes, showing some momentum alignment)
+            const candleSize = Math.abs(currentCandle.close - currentCandle.open);
+            const avgCandleSize = entryCandles.reduce((sum, c) => sum + Math.abs(c.close - c.open), 0) / entryCandles.length;
+
+            const isGoodEntryPoint =
+              // Not a doji (has clear direction)
+              candleSize > avgCandleSize * 0.3 &&
+              // Close is favorable (in direction of signal)
+              (this.pendingEntryDecision.signal.direction === 'LONG'
+                ? currentCandle.close > previousCandle.close
+                : currentCandle.close < previousCandle.close);
+
+            if (isGoodEntryPoint) {
+              this.logger.info('✅ ENTRY (1m): Suitable entry point found - ready to execute', {
+                direction: this.pendingEntryDecision.signal.direction,
+                price: currentCandle.close,
+                candleSize,
+                avgSize: avgCandleSize,
+              });
+
+              // Try to execute the trade
+              // NOTE: In a real implementation, would call positionManager.openPosition()
+              // For now, just log that we're ready
+              this.logger.info('🚀 Ready to open position on next execution cycle');
+            } else {
+              this.logger.debug('⏳ ENTRY (1m): Current candle not ideal for entry - waiting for better point', {
+                direction: this.pendingEntryDecision.signal.direction,
+                candleSize,
+                avgSize: avgCandleSize,
+                isSmallCandle: candleSize < avgCandleSize * 0.3,
+                isWrongDirection: !(
+                  this.pendingEntryDecision.signal.direction === 'LONG'
+                    ? currentCandle.close > previousCandle.close
+                    : currentCandle.close < previousCandle.close
+                ),
+              });
+            }
+          } catch (entryRefinementError) {
+            this.logger.error('Error refining entry point on ENTRY timeframe', {
+              error: entryRefinementError instanceof Error ? entryRefinementError.message : String(entryRefinementError),
+            });
+          }
+        }
+        // If no pending decision from PRIMARY, ENTRY candles are ignored (that's correct)
       }
     } catch (error) {
       this.logger.error('Error in orchestrator onCandleClosed', {
