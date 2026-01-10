@@ -1,0 +1,1421 @@
+{
+  "timestamp": "2026-01-10T16:07:27.154Z",
+  "strategy": "D:\\src\\Edison\\strategies\\json\\level-trading-v2.strategy.json",
+  "symbol": "XRPUSDT",
+  "totalTests": 72,
+  "bestResult": {
+    "params": {
+      "emaFastPeriods": 9,
+      "emaSlowPeriods": 21,
+      "minConfidences": 0.4,
+      "atrMultipliers": 2,
+      "riskPercentages": 0.5
+    },
+    "metrics": {
+      "winRate": 0.8,
+      "profitFactor": 29.550044976750236,
+      "sharpeRatio": 0.32428095597935663,
+      "totalTrades": 5,
+      "totalPnl": 41.57994357619137
+    },
+    "score": 0.6993210716984518
+  },
+  "allResults": [
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 12,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.4,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    },
+    {
+      "params": {
+        "emaFastPeriods": 15,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.55,
+        "atrMultipliers": 1.5,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 3.1291833691426363,
+        "sharpeRatio": 0.19834214665573124,
+        "totalTrades": 5,
+        "totalPnl": 29.274125069151744
+      },
+      "score": 0.6898756609991799
+    }
+  ],
+  "topResults": [
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 21,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 26,
+        "minConfidences": 0.55,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 0.5
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    },
+    {
+      "params": {
+        "emaFastPeriods": 9,
+        "emaSlowPeriods": 30,
+        "minConfidences": 0.4,
+        "atrMultipliers": 2,
+        "riskPercentages": 1
+      },
+      "metrics": {
+        "winRate": 0.8,
+        "profitFactor": 29.550044976750236,
+        "sharpeRatio": 0.32428095597935663,
+        "totalTrades": 5,
+        "totalPnl": 41.57994357619137
+      },
+      "score": 0.6993210716984518
+    }
+  ]
+}
