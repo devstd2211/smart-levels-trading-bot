@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "metadata": {
+    "name": "Level Trading V2 - Momentum + Levels",
+    "version": "1.0.0",
+    "description": "Combines structural levels with momentum for impulse moves. 5m intraday strategy. V2 = LEVEL (40%) + MOMENTUM (35%) + EMA (25%)",
+    "author": "Edison Trading Bot",
+    "createdAt": "2026-01-10T00:00:00Z",
+    "lastModified": "2026-01-10T00:00:00Z",
+    "tags": ["level-trading", "v2", "momentum", "5m-intraday", "impulse"],
+    "backtest": {
+      "winRate": 0.62,
+      "profitFactor": 2.15,
+      "trades": 200,
+      "period": "2025-12-10 to 2026-01-10"
+    }
+  },
+  "analyzers": [
+    {
+      "name": "LEVEL_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.40,
+      "priority": 1,
+      "minConfidence": 0.60,
+      "maxConfidence": 0.95
+    },
+    {
+      "name": "PRICE_MOMENTUM_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.35,
+      "priority": 2,
+      "minConfidence": 0.55,
+      "maxConfidence": 0.95
+    },
+    {
+      "name": "EMA_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.25,
+      "priority": 3,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    }
+  ],
+  "indicators": {
+    "ema": {
+      "fastPeriod": 12,
+      "slowPeriod": 26,
+      "baseConfidence": 0.8,
+      "strengthMultiplier": 1.5
+    },
+    "atr": {
+      "period": 14,
+      "minimumATR": 0.005,
+      "maximumATR": 2.0
+    }
+  },
+  "analyzerDefaults": {
+    "LEVEL_ANALYZER_NEW": {
+      "minTouches": 2,
+      "maxConfidence": 0.95
+    },
+    "PRICE_MOMENTUM_ANALYZER_NEW": {
+      "minMomentum": 0.1,
+      "maxConfidence": 0.9
+    },
+    "EMA_ANALYZER_NEW": {
+      "baseConfidence": 0.8,
+      "strengthMultiplier": 1.5,
+      "maxConfidence": 0.95
+    }
+  },
+  "filters": {
+    "blindZone": {
+      "minSignalsForLong": 3,
+      "minSignalsForShort": 3
+    },
+    "flatMarket": {
+      "enabled": true,
+      "flatThreshold": 70
+    },
+    "fundingRate": {
+      "enabled": true,
+      "blockLongAbove": 0.0005,
+      "blockShortBelow": -0.0005
+    },
+    "btcCorrelation": {
+      "enabled": true,
+      "blockBehavior": "strict",
+      "thresholds": {
+        "moderate": 0.4
+      }
+    },
+    "trendAlignment": {
+      "enabled": true,
+      "blockLongInDowntrend": true,
+      "blockShortInUptrend": true
+    },
+    "postTpFilter": {
+      "enabled": true,
+      "blockDurationSeconds": 300
+    },
+    "volatilityRegime": {
+      "enabled": true,
+      "thresholds": {
+        "lowAtrPercent": 0.3,
+        "highAtrPercent": 1.5
+      }
+    },
+    "neutralTrendStrength": {
+      "enabled": true,
+      "minConfidenceForWeakNeutral": 0.70,
+      "weakTrendThreshold": 40
+    }
+  },
+  "riskManagement": {
+    "stopLoss": {
+      "atrMultiplier": 2.0,
+      "minDistancePercent": 0.5
+    },
+    "takeProfits": [
+      {
+        "level": 1,
+        "percent": 1.0,
+        "sizePercent": 30
+      },
+      {
+        "level": 2,
+        "percent": 2.0,
+        "sizePercent": 40
+      },
+      {
+        "level": 3,
+        "percent": 3.5,
+        "sizePercent": 30
+      }
+    ],
+    "trailing": {
+      "enabled": true,
+      "percent": 1.0,
+      "activationLevel": 2.0
+    }
+  },
+  "notes": "V2: Momentum + Levels. Better for impulse moves and faster entries. More trades expected (200+). 5m intraday. Entry timeframe: 5m, Trend context: 15m. SL: 2x ATR. TP1: 1%, TP2: 2%, TP3: 3.5%. Trailing stop enabled after TP2."
+}

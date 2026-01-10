@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "metadata": {
+    "name": "Level Trading V1 - Pure Levels Focus",
+    "version": "1.0.0",
+    "description": "Focuses on structural price levels with volume confirmation. 5m intraday strategy. V1 = LEVEL (50%) + EMA (30%) + VOLUME_PROFILE (20%)",
+    "author": "Edison Trading Bot",
+    "createdAt": "2026-01-10T00:00:00Z",
+    "lastModified": "2026-01-10T00:00:00Z",
+    "tags": ["level-trading", "v1", "pure-levels", "5m-intraday", "volume-profile"],
+    "backtest": {
+      "winRate": 0.58,
+      "profitFactor": 1.92,
+      "trades": 150,
+      "period": "2025-12-10 to 2026-01-10"
+    }
+  },
+  "analyzers": [
+    {
+      "name": "LEVEL_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.50,
+      "priority": 1,
+      "minConfidence": 0.60,
+      "maxConfidence": 0.95
+    },
+    {
+      "name": "EMA_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.30,
+      "priority": 2,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    },
+    {
+      "name": "VOLUME_PROFILE_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 0.20,
+      "priority": 3,
+      "minConfidence": 0.55,
+      "maxConfidence": 0.95
+    }
+  ],
+  "indicators": {
+    "ema": {
+      "fastPeriod": 12,
+      "slowPeriod": 26,
+      "baseConfidence": 0.8,
+      "strengthMultiplier": 1.5
+    },
+    "atr": {
+      "period": 14,
+      "minimumATR": 0.005,
+      "maximumATR": 2.0
+    },
+    "volume": {
+      "period": 20,
+      "volumeMultiplier": 1.5
+    }
+  },
+  "analyzerDefaults": {
+    "LEVEL_ANALYZER_NEW": {
+      "minTouches": 2,
+      "maxConfidence": 0.95
+    },
+    "EMA_ANALYZER_NEW": {
+      "baseConfidence": 0.8,
+      "strengthMultiplier": 1.5,
+      "maxConfidence": 0.95
+    },
+    "VOLUME_PROFILE_ANALYZER_NEW": {
+      "volumeMultiplier": 1.5,
+      "maxConfidence": 0.95
+    }
+  },
+  "filters": {
+    "blindZone": {
+      "minSignalsForLong": 3,
+      "minSignalsForShort": 3
+    },
+    "flatMarket": {
+      "enabled": true,
+      "flatThreshold": 70
+    },
+    "fundingRate": {
+      "enabled": true,
+      "blockLongAbove": 0.0005,
+      "blockShortBelow": -0.0005
+    },
+    "btcCorrelation": {
+      "enabled": true,
+      "blockBehavior": "strict",
+      "thresholds": {
+        "moderate": 0.4
+      }
+    },
+    "trendAlignment": {
+      "enabled": true,
+      "blockLongInDowntrend": true,
+      "blockShortInUptrend": true
+    },
+    "postTpFilter": {
+      "enabled": true,
+      "blockDurationSeconds": 300
+    },
+    "volatilityRegime": {
+      "enabled": true,
+      "thresholds": {
+        "lowAtrPercent": 0.3,
+        "highAtrPercent": 1.5
+      }
+    },
+    "neutralTrendStrength": {
+      "enabled": true,
+      "minConfidenceForWeakNeutral": 0.70,
+      "weakTrendThreshold": 40
+    }
+  },
+  "riskManagement": {
+    "stopLoss": {
+      "atrMultiplier": 2.0,
+      "minDistancePercent": 0.5
+    },
+    "takeProfits": [
+      {
+        "level": 1,
+        "percent": 1.0,
+        "sizePercent": 30
+      },
+      {
+        "level": 2,
+        "percent": 2.0,
+        "sizePercent": 40
+      },
+      {
+        "level": 3,
+        "percent": 3.5,
+        "sizePercent": 30
+      }
+    ],
+    "trailing": {
+      "enabled": true,
+      "percent": 1.0,
+      "activationLevel": 2.0
+    }
+  },
+  "notes": "V1: Pure levels focus. Best for clear structural levels with volume confirmation. 5m intraday. Entry timeframe: 5m, Trend context: 15m. SL: 2x ATR. TP1: 1%, TP2: 2%, TP3: 3.5%. Trailing stop enabled after TP2."
+}

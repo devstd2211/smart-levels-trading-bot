@@ -18,6 +18,8 @@
 
 import { LoggerService } from '../services/logger.service';
 import { FilterOverrides } from '../types/strategy-config.types';
+import { correlateCandles, determineBtcTrend, isBtcAligned } from '../utils/correlation';
+import { Candle } from '../types';
 
 export interface FilterResult {
   allowed: boolean;
@@ -44,6 +46,8 @@ export class FilterOrchestrator {
     fundingRate?: number;
     lastTPTimestamp?: number; // timestamp of last TP
     trend?: any; // current trend analysis (bias, strength)
+    btcCandles?: Candle[]; // BTC candles for correlation analysis
+    altCandles?: Candle[]; // Target asset candles (XRP, etc)
   }): FilterResult {
     const appliedFilters: string[] = [];
 
@@ -219,6 +223,9 @@ export class FilterOrchestrator {
 
   /**
    * FILTER 4: BTC Correlation - block alt when BTC moves against us
+   *
+   * Prevents counter-trend entries by checking BTC correlation and trend.
+   * With strict blocking: blocks entries that go against BTC trend if correlation is high.
    */
   private evaluateBtcCorrelation(context: any): FilterResult {
     const config = this.filterConfig.btcCorrelation;
@@ -226,9 +233,67 @@ export class FilterOrchestrator {
       return { allowed: true, appliedFilters: [] };
     }
 
-    // To be implemented in Phase 3
-    // Requires BTC correlation analysis service
-    return { allowed: true, appliedFilters: [] };
+    // Need BTC and alt candles for correlation analysis
+    if (!context.btcCandles || !context.altCandles || !Array.isArray(context.btcCandles) || !Array.isArray(context.altCandles)) {
+      return { allowed: true, appliedFilters: [] };
+    }
+
+    if (context.btcCandles.length < 2 || context.altCandles.length < 2) {
+      return { allowed: true, appliedFilters: [] };
+    }
+
+    try {
+      // Calculate correlation
+      const lookbackPeriod = 20; // Last 20 candles
+      const correlationResult = correlateCandles(context.btcCandles, context.altCandles, lookbackPeriod, 'close');
+      const correlation = correlationResult.correlation;
+
+      // Determine BTC trend
+      const btcTrend = determineBtcTrend(context.btcCandles, lookbackPeriod);
+      const signalDirection = context.signal.direction === 'LONG' ? 'LONG' : 'SHORT';
+
+      // Get threshold from config (default: moderate = 0.4)
+      const threshold = config?.thresholds?.moderate ?? 0.4;
+
+      // Check if aligned
+      const aligned = isBtcAligned(btcTrend, signalDirection, correlation, threshold);
+
+      if (!aligned) {
+        this.logger.warn('🚫 Entry blocked: BTC Correlation filter', {
+          signal: `${signalDirection}`,
+          correlation: correlation.toFixed(3),
+          btcTrend,
+          threshold: threshold.toFixed(2),
+          correlationStrength: correlationResult.strength,
+          reason: `${signalDirection} signal conflicts with BTC trend`,
+        });
+
+        return {
+          allowed: false,
+          reason: `BTC correlation mismatch: ${signalDirection} vs BTC ${btcTrend} (corr=${correlation.toFixed(2)})`,
+          appliedFilters: [],
+        };
+      }
+
+      // If we're here, BTC correlation is not blocking
+      if (Math.abs(correlation) >= threshold) {
+        this.logger.debug('✅ Signal passed BTC Correlation check', {
+          signal: `${signalDirection}`,
+          correlation: correlation.toFixed(3),
+          btcTrend,
+          note: 'Aligned with BTC trend',
+        });
+      }
+
+      return { allowed: true, appliedFilters: [] };
+    } catch (error: any) {
+      this.logger.error('Error in BTC Correlation filter', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      // On error, allow the trade (fail open)
+      return { allowed: true, appliedFilters: [] };
+    }
   }
 
   /**

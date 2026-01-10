@@ -42,7 +42,8 @@ import { FilterOrchestrator } from './filter.orchestrator';
 // ============================================================================
 
 // Minimum confidence threshold to consider a signal valid
-const ENTRY_ORCHESTRATOR_MIN_CONFIDENCE = 60; // Increased from 30% - avoid weak reversals
+// DEFAULT: 60 (strict), can be overridden by strategy config
+let ENTRY_ORCHESTRATOR_MIN_CONFIDENCE = 60;
 
 // If multiple signals, prefer this many top signals for ranking
 const ENTRY_ORCHESTRATOR_TOP_SIGNALS = 3;
@@ -63,7 +64,21 @@ export class EntryOrchestrator {
     private logger: LoggerService,
     private filterOrchestrator?: FilterOrchestrator,
   ) {
-    this.logger.info('🎯 EntryOrchestrator initialized (PHASE 4)');
+    this.logger.info('🎯 EntryOrchestrator initialized (PHASE 4)', {
+      minConfidenceThreshold: ENTRY_ORCHESTRATOR_MIN_CONFIDENCE,
+    });
+  }
+
+  /**
+   * Set minimum confidence threshold (for backtesting/tuning)
+   * Default is 60%, can be lowered to 30-40% for more signal participation
+   */
+  static setMinConfidenceThreshold(threshold: number): void {
+    ENTRY_ORCHESTRATOR_MIN_CONFIDENCE = threshold;
+  }
+
+  static getMinConfidenceThreshold(): number {
+    return ENTRY_ORCHESTRATOR_MIN_CONFIDENCE;
   }
 
   /**

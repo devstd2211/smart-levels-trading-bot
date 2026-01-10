@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "metadata": {
+    "name": "Level Trading Test - EMA Only",
+    "version": "1.0.0",
+    "description": "Simple test strategy with EMA analyzer only. For backtest engine validation.",
+    "author": "Edison Trading Bot",
+    "createdAt": "2026-01-10T00:00:00Z",
+    "lastModified": "2026-01-10T00:00:00Z",
+    "tags": ["test", "ema-only", "5m-intraday"]
+  },
+  "analyzers": [
+    {
+      "name": "EMA_ANALYZER_NEW",
+      "enabled": true,
+      "weight": 1.0,
+      "priority": 1,
+      "minConfidence": 0.50,
+      "maxConfidence": 1.0
+    }
+  ],
+  "indicators": {
+    "ema": {
+      "fastPeriod": 12,
+      "slowPeriod": 26,
+      "baseConfidence": 0.8,
+      "strengthMultiplier": 1.5
+    },
+    "atr": {
+      "period": 14,
+      "minimumATR": 0.005,
+      "maximumATR": 2.0
+    }
+  },
+  "analyzerDefaults": {
+    "EMA_ANALYZER_NEW": {
+      "baseConfidence": 0.8,
+      "strengthMultiplier": 1.5,
+      "maxConfidence": 0.95
+    }
+  },
+  "filters": {
+    "blindZone": {
+      "minSignalsForLong": 1,
+      "minSignalsForShort": 1
+    },
+    "flatMarket": {
+      "enabled": false
+    },
+    "fundingRate": {
+      "enabled": false
+    },
+    "btcCorrelation": {
+      "enabled": false
+    },
+    "trendAlignment": {
+      "enabled": true,
+      "blockLongInDowntrend": false,
+      "blockShortInUptrend": false
+    },
+    "postTpFilter": {
+      "enabled": false
+    },
+    "volatilityRegime": {
+      "enabled": false
+    },
+    "neutralTrendStrength": {
+      "enabled": false
+    }
+  },
+  "riskManagement": {
+    "stopLoss": {
+      "atrMultiplier": 2.0,
+      "minDistancePercent": 0.5
+    },
+    "takeProfits": [
+      {
+        "level": 1,
+        "percent": 1.0,
+        "sizePercent": 30
+      },
+      {
+        "level": 2,
+        "percent": 2.0,
+        "sizePercent": 40
+      },
+      {
+        "level": 3,
+        "percent": 3.5,
+        "sizePercent": 30
+      }
+    ],
+    "trailing": {
+      "enabled": true,
+      "percent": 1.0,
+      "activationLevel": 2.0
+    }
+  },
+  "notes": "Test strategy with EMA analyzer only. Used to verify backtest engine functionality."
+}
