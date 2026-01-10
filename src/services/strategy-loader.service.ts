@@ -325,10 +325,16 @@ export class StrategyLoaderService {
   private validateFilterOverrides(overrides: Record<string, unknown>): void {
     const validFilters = [
       'blindZone',
+      'flatMarket',
+      'fundingRate',
       'btcCorrelation',
+      'trendAlignment',
+      'postTpFilter',
+      'timeBasedFilter',
+      'volatilityRegime',
+      // Legacy filters
       'nightTrading',
       'atr',
-      'volatilityRegime',
       'emaFilter',
     ];
 
