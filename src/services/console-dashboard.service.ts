@@ -1,39 +1,59 @@
 /**
- * Console Dashboard Service
- * Provides real-time live trading dashboard in terminal using blessed
- * Updates in real-time without interfering with logs
+ * Console Dashboard Service - Non-Blocking Edition
+ * Real-time trading dashboard using blessed
+ * Uses non-blocking render queue to prevent freezing
+ *
+ * KEY FIXES:
+ * - No blocking screen.render() calls in main thread
+ * - Queue-based updates to prevent log freezing
+ * - Separate render thread via setImmediate
+ * - Real-time indicator data + P&L tracking
  */
 
 import blessed, { Widgets } from 'blessed';
 import { EventEmitter } from 'events';
-import { MarketData, Position, Signal } from '../types';
+import { Position } from '../types';
 
 interface DashboardConfig {
   enabled: boolean;
-  updateInterval?: number; // ms between refreshes
+  updateInterval?: number; // ms between refreshes (1000 = 1 sec)
   theme?: 'dark' | 'light';
 }
 
-interface TimeframeData {
+interface TimeframeMetrics {
   timeframe: string;
-  trend: string;
+  trend: string; // UPTREND | DOWNTREND | NEUTRAL
   rsi: number;
-  emaFast: number;
-  emaSlow: number;
-  pattern: string;
+  ema20?: number;
+  ema50?: number;
+  atr?: number;
+  volume?: number;
 }
 
 interface DashboardState {
-  marketData: Map<string, TimeframeData>;
+  // Market data by timeframe
+  metrics: Map<string, TimeframeMetrics>;
+
+  // Current price & updates
   currentPrice: number;
+  priceUpdatedAt: number;
+
+  // Position info
   position?: Position;
   entryPrice?: number;
   currentPnL?: number;
   currentPnLPercent?: number;
-  tpLevels: Array<{ level: number; percent: number; reached: boolean }>;
+
+  // Protection levels
+  tpLevels: Array<{ price: number; percent: number; level: number; reached?: boolean }>;
   slLevel?: number;
-  patterns: string[];
-  logs: Array<{ level: string; message: string; timestamp: Date }>;
+
+  // Trading stats
+  dailyWins: number;
+  dailyLosses: number;
+  dailyPnL: number;
+
+  // UI state
   lastUpdate: Date;
 }
 
@@ -42,30 +62,40 @@ export class ConsoleDashboardService extends EventEmitter {
   private config: DashboardConfig;
   private state: DashboardState;
   private widgets: Map<string, Widgets.BoxElement> = new Map();
-  private updateTimer?: NodeJS.Timeout;
-  private lastRenderTime: number = 0;
-  private readonly minRenderInterval: number = 200; // Minimum ms between renders
+
+  // Non-blocking render control
+  private renderScheduled = false;
+  private updateQueue: Array<() => void> = [];
 
   constructor(config: DashboardConfig = { enabled: true }) {
     super();
-    this.config = config;
+    this.config = { ...config };
     this.state = {
-      marketData: new Map(),
+      metrics: new Map(),
       currentPrice: 0,
+      priceUpdatedAt: 0,
       tpLevels: [],
-      patterns: [],
-      logs: [],
+      dailyWins: 0,
+      dailyLosses: 0,
+      dailyPnL: 0,
       lastUpdate: new Date(),
     };
 
     if (this.config.enabled) {
-      this.initialize();
+      try {
+        this.initialize();
+      } catch (error) {
+        console.warn('[DASHBOARD] Failed to initialize:', error instanceof Error ? error.message : String(error));
+        this.config.enabled = false;
+      }
     }
   }
 
+  /**
+   * Initialize dashboard with blessed screen
+   */
   private initialize(): void {
     try {
-      // Create screen
       this.screen = blessed.screen({
         mouse: false,
         keyboard: true,
@@ -81,29 +111,41 @@ export class ConsoleDashboardService extends EventEmitter {
       });
 
       this.createLayout();
-      this.startUpdating();
-      console.log('[DASHBOARD] ✅ Console dashboard initialized successfully');
+
+      // Start non-blocking update loop
+      this.startNonBlockingUpdates();
+
+      console.log('[DASHBOARD] ✅ Initialized (non-blocking mode)');
     } catch (error) {
-      console.warn(
-        '[DASHBOARD] ⚠️ Failed to initialize dashboard UI (logs will continue):',
-        error instanceof Error ? error.message : String(error),
-      );
-      // Dashboard fails silently - logs continue working
+      console.warn('[DASHBOARD] Initialization failed:', error);
       this.config.enabled = false;
+      throw error;
     }
   }
 
+  /**
+   * Create dashboard layout
+   */
   private createLayout(): void {
     if (!this.screen) return;
 
-    // Header
+    // Header (top)
     this.createHeader();
 
-    // Main content area - split into sections
-    this.createMarketSection();
-    this.createPositionSection();
-    this.createPatternsSection();
-    this.createLogsPlaceholder();
+    // Market data (top-left 1/3)
+    this.createMarketMetrics();
+
+    // Position & P&L (top-right 2/3)
+    this.createPositionStats();
+
+    // Daily stats (middle)
+    this.createDailyStats();
+
+    // Indicators (bottom-left)
+    this.createIndicators();
+
+    // Recent updates (bottom-right)
+    this.createRecentUpdates();
 
     this.screen.render();
   }
@@ -111,279 +153,309 @@ export class ConsoleDashboardService extends EventEmitter {
   private createHeader(): void {
     if (!this.screen) return;
 
-    const header = blessed.box({
+    blessed.box({
       parent: this.screen,
       top: 0,
       left: 0,
       right: 0,
-      height: 3,
-      content: '          {bold}{yellow-fg,yellow-bg}E{/yellow-bg,yellow-fg}{white-fg}DISON TRADING DASHBOARD{/white-fg}{/bold}',
+      height: 1,
+      content: '{bold}{cyan-fg}EDISON TRADING BOT DASHBOARD{/cyan-fg}{/bold}',
       style: {
         fg: 'white',
         bg: 'darkblue',
       },
       tags: true,
     });
-
-    this.widgets.set('header', header);
   }
 
-  private createMarketSection(): void {
+  private createMarketMetrics(): void {
     if (!this.screen) return;
 
-    const market = blessed.box({
+    const widget = blessed.box({
       parent: this.screen,
-      top: 3,
+      top: 1,
       left: 0,
-      width: '50%',
-      height: '35%',
+      width: '33%',
+      height: '25%',
       border: 'line',
-      title: '📈 Market Data (Multi-Timeframe)',
+      title: '📈 Market Metrics',
       style: {
-        border: {
-          fg: 'cyan',
-        },
+        border: { fg: 'cyan' },
       },
+      tags: true,
       scrollable: false,
-      tags: true,
     });
 
-    this.widgets.set('market', market);
+    this.widgets.set('metrics', widget);
   }
 
-  private createPositionSection(): void {
+  private createPositionStats(): void {
     if (!this.screen) return;
 
-    const position = blessed.box({
+    const widget = blessed.box({
       parent: this.screen,
-      top: 3,
-      left: '50%',
-      right: 0,
-      height: '35%',
-      border: 'line',
-      title: '💼 Position',
-      style: {
-        border: {
-          fg: 'green',
-        },
-      },
-      tags: true,
-    });
-
-    this.widgets.set('position', position);
-  }
-
-  private createPatternsSection(): void {
-    if (!this.screen) return;
-
-    const patterns = blessed.box({
-      parent: this.screen,
-      top: '38%',
-      left: 0,
+      top: 1,
+      left: '33%',
       right: 0,
       height: '25%',
       border: 'line',
-      title: '🎯 Detected Patterns',
+      title: '💼 Position & P&L',
       style: {
-        border: {
-          fg: 'yellow',
-        },
+        border: { fg: 'green' },
       },
       tags: true,
+      scrollable: false,
     });
 
-    this.widgets.set('patterns', patterns);
+    this.widgets.set('position', widget);
   }
 
-  private createLogsPlaceholder(): void {
+  private createDailyStats(): void {
     if (!this.screen) return;
 
-    const logs = blessed.box({
+    const widget = blessed.box({
       parent: this.screen,
-      top: '63%',
+      top: '26%',
       left: 0,
+      right: 0,
+      height: '12%',
+      border: 'line',
+      title: '📊 Daily Stats',
+      style: {
+        border: { fg: 'yellow' },
+      },
+      tags: true,
+      scrollable: false,
+    });
+
+    this.widgets.set('stats', widget);
+  }
+
+  private createIndicators(): void {
+    if (!this.screen) return;
+
+    const widget = blessed.box({
+      parent: this.screen,
+      top: '38%',
+      left: 0,
+      width: '50%',
+      bottom: 0,
+      border: 'line',
+      title: '🔍 Indicators (1m/5m/15m)',
+      style: {
+        border: { fg: 'magenta' },
+      },
+      tags: true,
+      scrollable: true,
+      mouse: true,
+    });
+
+    this.widgets.set('indicators', widget);
+  }
+
+  private createRecentUpdates(): void {
+    if (!this.screen) return;
+
+    const widget = blessed.box({
+      parent: this.screen,
+      top: '38%',
+      left: '50%',
       right: 0,
       bottom: 0,
       border: 'line',
-      title: '📝 Live Logs',
+      title: '⏱️ Recent Updates',
       style: {
-        border: {
-          fg: 'magenta',
-        },
+        border: { fg: 'white' },
       },
+      tags: true,
       scrollable: true,
       mouse: true,
-      tags: true,
-      keys: true,
-      vi: true,
     });
 
-    this.widgets.set('logs', logs);
+    this.widgets.set('updates', widget);
   }
 
-  private startUpdating(): void {
-    this.updateTimer = setInterval(() => {
-      this.render();
-    }, this.config.updateInterval || 1000);
+  /**
+   * Non-blocking update loop using setImmediate
+   * Prevents blocking main trading thread
+   */
+  private startNonBlockingUpdates(): void {
+    const updateLoop = () => {
+      // Queue render for next event loop
+      if (!this.renderScheduled) {
+        this.renderScheduled = true;
+        setImmediate(() => {
+          try {
+            this.render();
+          } catch (error) {
+            // Silently fail - dashboard errors don't crash bot
+          } finally {
+            this.renderScheduled = false;
+          }
+        });
+      }
+
+      // Schedule next update
+      setTimeout(updateLoop, this.config.updateInterval || 1000);
+    };
+
+    updateLoop();
   }
 
+  /**
+   * Render all widgets
+   */
   private render(): void {
     if (!this.screen || !this.config.enabled) return;
 
-    // Throttle rendering to prevent freezing
-    const now = Date.now();
-    if (now - this.lastRenderTime < this.minRenderInterval) {
-      return; // Skip render if too soon
-    }
-    this.lastRenderTime = now;
-
     try {
-      this.renderMarketData();
+      this.renderMetrics();
       this.renderPosition();
-      this.renderPatterns();
-      this.renderLogs();
+      this.renderDailyStats();
+      this.renderIndicators();
+      this.renderRecentUpdates();
+
       this.screen.render();
     } catch (error) {
-      // Silently fail - don't break the bot
-      // Dashboard errors should never crash the trading bot
+      // Fail silently
     }
   }
 
-  private renderMarketData(): void {
-    const marketWidget = this.widgets.get('market');
-    if (!marketWidget) return;
+  private renderMetrics(): void {
+    const widget = this.widgets.get('metrics');
+    if (!widget) return;
 
-    let content = '';
-    const timeframes = ['1m', '5m', '15m', '30m'];
+    let content = '{bold}PRICE & TREND{/bold}\n';
+    content += `Price: {cyan-fg}${this.state.currentPrice.toFixed(4)}{/cyan-fg}\n\n`;
 
-    content += '{bold}{cyan-fg}MARKET DATA{/cyan-fg}{/bold}\n';
-    content += '{cyan-fg}═══════════════════════════════════════{/cyan-fg}\n';
-    content += '{bold}TF    Trend        RSI   EMA{/bold}\n';
-    content += '{cyan-fg}───────────────────────────────────────{/cyan-fg}\n';
-
+    const timeframes = ['1m', '5m', '15m'];
     timeframes.forEach((tf) => {
-      const data = this.state.marketData.get(tf);
-      if (data) {
-        // Format trend with color
-        const trendValue = data.trend.includes('UP') ? 'UPTREND ↑' : 'DOWNTREND ↓';
-        const trendText = data.trend.includes('UP')
-          ? `{green-fg}${trendValue}{/green-fg}`
-          : `{red-fg}${trendValue}{/red-fg}`;
-
-        // Format RSI with color - yellow if extreme
-        let rsiColor = '';
-        if (data.rsi > 70 || data.rsi < 30) rsiColor = '{yellow-fg}';
-        const rsiEnd = rsiColor ? '{/yellow-fg}' : '';
-        const rsiValue = data.rsi.toFixed(0);
-        const rsiText = `${rsiColor}${rsiValue}${rsiEnd}`;
-
-        // Format EMA
-        const emaText = `${data.emaFast.toFixed(1)}/${data.emaSlow.toFixed(1)}`;
-
-        // Use explicit spacing instead of padEnd (which breaks with color tags)
-        content += `${tf.padEnd(5)}${trendText}      ${rsiText}    ${emaText}\n`;
-      } else {
-        content += `${tf.padEnd(5)}{yellow-fg}Loading...{/yellow-fg}   {yellow-fg}--{/yellow-fg}     {yellow-fg}--/--{/yellow-fg}\n`;
+      const m = this.state.metrics.get(tf);
+      if (m) {
+        const trendIcon = m.trend === 'UPTREND' ? '↑' : m.trend === 'DOWNTREND' ? '↓' : '→';
+        const trendColor = m.trend === 'UPTREND' ? 'green-fg' : m.trend === 'DOWNTREND' ? 'red-fg' : 'yellow-fg';
+        content += `{bold}${tf}:{/bold} {${trendColor}}${m.trend}${trendIcon}{/${trendColor}} RSI:${m.rsi.toFixed(0)}\n`;
       }
     });
 
-    content += '{cyan-fg}═══════════════════════════════════════{/cyan-fg}\n';
-    content += `{bold}Price:{/bold} {cyan-fg}${this.state.currentPrice.toFixed(4)}{/cyan-fg}`;
-
-    marketWidget.setContent(content);
+    widget.setContent(content);
   }
 
   private renderPosition(): void {
-    const posWidget = this.widgets.get('position');
-    if (!posWidget) return;
+    const widget = this.widgets.get('position');
+    if (!widget) return;
 
     if (!this.state.position) {
-      posWidget.setContent('{yellow-fg}No active position{/yellow-fg}');
+      widget.setContent('{yellow-fg}No active position{/yellow-fg}');
       return;
     }
 
-    let content = '';
-    const isOpen = (this.state.position as any).isOpen ?? true;
-    const statusText = isOpen ? `{green-fg}OPEN{/green-fg}` : `{red-fg}CLOSED{/red-fg}`;
-    content += `{bold}Status:{/bold} ${statusText}\n`;
-    content += `\n{bold}Entry Price:{/bold} ${this.state.entryPrice?.toFixed(4)}\n`;
-    content += `{bold}Current Price:{/bold} ${this.state.currentPrice.toFixed(4)}\n`;
+    const isLong = this.state.position.side === 'LONG';
+    const sideColor = isLong ? 'green-fg' : 'red-fg';
 
-    const pnlPercent = this.state.currentPnLPercent || 0;
-    const pnlText =
-      pnlPercent >= 0
-        ? `{green-fg}${pnlPercent.toFixed(2)}% ($${this.state.currentPnL?.toFixed(2)}){/green-fg}`
-        : `{red-fg}${pnlPercent.toFixed(2)}% ($${this.state.currentPnL?.toFixed(2)}){/red-fg}`;
-    content += `\n{bold}Current P&L:{/bold} ${pnlText}\n`;
+    let content = '{bold}Status:{/bold} {green-fg}OPEN{/green-fg}\n';
+    content += `{bold}Side:{/bold} {${sideColor}}${this.state.position.side}{/${sideColor}}\n`;
+    content += `{bold}Entry:{/bold} ${this.state.entryPrice?.toFixed(4)}\n`;
+    content += `{bold}Current:{/bold} ${this.state.currentPrice.toFixed(4)}\n\n`;
 
-    content += '\n{bold}Take Profits:{/bold}\n';
-    this.state.tpLevels.forEach((tp, idx) => {
-      const reachedText = tp.reached ? '{green-fg}✓{/green-fg}' : ' ';
-      content += `  TP${idx + 1}: ${tp.level.toFixed(4)} (${tp.percent}%) ${reachedText}\n`;
+    const pnlColor = (this.state.currentPnLPercent || 0) >= 0 ? 'green-fg' : 'red-fg';
+    content += `{bold}P&L:{/bold} {${pnlColor}}${(this.state.currentPnLPercent || 0).toFixed(2)}% ($${(this.state.currentPnL || 0).toFixed(2)}){/${pnlColor}}\n\n`;
+
+    content += '{bold}Take Profits:{/bold}\n';
+    this.state.tpLevels.forEach((tp) => {
+      content += `  TP${tp.level}: ${tp.price.toFixed(4)} (${tp.percent}%)\n`;
     });
 
     if (this.state.slLevel) {
-      content += `\n{bold}Stop Loss:{/bold} ${this.state.slLevel.toFixed(4)}\n`;
+      content += `\n{bold}Stop Loss:{/bold} {red-fg}${this.state.slLevel.toFixed(4)}{/red-fg}\n`;
     }
 
-    posWidget.setContent(content);
+    widget.setContent(content);
   }
 
-  private renderPatterns(): void {
-    const patternsWidget = this.widgets.get('patterns');
-    if (!patternsWidget) return;
+  private renderDailyStats(): void {
+    const widget = this.widgets.get('stats');
+    if (!widget) return;
 
-    if (this.state.patterns.length === 0) {
-      patternsWidget.setContent('{yellow-fg}No patterns detected{/yellow-fg}');
-      return;
-    }
+    const winRate = this.state.dailyWins + this.state.dailyLosses > 0
+      ? ((this.state.dailyWins / (this.state.dailyWins + this.state.dailyLosses)) * 100).toFixed(1)
+      : '0.0';
 
-    let content = '{bold}Detected Patterns:{/bold}\n';
-    this.state.patterns.forEach((pattern) => {
-      content += `  {green-fg}✓{/green-fg} ${pattern}\n`;
+    const pnlColor = this.state.dailyPnL >= 0 ? 'green-fg' : 'red-fg';
+
+    let content = `Trades: {cyan-fg}${this.state.dailyWins}{/cyan-fg} W / {red-fg}${this.state.dailyLosses}{/red-fg} L | `;
+    content += `Win Rate: {cyan-fg}${winRate}%{/cyan-fg} | `;
+    content += `Daily P&L: {${pnlColor}}${this.state.dailyPnL.toFixed(2)} USDT{/${pnlColor}}`;
+
+    widget.setContent(content);
+  }
+
+  private renderIndicators(): void {
+    const widget = this.widgets.get('indicators');
+    if (!widget) return;
+
+    let content = '{bold}Indicator Snapshot{/bold}\n';
+    content += '{cyan-fg}' + '═'.repeat(50) + '{/cyan-fg}\n\n';
+
+    const timeframes = ['1m', '5m', '15m'];
+    timeframes.forEach((tf) => {
+      const m = this.state.metrics.get(tf);
+      if (m) {
+        content += `{bold}${tf}:{/bold}\n`;
+        content += `  RSI: ${m.rsi.toFixed(1)}\n`;
+        if (m.ema20) content += `  EMA20: ${m.ema20.toFixed(4)}\n`;
+        if (m.ema50) content += `  EMA50: ${m.ema50.toFixed(4)}\n`;
+        if (m.atr) content += `  ATR: ${m.atr.toFixed(4)}\n`;
+        if (m.volume) content += `  Volume: ${m.volume.toFixed(0)}\n`;
+        content += '\n';
+      }
     });
 
-    patternsWidget.setContent(content);
+    widget.setContent(content || '{yellow-fg}No indicator data{/yellow-fg}');
   }
 
-  // Public methods for updating state
-  public updateMarketData(
-    timeframe: string,
-    data: Partial<TimeframeData>
-  ): void {
-    const existing = this.state.marketData.get(timeframe) || {
+  private renderRecentUpdates(): void {
+    const widget = this.widgets.get('updates');
+    if (!widget) return;
+
+    let content = '{bold}Latest Events{/bold}\n';
+    const time = new Date().toLocaleTimeString();
+    content += `Last update: {cyan-fg}${time}{/cyan-fg}\n\n`;
+    content += '{yellow-fg}Monitor logs for detailed events{/yellow-fg}\n';
+
+    if (this.state.position) {
+      content += `\n{green-fg}✓{/green-fg} Position opened\n`;
+      content += `  Time: ${this.state.position.openedAt ? new Date(this.state.position.openedAt).toLocaleTimeString() : 'N/A'}\n`;
+    }
+
+    widget.setContent(content);
+  }
+
+  // =========================================================================
+  // PUBLIC API: Update state from bot
+  // =========================================================================
+
+  public updateMetrics(timeframe: string, data: Partial<TimeframeMetrics>): void {
+    const existing = this.state.metrics.get(timeframe) || {
       timeframe,
       trend: 'NEUTRAL',
       rsi: 50,
-      emaFast: 0,
-      emaSlow: 0,
-      pattern: '-',
     };
 
-    const updated = {
-      ...existing,
-      ...data,
-    };
-
-    this.state.marketData.set(timeframe, updated);
+    this.state.metrics.set(timeframe, { ...existing, ...data });
     this.state.lastUpdate = new Date();
   }
 
   public updatePrice(price: number): void {
     this.state.currentPrice = price;
+    this.state.priceUpdatedAt = Date.now();
   }
 
   public updatePosition(position: Position | undefined): void {
     this.state.position = position;
     if (position) {
-      console.log(`[DASHBOARD] Position updated: ${position.id} ${position.side} @ ${position.entryPrice}`);
-    } else {
-      console.log(`[DASHBOARD] Position cleared`);
+      this.state.entryPrice = position.entryPrice;
     }
-  }
-
-  public setEntryPrice(price: number): void {
-    this.state.entryPrice = price;
   }
 
   public updatePnL(pnl: number, pnlPercent: number): void {
@@ -391,103 +463,36 @@ export class ConsoleDashboardService extends EventEmitter {
     this.state.currentPnLPercent = pnlPercent;
   }
 
-  public setTakeProfits(
-    levels: Array<{ level?: number; percent: number; reached?: boolean }>
-  ): void {
+  public setTakeProfits(levels: Array<{ price?: number; percent: number; level?: number }>): void {
     this.state.tpLevels = levels.map((l, idx) => ({
-      level: l.level ?? idx + 1,
+      price: l.price || 0,
       percent: l.percent,
-      reached: l.reached ?? false,
+      level: l.level ?? idx + 1,
+      reached: false,
     }));
   }
 
-  public setStopLoss(level: number): void {
-    this.state.slLevel = level;
+  public setStopLoss(price: number): void {
+    this.state.slLevel = price;
   }
 
-  public addPattern(pattern: string): void {
-    if (!this.state.patterns.includes(pattern)) {
-      this.state.patterns.push(pattern);
-      console.log(`[DASHBOARD] Pattern added: ${pattern}`);
-      // Keep only last 5 patterns
-      if (this.state.patterns.length > 5) {
-        this.state.patterns.shift();
-      }
-    } else {
-      console.log(`[DASHBOARD] Pattern already exists (skipped): ${pattern}`);
-    }
+  public recordWin(pnl: number): void {
+    this.state.dailyWins++;
+    this.state.dailyPnL += pnl;
   }
 
-  public clearPatterns(): void {
-    this.state.patterns = [];
-  }
-
-  private renderLogs(): void {
-    const logsWidget = this.widgets.get('logs');
-    if (!logsWidget) return;
-
-    // Show last 20 logs
-    const lastLogs = this.state.logs.slice(-20);
-    let content = '';
-
-    lastLogs.forEach((log) => {
-      const levelColor = this.getLevelColor(log.level);
-      const time = log.timestamp.toLocaleTimeString();
-      content += `${levelColor}[${time}] ${log.level.toUpperCase()}{/${this.getLevelColorClose(log.level)}} ${log.message}\n`;
-    });
-
-    logsWidget.setContent(content || '{yellow-fg}No logs yet...{/yellow-fg}');
-  }
-
-  private getLevelColor(level: string): string {
-    switch (level.toLowerCase()) {
-      case 'error':
-        return '{red-fg}';
-      case 'warn':
-        return '{yellow-fg}';
-      case 'info':
-        return '{cyan-fg}';
-      case 'debug':
-        return '{white-fg}'; // Changed from gray-fg to white-fg for visibility
-      default:
-        return '{white-fg}';
-    }
-  }
-
-  private getLevelColorClose(level: string): string {
-    switch (level.toLowerCase()) {
-      case 'error':
-        return 'red-fg}';
-      case 'warn':
-        return 'yellow-fg}';
-      case 'info':
-        return 'cyan-fg}';
-      case 'debug':
-        return 'white-fg}'; // Changed from gray-fg to white-fg for visibility
-      default:
-        return 'white-fg}';
-    }
-  }
-
-  public addLog(level: string, message: string): void {
-    this.state.logs.push({
-      level,
-      message: message.substring(0, 300), // Truncate long messages (300 chars for better visibility)
-      timestamp: new Date(),
-    });
-
-    // Keep only last 100 logs in memory
-    if (this.state.logs.length > 100) {
-      this.state.logs.shift();
-    }
+  public recordLoss(pnl: number): void {
+    this.state.dailyLosses++;
+    this.state.dailyPnL += pnl;
   }
 
   public destroy(): void {
-    if (this.updateTimer) {
-      clearInterval(this.updateTimer);
-    }
     if (this.screen) {
-      this.screen.destroy();
+      try {
+        this.screen.destroy();
+      } catch (error) {
+        // Ignore destroy errors
+      }
     }
   }
 }

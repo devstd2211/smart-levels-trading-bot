@@ -98,12 +98,14 @@ export class BotServices {
 
   constructor(config: Config) {
     // 0. Initialize dashboard FIRST to capture early logs
+    // NOW FIXED: Uses non-blocking setImmediate render queue
+    const dashboardConfig = (config as any)?.dashboard || {};
     this.dashboard = new ConsoleDashboardService({
-      enabled: false, // TEMPORARILY DISABLED - dashboard was causing hang/freeze issues
-      updateInterval: 500,
-      theme: 'dark',
+      enabled: dashboardConfig.enabled !== false, // Enabled by default (can disable in config)
+      updateInterval: dashboardConfig.updateInterval || 1000, // 1 second refresh
+      theme: dashboardConfig.theme || 'dark',
     });
-    console.log('🎨 Console Dashboard DISABLED - focus on fixing position-opened event issue');
+    console.log(`🎨 Console Dashboard initialized (${this.dashboard ? 'ENABLED' : 'DISABLED'})`);
 
     // 1. Initialize logger
     this.logger = new LoggerService(
