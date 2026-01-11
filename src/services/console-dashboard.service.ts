@@ -53,6 +53,9 @@ interface DashboardState {
   dailyLosses: number;
   dailyPnL: number;
 
+  // Events log
+  events: Array<{ timestamp: Date; type: string; message: string }>;
+
   // UI state
   lastUpdate: Date;
 }
@@ -78,6 +81,7 @@ export class ConsoleDashboardService extends EventEmitter {
       dailyWins: 0,
       dailyLosses: 0,
       dailyPnL: 0,
+      events: [],
       lastUpdate: new Date(),
     };
 
@@ -419,13 +423,22 @@ export class ConsoleDashboardService extends EventEmitter {
     if (!widget) return;
 
     let content = '{bold}Latest Events{/bold}\n';
-    const time = new Date().toLocaleTimeString();
-    content += `Last update: {cyan-fg}${time}{/cyan-fg}\n\n`;
-    content += '{yellow-fg}Monitor logs for detailed events{/yellow-fg}\n';
+    content += '{cyan-fg}' + '═'.repeat(50) + '{/cyan-fg}\n\n';
 
-    if (this.state.position) {
-      content += `\n{green-fg}✓{/green-fg} Position opened\n`;
-      content += `  Time: ${this.state.position.openedAt ? new Date(this.state.position.openedAt).toLocaleTimeString() : 'N/A'}\n`;
+    // Show recent events (last 10, limit memory)
+    if (this.state.events.length === 0) {
+      content += '{yellow-fg}Waiting for trading events...{/yellow-fg}\n';
+    } else {
+      const recentEvents = this.state.events.slice(-10);
+      recentEvents.forEach((event) => {
+        const time = event.timestamp.toLocaleTimeString();
+        const typeColor = event.type === 'position-open' ? 'green-fg'
+                        : event.type === 'position-close' ? 'red-fg'
+                        : event.type === 'tp-hit' ? 'cyan-fg'
+                        : 'white-fg';
+        content += `[{${typeColor}}${time}{/${typeColor}}] {${typeColor}}${event.type}{/${typeColor}}\n`;
+        content += `  ${event.message}\n\n`;
+      });
     }
 
     widget.setContent(content);
@@ -484,6 +497,26 @@ export class ConsoleDashboardService extends EventEmitter {
   public recordLoss(pnl: number): void {
     this.state.dailyLosses++;
     this.state.dailyPnL += pnl;
+  }
+
+  /**
+   * Record a trading event
+   * IMPORTANT: Max 50 events in memory to prevent memory leak
+   *
+   * @param type - Event type (position-open, position-close, tp-hit, sl-hit, etc)
+   * @param message - Human-readable event description
+   */
+  public recordEvent(type: string, message: string): void {
+    this.state.events.push({
+      timestamp: new Date(),
+      type,
+      message,
+    });
+
+    // Keep only last 50 events (prevent memory leak)
+    if (this.state.events.length > 50) {
+      this.state.events.shift();
+    }
   }
 
   public destroy(): void {
