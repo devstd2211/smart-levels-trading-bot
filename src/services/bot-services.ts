@@ -100,14 +100,16 @@ export class BotServices {
     // 0. Initialize dashboard FIRST to capture early logs
     // NOW FIXED: Uses non-blocking setImmediate render queue
     const dashboardConfig = (config as any)?.dashboard || {};
-    const dashboardEnabled = dashboardConfig.enabled !== false;
+    const dashboardEnabled = dashboardConfig.enabled === true; // Only true if explicitly enabled
 
     this.dashboard = new ConsoleDashboardService({
       enabled: dashboardEnabled,
       updateInterval: dashboardConfig.updateInterval || 1000, // 1 second refresh
       theme: dashboardConfig.theme || 'dark',
     });
-    console.log(`🎨 Console Dashboard initialized (${dashboardEnabled ? 'ENABLED' : 'DISABLED'})`);
+    if (dashboardEnabled) {
+      console.log('🎨 Console Dashboard ENABLED');
+    }
 
     // 1. Initialize logger
     this.logger = new LoggerService(
@@ -123,8 +125,10 @@ export class BotServices {
 
     // CRITICAL: Disable console output when dashboard is enabled
     // Prevents logs from overwriting blessed UI
+    // Only happens if dashboard explicitly enabled in config
     if (dashboardEnabled) {
       this.logger.setConsoleOutputEnabled(false);
+      this.logger.info('📊 Console output disabled - logs to file only (dashboard mode active)');
     }
 
     // Log strategy analyzer information

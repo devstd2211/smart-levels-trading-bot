@@ -142,8 +142,10 @@ export class TradingBot {
       // Phase 4.5: Setup critical error handling
       this.setupCriticalErrorHandling();
 
-      // Phase 4.7: Connect dashboard to trading events
-      this.setupDashboardEventListeners();
+      // Phase 4.7: Connect dashboard to trading events (only if enabled)
+      if (this.services.dashboard && (this.config as any)?.dashboard?.enabled === true) {
+        this.setupDashboardEventListeners();
+      }
 
       // Phase 5: Start position monitoring and periodic tasks
       await this.initializer.startMonitoring();
