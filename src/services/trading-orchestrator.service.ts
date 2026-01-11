@@ -23,6 +23,7 @@ import {
   TrendAnalysis,
   OrchestratorConfig,
   ExitType,
+  Position,
 } from '../types';
 // PHASE 4: ContextAnalyzer archived to src/archive/phase4-integration/
 // Replaced by TrendAnalyzer (PRIMARY component)
@@ -150,6 +151,18 @@ export class TradingOrchestrator {
       // PRIMARY (5m) closed → MAIN ENTRY SIGNAL ANALYSIS
       // This is the DECIDING timeframe where analyzers generate entry signals
       if (role === TimeframeRole.PRIMARY) {
+        // CRITICAL: Skip analysis if position already open
+        // No point running expensive analyzer calculations when we can't enter anyway
+        const currentPosition = this.positionManager.getCurrentPosition();
+        if (currentPosition) {
+          this.logger.info('📊 PRIMARY (5m) candle closed - SKIP ANALYSIS (already in position)', {
+            positionId: currentPosition.id,
+            side: currentPosition.side,
+            ageMins: Math.floor((Date.now() - currentPosition.openedAt) / 1000 / 60),
+          });
+          return; // ← EXIT EARLY - Don't run expensive analyzers
+        }
+
         this.logger.info('📊 PRIMARY (5m) candle closed - ANALYZING ENTRY SIGNALS (main timeframe)');
 
         try {
@@ -174,21 +187,11 @@ export class TradingOrchestrator {
 
             // Evaluate signals with EntryOrchestrator
             if (this.entryOrchestrator) {
-              const currentPosition = this.positionManager.getCurrentPosition();
+              // NOTE: No position can exist here (already checked and returned above)
               // Get account balance (use configured position size as fallback)
               const configBalance = (this.config as any)?.riskManager?.accountBalance || 1000;
               const currentBalance = configBalance > 0 ? configBalance : 1000;
-              const openPositions = currentPosition ? [currentPosition] : [];
-
-              // CRITICAL: Check if position already exists
-              if (currentPosition) {
-                this.logger.info('⏭️ SKIP ENTRY ANALYSIS - Already in position', {
-                  positionId: currentPosition.id,
-                  side: currentPosition.side,
-                  entryPrice: currentPosition.entryPrice,
-                  pnl: currentPosition.unrealizedPnL,
-                });
-              }
+              const openPositions: Position[] = []; // Empty - no position exists at this point
 
               try {
                 // Get trend bias from context
