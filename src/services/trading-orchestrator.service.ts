@@ -450,9 +450,18 @@ export class TradingOrchestrator {
     const analyzerConfigs = (this.config as any).analyzers as any[] | undefined;
 
     if (!analyzerConfigs || analyzerConfigs.length === 0) {
-      this.logger.debug('No analyzers configured in strategy');
+      this.logger.warn('⚠️ No analyzers configured in strategy - check config.analyzers array');
+      this.logger.debug('Available config keys:', {
+        configKeys: Object.keys(this.config),
+        hasAnalyzers: 'analyzers' in this.config,
+      });
       return signals;
     }
+
+    this.logger.info('🔍 Strategy analysis - Analyzer configs available:', {
+      totalAnalyzers: analyzerConfigs.length,
+      names: analyzerConfigs.map((a: any) => `${a.name}(${a.enabled ? '✓' : '✗'})`).join(', '),
+    });
 
     if (!this.analyzerRegistry) {
       this.logger.error('AnalyzerRegistry not initialized');
@@ -465,6 +474,11 @@ export class TradingOrchestrator {
       this.buildAnalyzerConfigForRegistry(),
     );
 
+    this.logger.info('📊 Enabled analyzers loaded from registry:', {
+      count: enabledAnalyzers.size,
+      names: Array.from(enabledAnalyzers.keys()),
+    });
+
     // Get current price from last candle
     const currentPrice = entryCandles.length > 0 ? entryCandles[entryCandles.length - 1].close : undefined;
 
@@ -474,9 +488,11 @@ export class TradingOrchestrator {
         const analyzerCfg = analyzerConfigs.find((cfg) => cfg.name === analyzerName);
         if (!analyzerCfg) continue;
 
+        this.logger.debug(`🔄 Running analyzer: ${analyzerName}`);
         const signal = await instance.analyze(entryCandles);
 
         if (signal && signal.direction !== 'HOLD') {
+          this.logger.info(`✅ ${analyzerName} → ${signal.direction} @ ${signal.confidence}% confidence`);
           signals.push({
             ...signal,
             type: signal.source as any, // Map source to type (e.g., 'EMA_ANALYZER' → type field)
@@ -484,9 +500,11 @@ export class TradingOrchestrator {
             priority: analyzerCfg.priority,
             price: currentPrice,
           });
+        } else {
+          this.logger.debug(`⏭️ ${analyzerName} → HOLD`);
         }
       } catch (analyzerError) {
-        this.logger.debug(`Error running analyzer ${analyzerName}`, {
+        this.logger.warn(`❌ Error running analyzer ${analyzerName}`, {
           error: analyzerError instanceof Error ? analyzerError.message : String(analyzerError),
         });
       }

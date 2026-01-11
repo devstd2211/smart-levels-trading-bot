@@ -13,6 +13,7 @@
  */
 
 import { LoggerService } from './logger.service';
+import { SwingPointDetectorService } from './swing-point-detector.service';
 import { StrategyAnalyzerConfig } from '../types/strategy-config.types';
 
 // Lazy-load analyzer types for type safety
@@ -40,9 +41,12 @@ const ANALYZER_REGISTRY: Map<string, AnalyzerMetadata> = new Map();
 export class AnalyzerRegistryService {
   private loadedAnalyzers: Map<string, AnalyzerInstance> = new Map();
   private analyzerClasses: Map<string, any> = new Map();
+  private swingPointDetector: SwingPointDetectorService;
 
   constructor(private logger: LoggerService) {
     this.initializeAnalyzerMap();
+    // Initialize SwingPointDetectorService for analyzers that need it
+    this.swingPointDetector = new SwingPointDetectorService(this.logger, 2);
   }
 
   /**
@@ -180,8 +184,15 @@ export class AnalyzerRegistryService {
       // Build analyzer-specific config by merging defaults and strategy params
       const analyzerConfig2 = this.buildAnalyzerConfig(config, analyzerConfig);
 
-      // Create instance with merged config
-      const instance = new AnalyzerClass(analyzerConfig2, this.logger);
+      // Create instance - some analyzers need additional services injected
+      let instance;
+      if (analyzerName === 'LEVEL_ANALYZER_NEW') {
+        // LevelAnalyzer needs SwingPointDetectorService for better level detection
+        instance = new AnalyzerClass(analyzerConfig2, this.logger, this.swingPointDetector);
+      } else {
+        // Standard analyzers only need config and logger
+        instance = new AnalyzerClass(analyzerConfig2, this.logger);
+      }
 
       // Cache instance for reuse
       this.loadedAnalyzers.set(analyzerName, instance);
