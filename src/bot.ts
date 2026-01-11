@@ -142,6 +142,9 @@ export class TradingBot {
       // Phase 4.5: Setup critical error handling
       this.setupCriticalErrorHandling();
 
+      // Phase 4.7: Connect dashboard to trading events
+      this.setupDashboardEventListeners();
+
       // Phase 5: Start position monitoring and periodic tasks
       await this.initializer.startMonitoring();
 
@@ -238,6 +241,33 @@ export class TradingBot {
       this.logger.error('Error during shutdown', { error });
       throw error;
     }
+  }
+
+  /**
+   * Setup dashboard event listeners for real-time updates
+   * Connects position and exit events to dashboard display
+   */
+  private setupDashboardEventListeners(): void {
+    // Listen for position-opened events
+    this.eventBus.on('position-opened', (data: any) => {
+      if (data.position) {
+        const p = data.position;
+        const msg = `${p.side} @ ${p.entryPrice.toFixed(4)} | Qty: ${p.quantity}`;
+        this.services.dashboard.recordEvent('position-open', msg);
+      }
+    });
+
+    // Listen for position-closed events
+    this.eventBus.on('position-closed', (data: any) => {
+      if (data.closedPosition) {
+        const p = data.closedPosition;
+        const pnl = data.pnl || 0;
+        const msg = `${p.side} closed | P&L: ${pnl > 0 ? '+' : ''}${pnl.toFixed(2)} USDT`;
+        this.services.dashboard.recordEvent('position-close', msg);
+      }
+    });
+
+    this.logger.debug('📊 Dashboard event listeners configured');
   }
 
   /**
