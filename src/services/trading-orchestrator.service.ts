@@ -180,6 +180,16 @@ export class TradingOrchestrator {
               const currentBalance = configBalance > 0 ? configBalance : 1000;
               const openPositions = currentPosition ? [currentPosition] : [];
 
+              // CRITICAL: Check if position already exists
+              if (currentPosition) {
+                this.logger.info('⏭️ SKIP ENTRY ANALYSIS - Already in position', {
+                  positionId: currentPosition.id,
+                  side: currentPosition.side,
+                  entryPrice: currentPosition.entryPrice,
+                  pnl: currentPosition.unrealizedPnL,
+                });
+              }
+
               try {
                 // Get trend bias from context
                 // For now use neutral default - in production would use TrendAnalyzer or MultiTimeframeTrendService
@@ -225,7 +235,16 @@ export class TradingOrchestrator {
               }
             }
           } else {
-            this.logger.debug('No entry signals generated on PRIMARY (5m)');
+            // Check if position exists - if yes, that's why we're not looking for signals
+            const currentPosition = this.positionManager.getCurrentPosition();
+            if (currentPosition) {
+              this.logger.debug('⏭️ SKIP SIGNAL SCAN - Already in position', {
+                positionId: currentPosition.id,
+                age: Math.floor((Date.now() - currentPosition.openedAt) / 1000 / 60),
+              });
+            } else {
+              this.logger.debug('🔍 No entry signals generated on PRIMARY (5m)');
+            }
 
             // TEST MODE: Allow opening position without signals for debugging
             if (this.testModeEnabled && this.testModeSignalCount < 1) {
