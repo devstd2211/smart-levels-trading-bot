@@ -120,7 +120,11 @@ async function main(): Promise<void> {
     console.log('[Main] Starting Trading Bot...\n');
     await bot.start();
 
+    // TESTING: Enable test mode to verify position opening without signals
+    bot.enableTestMode();
+
     console.log('\n✅ Bot is running! Press Ctrl+C to stop.');
+    console.log('🧪 TEST MODE ENABLED - Positions will open without real signals');
     console.log('📊 Web Interface: http://localhost:3000');
     console.log(`🔌 API: http://localhost:${API_PORT}`);
     console.log(`📡 WebSocket: ws://localhost:${WS_PORT}`);

@@ -64,6 +64,9 @@ export class TradingOrchestrator {
   // Entry decision tracking (for PRIMARY->ENTRY refinement)
   private pendingEntryDecision: any = null;
 
+  // DEBUG: Allow testing without real signals
+  private testModeEnabled: boolean = false;
+  private testModeSignalCount: number = 0;
 
   constructor(
     private config: OrchestratorConfig,
@@ -90,6 +93,24 @@ export class TradingOrchestrator {
 
     // Initialize context on startup (async)
     void this.initializeContext();
+  }
+
+  /**
+   * Enable test mode - allows opening positions without real signals
+   * Used for debugging/testing position opening workflow
+   */
+  enableTestMode(): void {
+    this.testModeEnabled = true;
+    this.logger.info('🧪 TEST MODE ENABLED - Positions will open without real signals');
+  }
+
+  /**
+   * Disable test mode
+   */
+  disableTestMode(): void {
+    this.testModeEnabled = false;
+    this.testModeSignalCount = 0;
+    this.logger.info('🧪 TEST MODE DISABLED - Normal mode restored');
   }
 
   /**
@@ -182,14 +203,16 @@ export class TradingOrchestrator {
 
                 // Store decision for ENTRY timeframe to use for entry point refinement
                 if (entryDecision.decision === 'ENTER') {
+                  // CRITICAL: Enrich signal early to ensure all required fields are present
+                  const enrichedSignal = this.enrichSignalWithProtection(entryDecision.signal || {});
                   this.pendingEntryDecision = {
                     decision: entryDecision.decision,
-                    signal: entryDecision.signal,
+                    signal: enrichedSignal,
                     timestamp: Date.now(),
                     primaryCandle: primaryCandles[primaryCandles.length - 1],
                   };
                   this.logger.info('💾 Pending entry decision stored for ENTRY timeframe refinement', {
-                    signalType: entryDecision.signal?.type,
+                    signalType: enrichedSignal?.type,
                   });
                 } else if (entryDecision.decision === 'SKIP') {
                   this.pendingEntryDecision = null;
@@ -203,6 +226,52 @@ export class TradingOrchestrator {
             }
           } else {
             this.logger.debug('No entry signals generated on PRIMARY (5m)');
+
+            // TEST MODE: Allow opening position without signals for debugging
+            if (this.testModeEnabled && this.testModeSignalCount < 1) {
+              this.testModeSignalCount++;
+              const currentPrice = candle.close;
+
+              // Create a test signal for debugging
+              const testSignal = {
+                type: 'TEST_SIGNAL',
+                source: 'TEST_MODE',
+                direction: 'LONG' as const,
+                confidence: 100,
+                price: currentPrice,
+                stopLoss: currentPrice * 0.98, // 2% below entry
+                takeProfits: [
+                  { price: currentPrice * 1.01, percent: 1.0 },
+                  { price: currentPrice * 1.02, percent: 2.0 },
+                  { price: currentPrice * 1.03, percent: 3.0 },
+                ],
+                reason: 'Test Mode Signal (no real signals)',
+                timestamp: Date.now(),
+                weight: 1.0,
+                priority: 1,
+              };
+
+              this.logger.warn(
+                '🧪 TEST MODE: Creating test signal to verify position opening workflow',
+                {
+                  price: currentPrice,
+                  stopLoss: testSignal.stopLoss,
+                },
+              );
+
+              // Enrich and store for ENTRY timeframe
+              const enrichedSignal = this.enrichSignalWithProtection(testSignal);
+              this.pendingEntryDecision = {
+                decision: 'ENTER',
+                signal: enrichedSignal,
+                timestamp: Date.now(),
+                primaryCandle: candle,
+              };
+
+              this.logger.info('💾 Test signal stored for ENTRY timeframe refinement', {
+                price: currentPrice,
+              });
+            }
           }
 
           // ALSO evaluate exits on PRIMARY timeframe
@@ -310,10 +379,8 @@ export class TradingOrchestrator {
                   confidence: this.pendingEntryDecision.signal.confidence,
                 });
 
-                // Actually open the position
-                await this.positionManager.openPosition(
-                  this.pendingEntryDecision.signal,
-                );
+                // Actually open the position (signal already enriched earlier)
+                await this.positionManager.openPosition(this.pendingEntryDecision.signal);
 
                 // Clear pending decision once position opened
                 this.pendingEntryDecision = null;
@@ -390,6 +457,7 @@ export class TradingOrchestrator {
         if (signal && signal.direction !== 'HOLD') {
           signals.push({
             ...signal,
+            type: signal.source as any, // Map source to type (e.g., 'EMA_ANALYZER' → type field)
             weight: analyzerCfg.weight,
             priority: analyzerCfg.priority,
             price: currentPrice,
@@ -522,6 +590,52 @@ export class TradingOrchestrator {
    */
   async checkWhaleSignalRealtime(orderbook: OrderBook): Promise<void> {
     // Whale signal detection is handled by market analysis
+  }
+
+  /**
+   * Enrich signal with SL/TP protection levels before opening position
+   * CRITICAL: Signal must have stopLoss and takeProfits arrays to avoid crashes
+   */
+  private enrichSignalWithProtection(signal: any): any {
+    // CRITICAL: Ensure takeProfits is an array (not undefined)
+    if (!signal.takeProfits || !Array.isArray(signal.takeProfits)) {
+      this.logger.warn('⚠️ Signal missing takeProfits array - using empty array', {
+        signalType: signal.type,
+        direction: signal.direction,
+      });
+      signal.takeProfits = [];
+    }
+
+    // CRITICAL: Ensure stopLoss is a number (not undefined or NaN)
+    if (typeof signal.stopLoss !== 'number' || isNaN(signal.stopLoss)) {
+      // Use default ATR-based SL: 2x ATR from current price
+      const atrMultiplier = 2.0;
+      const currentPrice = signal.price || 0;
+      const atrDistance = currentPrice * 0.01 * atrMultiplier; // Simple 1% ATR estimate
+
+      signal.stopLoss = signal.direction === 'LONG'
+        ? currentPrice - atrDistance
+        : currentPrice + atrDistance;
+
+      this.logger.warn('⚠️ Signal missing stopLoss - calculated default', {
+        signalType: signal.type,
+        direction: signal.direction,
+        price: currentPrice,
+        calculatedStopLoss: signal.stopLoss,
+      });
+    }
+
+    // CRITICAL: Ensure reason is string (not undefined)
+    if (typeof signal.reason !== 'string') {
+      signal.reason = `${signal.type} @ ${signal.confidence?.toFixed(1) || '?'}% confidence`;
+    }
+
+    // CRITICAL: Ensure timestamp is number (not undefined)
+    if (typeof signal.timestamp !== 'number') {
+      signal.timestamp = Date.now();
+    }
+
+    return signal;
   }
 
   /**

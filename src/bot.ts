@@ -241,6 +241,21 @@ export class TradingBot {
   }
 
   /**
+   * Enable test mode - allows position opening without real signals
+   * Used for debugging the position opening workflow
+   */
+  enableTestMode(): void {
+    this.tradingOrchestrator.enableTestMode();
+  }
+
+  /**
+   * Disable test mode
+   */
+  disableTestMode(): void {
+    this.tradingOrchestrator.disableTestMode();
+  }
+
+  /**
    * Get current position
    */
   getCurrentPosition(): Position | null {

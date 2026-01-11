@@ -252,7 +252,7 @@ export class PositionLifecycleService {
           isTrailing: false,
           updatedAt: Date.now(),
         },
-        takeProfits: signal.takeProfits.map((tp, i) => ({
+        takeProfits: (signal.takeProfits || []).map((tp, i) => ({
           ...tp,
           orderId: tpOrderIds[i] || undefined,
           hit: false,
