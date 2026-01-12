@@ -2,201 +2,114 @@
 
 ![Screenshot](logo.png)
 
-> Educational algorithmic trading bot with Smart Money Concepts strategies
-> Created with Claude Code
+## 🎯 What Is This?
 
+**Edison** is an **educational TypeScript trading bot** that demonstrates how to build professional algorithmic trading systems using **Smart Money Concepts (SMC)** strategies.
 
-An advanced TypeScript trading bot featuring multiple strategies based on **Smart Money Concepts (SMC)**, including level-based support/resistance analysis, liquidity zone detection, whale wall identification, and advanced risk management.
+**Key Facts:**
+- ✅ **Educational only** - Learn professional trading bot architecture
+- ✅ **Configuration-driven** - Create/modify strategies via JSON (no coding)
+- ✅ **Multi-strategy** - 14+ pre-built strategies to choose from
+- ✅ **Bybit Futures** - Real exchange integration (testnet/demo)
+- ✅ **2500+ tests** - Production-grade code quality
+- ✅ **Smart Money Concepts** - Liquidity zones, order blocks, SMC patterns
 
----
-
-## 📚 About This Project
-
-**This is an EDUCATIONAL PROJECT** designed to demonstrate professional trading bot architecture, multi-strategy systems, and advanced risk management techniques.
-
-**Purpose:** Learn how to build production-grade algorithmic trading systems with TypeScript, proper architecture, comprehensive testing, and real exchange integration (Bybit Futures).
-
-**Not Production Ready for Live Trading:** This bot is designed for educational purposes and testing on demo accounts only. See disclaimer below.
+**Demo account trading ONLY** - NOT for real money. See ⚠️ disclaimer below.
 
 ---
 
-**⚠️ CRITICAL DISCLAIMER - READ BEFORE USE**
+## ⚠️ Risk Warning (Read This)
 
-```
-THIS SOFTWARE IS PROVIDED FOR EDUCATIONAL PURPOSES ONLY
+**BEFORE YOU START:** This bot is for DEMO/TESTNET trading only. Using it on real money accounts will likely result in **complete loss of your deposit**. Not a suggestion - a fact.
 
-═══════════════════════════════════════════════════════════════════════════════
+- 🚨 **Demo ONLY** - Bybit testnet or demo accounts
+- 🚨 **Not profitable** - Past results ≠ future results
+- 🚨 **Can lose everything** - Your responsibility alone
+- 🚨 **NOT financial advice** - Educational demonstration only
 
-🚨 EXCHANGE: BYBIT FUTURES ONLY
-   - This bot is designed for Bybit Futures trading only
-   - Tested and validated on Bybit testnet/demo accounts
-   - May not work with other exchanges
-
-🚨 TESTED ON DEMO ACCOUNTS ONLY
-   - This bot has been tested EXCLUSIVELY on Bybit DEMO trading accounts
-   - Demo results DO NOT guarantee live trading performance
-   - Live market conditions differ significantly from demo
-   - Real slippage, fees, and volatility can impact results
-
-🚨 TRADING WITH REAL MONEY = POTENTIAL TOTAL LOSS
-   - Using this bot on LIVE trading accounts can and WILL result in:
-     • Complete loss of your deposit
-     • Rapid account liquidation
-     • Negative balance (debt)
-   - Markets are unpredictable and highly volatile
-   - No guarantee of profitability under any conditions
-   - Past performance ≠ future results
-
-═══════════════════════════════════════════════════════════════════════════════
-
-EXPLICIT REQUIREMENTS:
-✓ Test ONLY on Bybit TESTNET or DEMO accounts first
-✓ Start with MINIMUM position sizes (even on demo)
-✓ Monitor trades for at least 1-2 weeks before considering live
-✓ Use minimal leverage (avoid maximum 20x)
-✓ Risk ONLY money you can afford to lose completely
-✓ If you trade live, your losses are YOUR RESPONSIBILITY
-
-═══════════════════════════════════════════════════════════════════════════════
-
-LEGAL:
-- NOT financial or investment advice
-- NO warranty or guarantees of profitability
-- Author assumes NO responsibility for financial losses
-- Use at YOUR OWN RISK - full personal responsibility
-- Author is NOT liable for any losses, liquidations, or negative balances
-
-═══════════════════════════════════════════════════════════════════════════════
-
-⛔ DO NOT USE WITH REAL MONEY UNLESS YOU FULLY ACCEPT:
-   - You will likely lose your entire deposit
-   - You may owe money to the exchange (negative balance)
-   - No one will bail you out
-   - This is your decision and your responsibility
-
-If you do not accept these risks, DO NOT RUN THIS BOT.
-```
+[Full legal disclaimer below](#-full-legal-disclaimer)
 
 ---
 
-## Features
+## ⚡ Quick Start (5 Minutes)
 
-### Core Strategies
+### Prerequisites
+- Node.js 18+, npm 9+
+- Bybit account (use DEMO, not live!)
+- API key + secret from Bybit
 
-- **Level-Based Trading** - Support/resistance detection with multi-level analysis
-- **Whale Hunter** - Detects large order walls and liquidity sweeps
-- **Multi-Scalping Strategies**:
-  - Micro-Wall detection and trading
-  - Tick Delta analysis
-  - Ladder TP (adaptive take-profit levels)
-  - Limit Order optimization
-  - Order Flow analysis
-
-### Advanced Risk Management
-
-- **Dynamic Position Sizing** - Based on account risk percentage
-- **Adaptive TP/SL** - Adjusts based on volatility (ATR) and whale walls
-- **Multi-Level Take Profits** - Partial position closure at different levels
-- **Trailing Stop Loss** - Optional trail activation after profit targets
-- **Trend Validation** - Prevents SHORT entries in uptrends (and vice versa)
-
-### Smart Money Concepts
-
-- **Liquidity Zone Detection** - Identifies support/resistance zones based on swing points
-- **Break of Structure (BoS)** - Market structure analysis
-- **Change of Character (ChoCh)** - Trend confirmation signals
-- **Divergence Detection** - Price/RSI divergence analysis
-- **Order Block Recognition** - High-probability reversal zones
-
-### Analytics & Monitoring
-
-- **Trading Journal** - Detailed trade logging with entry/exit analysis
-- **Performance Analytics** - Win rate, PnL, drawdown, Sharpe ratio
-- **Pattern Analysis** - Identify loss patterns and optimization opportunities
-- **Session Reports** - Comprehensive trading session breakdowns
-
-### User Interface
-
-- **Web Interface** - ⏳ Currently in development
-  - Real-time trading dashboard (planned)
-  - Configuration UI (planned)
-  - Performance analytics viewer (planned)
-  - Trade journal browser (planned)
-
-**Status:** For now, the bot runs via CLI. Web UI coming soon!
-
----
-
-## Quick Start
-
-### ⚠️ START WITH DEMO/TESTNET - NOT LIVE TRADING
-
-**This is MANDATORY:**
-1. Always start on Bybit DEMO or TESTNET
-2. Never use real money initially
-3. Test for at least 1-2 weeks
-4. Only then consider small live amounts (if at all)
-
-### 1. Prerequisites
-
-- **Node.js** 18+
-- **npm** 9+
-- **Bybit Account** (⭐ DEMO account recommended, not live!)
-- **API Keys** from Bybit (from demo/testnet, NOT live trading!)
-
-### 2. Installation
-
+### 1️⃣ Setup
 ```bash
-# Clone the repository
 git clone https://github.com/devstd2211/smart-levels-trading-bot.git
 cd smart-levels-trading-bot
-
-# Install dependencies
 npm install
-
-# Build TypeScript
-npm run build
 ```
 
-### 3. Setup Credentials - .env File
-
+### 2️⃣ Configure
 ```bash
-# Copy environment template
 cp .env.example .env
+# Edit .env with your Bybit DEMO API keys:
+# BYBIT_API_KEY=your_demo_key
+# BYBIT_API_SECRET=your_demo_secret
+# BYBIT_TESTNET=true
 
-# Edit with your Bybit API credentials
-nano .env  # or use your editor
+cp config.example.json config.json
+# Edit config.json with trading settings (symbol, leverage, risk, etc.)
 ```
 
-**Your .env should contain:**
+### 3️⃣ Run
+```bash
+npm run dev
+```
 
+✅ Bot connects to Bybit DEMO, downloads candles, and starts trading!
+
+---
+
+## 🎮 What This Bot Does
+
+### Trading Strategies
+
+| Strategy | Purpose |
+|----------|---------|
+| **Level Trading** | Trade support/resistance levels detected from swing points |
+| **Whale Hunter** | Detect and trade large order walls and liquidity sweeps |
+| **Scalping** | Micro-wall detection, tick delta, ladder TP, order flow |
+| **Liquidity-Based** | Trade around liquidity zones and order blocks |
+| **Swing Trading** | Multi-timeframe swing detection and reversals |
+
+→ [View all 14+ strategies in strategies/json/README.md](./strategies/json/README.md)
+
+### Smart Money Concepts Built-In
+
+- 🎯 **Liquidity Zones** - Identify where big traders place stops
+- 🎯 **Order Blocks** - High-probability reversal areas
+- 🎯 **Break of Structure** - Trend changes and reversals
+- 🎯 **Fair Value Gaps** - Price gaps for reversal trading
+- 🎯 **Divergences** - Price vs indicator mismatches
+
+### Risk Management
+
+- ✅ **Position Sizing** - Automatic USDT or risk % based
+- ✅ **Stop Loss** - ATR-based or fixed distance
+- ✅ **Take Profits** - Multi-level exits (TP1, TP2, etc.)
+- ✅ **Trailing Stops** - Lock profits as price moves
+- ✅ **Filters** - Market structure, volatility, correlation checks
+
+---
+
+## 🛠️ Configuration Guide
+
+### How to Configure (3 Files)
+
+**1. `.env` → API Keys (keep secret!)**
 ```env
-# Bybit API Credentials (from https://www.bybit.com/app/user/api-management)
-# Use DEMO account credentials, NOT live trading!
-BYBIT_API_KEY=your_demo_api_key_here
-BYBIT_API_SECRET=your_demo_api_secret_here
-
-# Start with testnet enabled!
+BYBIT_API_KEY=your_demo_key
+BYBIT_API_SECRET=your_demo_secret
 BYBIT_TESTNET=true
 ```
 
-**⚠️ IMPORTANT:**
-- Store API credentials ONLY in `.env`, NEVER in config.json
-- Copy from `.env.example`, NEVER commit `.env` (it's in .gitignore)
-- Use DEMO account credentials for initial testing
-
-### 4. Setup Configuration - config.json
-
-```bash
-# Copy config template
-cp config.example.json config.json
-
-# Edit with your trading settings
-nano config.json  # or use your editor
-```
-
-**Key settings in config.json (start conservative):**
-
+**2. `config.json` → Trading Settings**
 ```json
 {
   "exchange": {
@@ -206,9 +119,8 @@ nano config.json  # or use your editor
     "demo": true
   },
   "trading": {
-    "leverage": 10,
-    "riskPercent": 1,
-    "maxPositions": 1
+    "leverage": 5,
+    "riskPercent": 1
   },
   "riskManagement": {
     "positionSizeUsdt": 10,
@@ -221,421 +133,113 @@ nano config.json  # or use your editor
 }
 ```
 
-**Configuration Priority:**
-- `.env` file for API credentials and testnet flag
-- `config.json` for all trading settings
-- Start with `testnet: true` and `demo: true`
-
-### 5. Run the Bot
-
-```bash
-# Start trading on testnet/demo
-npm run dev
+**3. `strategies/json/*.strategy.json` → Choose Strategy**
+```json
+{
+  "metadata": { "name": "Level Trading - Single EMA" },
+  "analyzers": [
+    { "name": "EMA_ANALYZER_NEW", "enabled": true, "weight": 1.0 },
+    { "name": "DIVERGENCE_ANALYZER_NEW", "enabled": true, "weight": 0.8 }
+  ]
+}
 ```
 
-**Verify in logs:**
-- ✅ `.env` loads API keys correctly
-- ✅ `config.json` settings applied
-- ✅ WebSocket connects to Bybit DEMO
-- ✅ Historical data downloads
-- ✅ First signals generate
-
-### 6. Test & Backtest Before Going Live
-
-**Recommended testing timeline:**
-
-1. **Week 1-2:** Monitor live demo trading
-   - Run `npm run dev` for at least 100+ trades
-   - Check win rate and loss patterns
-   - Verify risk management works
-
-2. **Backtest to validate strategy:**
-   ```bash
-   npm run download-data XRPUSDT 2025-12-01 2025-12-31
-   npm run backtest:sqlite
-   npm run analyze-journal
-   npm run analyze-losses
-   ```
-
-3. **Only then** consider very small amounts on live (if you accept total loss)
-
-### 7. ⚠️ LIVE TRADING - ONLY IF YOU ACCEPT TOTAL LOSS
-
-⛔ **DO NOT RUN THIS UNLESS YOU FULLY ACCEPT:**
-- You will probably lose all your money
-- Your account can be liquidated
-- You may owe money to the exchange
-- This is completely your responsibility
-
-**If you still want to proceed (not recommended):**
-
-```bash
-# ⚠️ BACKUP YOUR DATA FIRST ⚠️
-
-# Final checks
-npm run build
-npm test
-
-# ONLY if you accept total loss:
-# Change in .env:
-# BYBIT_TESTNET=false
-
-# And in config.json:
-# "testnet": false
-# "demo": false
-
-# Use MINIMUM leverage and position sizes
-# "leverage": 2  (NOT 10, NOT 20)
-# "riskPercent": 0.1  (NOT 1.0)
-
-npm run dev
-```
-
-**Remember:** Even after all this, you can still lose everything. This is trading, not gambling - it's worse!
+→ [Read config.example.json](./config.example.json) for detailed explanation of each setting
 
 ---
 
-## Project Structure
+## 📊 System Architecture (Visual)
 
-The project follows a **modular building blocks architecture**:
+### How It Works: 4-Layer System
 
 ```
-edison-smart-levels-trading-bot/
-│
-├── 📊 STRATEGIES (Configuration-driven composition)
-│   ├── strategies/json/
-│   │   ├── level-trading.strategy.json                    # Strategy 1
-│   │   ├── level-trading-single-ema.strategy.json         # Strategy 2
-│   │   ├── whale-hunter.strategy.json                     # Strategy 3
-│   │   └── *.strategy.json                                # More strategies...
-│   │       └─ Each JSON specifies:
-│   │          • Which analyzers to use (enabled/disabled)
-│   │          • Analyzer weights and priorities
-│   │          • Indicator periods
-│   │          • Entry/exit rules
-│   │
-├── 📈 SOURCE CODE
-│   ├── src/
-│   │   ├── index.ts                                       # Entry point
-│   │   ├── bot.ts                                         # Main trading bot
-│   │   ├── bot-factory.ts                                 # Dependency injection
-│   │   │
-│   │   ├── indicators/                                    # Layer 1: Calculation
-│   │   │   ├── ema.indicator-new.ts                       # EMA calculation
-│   │   │   ├── rsi.indicator-new.ts                       # RSI calculation
-│   │   │   ├── atr.indicator-new.ts                       # ATR calculation
-│   │   │   ├── volume.indicator-new.ts                    # Volume calculation
-│   │   │   ├── stochastic.indicator-new.ts                # Stochastic %K/%D
-│   │   │   └── bollinger-bands.indicator-new.ts           # Bollinger Bands
-│   │   │       └─ Each indicator:
-│   │   │          • Receives candles (OHLCV data)
-│   │   │          • Computes values (pure math)
-│   │   │          • Returns numeric results
-│   │   │
-│   │   ├── analyzers/                                     # Layer 2: Decision Logic
-│   │   │   ├── TECHNICAL (6):
-│   │   │   │   ├── ema.analyzer-new.ts
-│   │   │   │   ├── rsi.analyzer-new.ts
-│   │   │   │   ├── atr.analyzer-new.ts
-│   │   │   │   ├── volume.analyzer-new.ts
-│   │   │   │   ├── stochastic.analyzer-new.ts
-│   │   │   │   └── bollinger-bands.analyzer-new.ts
-│   │   │   ├── ADVANCED ANALYSIS (4):
-│   │   │   │   ├── divergence.analyzer-new.ts
-│   │   │   │   ├── breakout.analyzer-new.ts
-│   │   │   │   ├── wick.analyzer-new.ts
-│   │   │   │   └── price-momentum.analyzer-new.ts
-│   │   │   ├── STRUCTURE (4):
-│   │   │   │   ├── trend-detector.analyzer-new.ts
-│   │   │   │   ├── swing.analyzer-new.ts
-│   │   │   │   ├── level.analyzer-new.ts
-│   │   │   │   └── choch-bos.analyzer-new.ts
-│   │   │   ├── LIQUIDITY & SMC (8):
-│   │   │   │   ├── liquidity-sweep.analyzer-new.ts
-│   │   │   │   ├── liquidity-zone.analyzer-new.ts
-│   │   │   │   ├── order-block.analyzer-new.ts
-│   │   │   │   ├── fair-value-gap.analyzer-new.ts
-│   │   │   │   ├── volume-profile.analyzer-new.ts
-│   │   │   │   ├── order-flow.analyzer-new.ts
-│   │   │   │   ├── footprint.analyzer-new.ts
-│   │   │   │   └── whale.analyzer-new.ts
-│   │   │   ├── MICRO-LEVEL (3):
-│   │   │   │   ├── micro-wall.analyzer-new.ts
-│   │   │   │   ├── delta.analyzer-new.ts
-│   │   │   │   └── tick-delta.analyzer-new.ts
-│   │   │   ├── ADDITIONAL (3):
-│   │   │   │   ├── price-action.analyzer-new.ts
-│   │   │   │   ├── trend-conflict.analyzer-new.ts
-│   │   │   │   └── volatility-spike.analyzer-new.ts
-│   │   │   │
-│   │   │   └─ Each analyzer:
-│   │   │      • Uses indicator(s) to get values
-│   │   │      • Checks for signal conditions
-│   │   │      • Returns AnalyzerSignal (direction + confidence)
-│   │   │
-│   │   ├── orchestrators/                                 # Layer 3: Coordination
-│   │   │   ├── entry.orchestrator.ts                      # Decides: ENTER/SKIP
-│   │   │   ├── exit.orchestrator.ts                       # Decides: EXIT/HOLD
-│   │   │   └── filter.orchestrator.ts                     # Apply trading filters
-│   │   │
-│   │   ├── services/                                      # Core Services
-│   │   │   ├── bot-services.ts                            # DI container
-│   │   │   ├── analyzer-registry.service.ts               # Dynamic analyzer loading
-│   │   │   ├── strategy-loader.service.ts                 # Load strategies from JSON
-│   │   │   ├── trading-orchestrator.service.ts            # Main coordinator
-│   │   │   ├── candle.provider.ts                         # Candle storage/retrieval
-│   │   │   ├── timeframe.provider.ts                      # Timeframe management
-│   │   │   ├── position-lifecycle.service.ts              # Open/close positions
-│   │   │   ├── position-monitor.ts                        # Watch for TP/SL
-│   │   │   ├── trading-journal.service.ts                 # Trade logging
-│   │   │   ├── bybit.service.ts                           # Exchange API
-│   │   │   ├── websocket-manager.ts                       # WebSocket connections
-│   │   │   ├── telegram.service.ts                        # Notifications
-│   │   │   ├── risk-manager.service.ts                    # Position sizing
-│   │   │   ├── logger.service.ts                          # Logging
-│   │   │   └── *.service.ts                               # 40+ more services
-│   │   │
-│   │   ├── types/
-│   │   │   ├── config-new.types.ts                        # Strict ConfigNew types
-│   │   │   ├── strategy-config.types.ts                   # Strategy types
-│   │   │   ├── core.ts                                    # Core interfaces
-│   │   │   ├── enums.ts                                   # Enums
-│   │   │   └── strategy.ts
-│   │   │
-│   │   ├── providers/
-│   │   │   ├── candle.provider.ts
-│   │   │   └── timeframe.provider.ts
-│   │   │
-│   │   ├── constants/
-│   │   │   ├── analyzer-constants.ts
-│   │   │   ├── strategy-constants.ts
-│   │   │   └── technical.constants.ts
-│   │   │
-│   │   └── __tests__/                                     # Comprehensive tests
-│   │       ├── indicators/
-│   │       │   ├── *.indicator-new.test.ts                # Technical tests
-│   │       │   └── *.indicator-new.functional.test.ts     # Functional tests
-│   │       ├── analyzers/
-│   │       │   ├── *.analyzer-new.test.ts                 # Technical tests
-│   │       │   └── *.analyzer-new.functional.test.ts      # Functional tests
-│   │       ├── orchestrators/
-│   │       ├── services/
-│   │       └── integration/
-│   │
-├── 🔧 CONFIGURATION
-│   ├── config.json                                        # Master config (created from example)
-│   ├── config-new.json                                    # TypeScript-driven version
-│   ├── config.example.json                                # Config template
-│   └── .env.example                                       # API keys template
-│
-├── 📚 DOCUMENTATION
-│   ├── README.md                                          # This file
-│   ├── CLAUDE.md                                          # Project instructions
-│   ├── MIGRATION_PLAN.md                                  # Migration status
-│   └── MIGRATION/
-│       └── *.md                                           # Detailed specifications
-│
-├── 📦 BUILD & TEST
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── jest.config.js
-│   └── node_modules/
-│
-├── 📊 DATA
-│   └── data/
-│       ├── market-data.db                                 # SQLite: candles, orderbook
-│       ├── trading-journal.json                           # Trade records
-│       └── *.json                                         # Analysis results
-│
-├── 🌐 WEB SERVER (Optional)
-│   └── web-server/
-│       └── server.ts
-│
-└── LICENSE, .gitignore, etc.
+┌─────────────────────────────────────────────────────────┐
+│  LAYER 4: EXECUTION (Services)                          │
+│  ↓ Orders, positions, risk management, logging          │
+├─────────────────────────────────────────────────────────┤
+│  LAYER 3: ORCHESTRATORS (Coordination)                  │
+│  EntryOrchestrator ← Rank signals → ExitOrchestrator    │
+├─────────────────────────────────────────────────────────┤
+│  LAYER 2: ANALYZERS (Decision Logic) ×29                │
+│  EMA | RSI | Divergence | Order Blocks | Liquidity Zones│
+├─────────────────────────────────────────────────────────┤
+│  LAYER 1: INDICATORS (Raw Math) ×6                      │
+│  EMA | RSI | ATR | Volume | Stochastic | Bollinger      │
+├─────────────────────────────────────────────────────────┤
+│  MARKET DATA                                            │
+│  ← Bybit WebSocket: Real-time candles, orderbook, trades│
+└─────────────────────────────────────────────────────────┘
 ```
 
-### Architecture Layers Explained
+### Data Flow: From Candle to Trade
 
-**Layer 1: Indicators** → Pure math, compute values
 ```
-Indicators: ema, rsi, atr, volume, stochastic, bollinger-bands
-Input: Candles (OHLCV)
-Output: Numeric values (0.75, 65, 1.2, etc.)
-Example: EMA Indicator gets price, outputs fast EMA = 100.5, slow EMA = 99.8
-```
-
-**Layer 2: Analyzers** → Decision logic, generate signals
-```
-Analyzers: 29 total (6 technical + 23 advanced)
-Input: Candles + indicator values
-Output: AnalyzerSignal { direction, confidence }
-Example: EMA Analyzer gets EMA values, outputs "LONG @ 0.75 confidence"
-```
-
-**Layer 3: Orchestrators** → Coordinate decisions, make trades
-```
-Orchestrators: EntryOrchestrator, ExitOrchestrator, FilterOrchestrator
-Input: Signals from analyzers
-Output: ENTER/SKIP/WAIT or EXIT/HOLD
-Example: EntryOrchestrator gets [LONG@0.75, LONG@0.65], decides ENTER
-```
-
-**Layer 4: Execution** → Place orders, manage positions
-```
-Services: PositionLifecycleService, RiskManager, TradingJournal
-Input: ENTER/EXIT decisions
-Output: Orders placed, positions opened/closed, profits tracked
-Example: Opens $100 position, places TP/SL, monitors until exit
+New Candle Closes
+     ↓
+Load 1000 Historical Candles
+     ↓
+Run All Enabled Analyzers
+├─ EMA Analyzer: "LONG @ 0.75"
+├─ Divergence Analyzer: "LONG @ 0.60"
+└─ Other Analyzers...
+     ↓
+Filter Signals (market structure, volatility, etc.)
+     ↓
+EntryOrchestrator: Average confidence > threshold?
+     ↓
+If YES → Calculate position size → Place order
+     ↓
+Monitor: Watch for TP/SL hits
+     ↓
+Exit and Log Trade
 ```
 
 ---
 
-## Configuration Guide
+## ✅ What Is Edison / ❌ What Is NOT
 
-### Exchange Setup
+### ✅ Edison IS...
 
-```json
-"exchange": {
-  "name": "bybit",
-  "symbol": "XRPUSDT",           // Trading pair
-  "timeframe": "5",              // 5-minute candles (main strategy)
-  "testnet": true,               // Start with testnet!
-  "demo": true                   // Demo trading (no real orders)
-}
-```
+| Feature | What You Get |
+|---------|-------------|
+| **Educational** | Learn professional trading bot architecture |
+| **Configuration-Driven** | Edit JSON to create/modify strategies (no coding) |
+| **Multi-Strategy** | 14+ pre-built strategies, mix them together |
+| **Real Exchange** | Actually trades on Bybit Futures (testnet/demo) |
+| **Production Code** | 2500+ tests, full TypeScript strict mode |
+| **Modular** | Add new analyzers without changing orchestrators |
+| **SMC-Focused** | Liquidity zones, order blocks, fair value gaps |
 
-**Note:** API credentials come from `.env` file, NOT from config.json
+### ❌ Edison IS NOT...
 
-### Strategy Configuration
-
-```json
-"strategies": {
-  "levelBased": {
-    "enabled": true,
-    "maxDistancePercent": 1.0,              // Max distance to level for entry
-    "minDistanceFloorPercent": 0.3,         // Min distance floor
-    "requireTrendAlignment": true,          // Only trade with trend
-    "blockLongInDowntrend": true,           // Prevent LONG in downtrend
-    "blockShortInUptrend": true,            // Prevent SHORT in uptrend
-    "minStrengthForNeutral": 0.25,          // Min confidence in NEUTRAL trend
-    "minTouchesRequired": 3                 // Min touches for valid level
-  }
-}
-```
-
-### Risk Management
-
-```json
-"riskManagement": {
-  "positionSizeUsdt": 10,                  // Position size in USDT
-  "stopLossPercent": 2.5,                  // SL distance from entry
-  "minStopLossPercent": 1.0,               // Minimum SL
-  "takeProfits": [
-    { "level": 1, "percent": 0.5, "sizePercent": 70 },   // 70% at 0.5%
-    { "level": 2, "percent": 1.0, "sizePercent": 30 }    // 30% at 1.0%
-  ],
-  "trailingStopEnabled": false,
-  "trailingStopPercent": 0.6
-}
-```
-
-### Entry Conditions
-
-```json
-"entryConfig": {
-  "divergenceDetector": {
-    "minStrength": 0.3,           // Min divergence strength
-    "priceDiffPercent": 0.2       // Min price difference threshold
-  },
-  "rsiPeriod": 14,
-  "rsiOversold": 30,
-  "rsiOverbought": 70,
-  "fastEmaPeriod": 9,             // Fast EMA for trend
-  "slowEmaPeriod": 21,            // Slow EMA for trend
-  "zigzagDepth": 2                // Swing detection depth
-}
-```
+| Myth | Reality |
+|------|---------|
+| **Profitable** | Past results ≠ future results. Markets change. |
+| **For Live Trading** | Demo/testnet ONLY. Will lose real money. |
+| **Financial Advice** | Educational demo. Do your own research. |
+| **Easy Money** | Trading is hard. Most bots lose money. |
+| **Ready to Use** | Requires configuration and testing first. |
+| **Magic** | It's code + logic. No magic, just algorithms. |
 
 ---
 
-## Commands
+## 📝 Common Commands
 
 ### Development
-
 ```bash
-npm run dev              # Start bot with hot reload
+npm run dev              # Start bot with live trading
 npm run build            # Compile TypeScript
-npm test                 # Run all 2500+ unit tests
+npm test                 # Run 2500+ unit tests
 npm run lint             # Check code style
 npm run format           # Auto-format code
 ```
 
-### Backtesting & Analysis
-
+### Testing & Analysis
 ```bash
-# Download historical data
-npm run download-data XRPUSDT 2025-12-01 2025-12-31
-
-# Backtest with orderbook data (for Whale Hunter)
-npm run backtest:sqlite
-
-# Backtest with JSON candle data only
-npm run backtest:json
-
-# Analyze trading journal
-npm run analyze-journal
-npm run analyze-losses
-npm run analyze-patterns
-npm run analyze-last-24h
-```
-
-### Deployment
-
-```bash
-# Deploy to separate directories for multi-bot setup
-npm run deploy:main           # Main bot
-npm run deploy:microwall      # Micro-Wall strategy
-npm run deploy:tickdelta      # Tick Delta strategy
-```
-
----
-
-## Understanding the Strategy
-
-### Level-Based Trading
-
-The bot identifies **support and resistance levels** based on historical swing points:
-
-1. **Swing Detection** - Find local highs and lows
-2. **Level Clustering** - Group nearby swings into zones
-3. **Strength Calculation** - Measure how many times price touches each level
-4. **Entry Signal** - Trade when price approaches a level with sufficient strength
-
-### SMC Concepts Used
-
-- **Liquidity Zones** - Areas where large stops are placed
-- **Sweep & Reversal** - Price moves through stops, then reverses
-- **Break of Structure** - New highs/lows indicating trend change
-- **Fair Value Gaps** - Price gaps offering reversal opportunities
-- **Order Blocks** - Support/resistance from previous liquidation zones
-
-### Example Trade
-
-```
-Market Structure: UPTREND (EMA 9 > EMA 21)
-↓
-Bot Scans for Support Levels
-↓
-Price approaches level with 5 touches (Strong)
-↓
-RSI shows oversold (< 30) → Divergence detected
-↓
-Entry Signal: BUY (LONG position)
-↓
-Position Management:
-  - SL at: Entry - 2.5% (Risk management)
-  - TP1 at: Entry + 0.5% (70% position closed)
-  - TP2 at: Entry + 1.0% (30% position closed)
+npm run backtest:sqlite          # Backtest with historical data
+npm run analyze-journal          # View trading performance
+npm run analyze-losses           # Analyze losing trades
+npm run download-data XRPUSDT 2025-01-01 2025-01-31  # Download candles
 ```
 
 ---
@@ -1441,6 +1045,63 @@ if (fastEMA > slowEMA && RSI < 70 && ATR > X) {
 That's it! Edison handles the orchestration, signal ranking, filtering, and execution automatically.
 
 ---
+
+## 📋 Full Legal Disclaimer
+
+```
+THIS SOFTWARE IS PROVIDED FOR EDUCATIONAL PURPOSES ONLY
+
+════════════════════════════════════════════════════════════════════════
+
+🚨 EXCHANGE: BYBIT FUTURES ONLY
+   - This bot is designed for Bybit Futures trading only
+   - Tested and validated on Bybit testnet/demo accounts
+   - May not work with other exchanges
+
+🚨 TESTED ON DEMO ACCOUNTS ONLY
+   - This bot has been tested EXCLUSIVELY on Bybit DEMO trading accounts
+   - Demo results DO NOT guarantee live trading performance
+   - Live market conditions differ significantly from demo
+   - Real slippage, fees, and volatility impact results
+
+🚨 TRADING WITH REAL MONEY = POTENTIAL TOTAL LOSS
+   - Using this bot on LIVE trading accounts can and WILL result in:
+     • Complete loss of your deposit
+     • Rapid account liquidation
+     • Negative balance (debt)
+   - Markets are unpredictable and highly volatile
+   - No guarantee of profitability under any conditions
+   - Past performance ≠ future results
+
+════════════════════════════════════════════════════════════════════════
+
+EXPLICIT REQUIREMENTS:
+✓ Test ONLY on Bybit TESTNET or DEMO accounts first
+✓ Start with MINIMUM position sizes (even on demo)
+✓ Monitor trades for at least 1-2 weeks before considering live
+✓ Use minimal leverage (NOT 10x or 20x leverage)
+✓ Risk ONLY money you can afford to lose completely
+✓ If you trade live, your losses are YOUR RESPONSIBILITY
+
+════════════════════════════════════════════════════════════════════════
+
+LEGAL:
+- NOT financial or investment advice
+- NO warranty or guarantees of profitability
+- Author assumes NO responsibility for financial losses
+- Use at YOUR OWN RISK - full personal responsibility
+- Author is NOT liable for losses, liquidations, or negative balances
+
+════════════════════════════════════════════════════════════════════════
+
+⛔ DO NOT USE WITH REAL MONEY UNLESS YOU FULLY ACCEPT:
+   - You will likely lose your entire deposit
+   - You may owe money to the exchange (negative balance)
+   - No one will bail you out
+   - This is YOUR decision and YOUR responsibility
+
+If you do not accept these risks, DO NOT RUN THIS BOT.
+```
 
 ---
 
