@@ -10,6 +10,28 @@ All strategies are **configuration files** (JSON) that compose trading logic wit
 
 ---
 
+## 📑 Table of Contents
+
+- [🚀 Key Features](#-key-features)
+- [📋 Available Strategies](#-available-strategies)
+  - [Level Trading Strategy](#1-level-trading-strategy)
+  - [Level Trading - Single EMA](#2-level-trading---single-ema)
+  - [Whale Hunter](#3-whale-hunter-strategy)
+  - [Liquidity-Based Strategy](#4-liquidity-based-strategy)
+  - [Swing Support/Resistance](#5-swing-supportresistance)
+  - [Momentum Scalping](#6-momentum-scalping)
+  - [Simple Levels](#7-simple-levels)
+- [🔧 How to Create Your Own Strategy](#-how-to-create-your-own-strategy)
+- [📊 Analyzer Types](#-analyzer-types-for-composition)
+- [⚙️ Common Parameters](#️-common-parameters-explained)
+- [🎯 Strategy Selection Guide](#-strategy-selection-guide)
+- [🔄 Tips for Optimization](#-tips-for-strategy-optimization)
+- [📋 Complete Parameter Reference](#-complete-parameter-reference)
+- [❓ FAQ](#-faq)
+- [📚 Learn More](#-learn-more)
+
+---
+
 ## 📋 Available Strategies
 
 ### 1. Level Trading Strategy
@@ -76,6 +98,8 @@ Simplified version using only EMA analyzer for trend following. Minimal filters 
 **Use Case:**
 Perfect for backtesting and understanding how the bot makes decisions with single analyzer.
 
+[⬆ Back to TOC](#-table-of-contents)
+
 ---
 
 ### 3. Whale Hunter Strategy
@@ -109,6 +133,8 @@ Detects and trades large liquidity sweeps and order block formations where insti
 }
 ```
 
+[⬆ Back to TOC](#-table-of-contents)
+
 ---
 
 ### 4. Liquidity-Based Strategy
@@ -134,6 +160,8 @@ Focuses on liquidity zones, order blocks, and fair value gaps. Trades reversals 
 - Trades fair value gap fills
 - Maps volume profile levels
 
+[⬆ Back to TOC](#-table-of-contents)
+
 ---
 
 ### 5. Swing Support/Resistance
@@ -152,6 +180,8 @@ Pure swing analysis based on highs and lows. Ideal for position traders holding 
 - Position trading (daily+ timeframes)
 - Clear swing structures
 - Multiple day holding periods
+
+[⬆ Back to TOC](#-table-of-contents)
 
 ---
 
@@ -183,6 +213,8 @@ Fast-moving strategy using price momentum, delta analysis, and tick-level signal
 }
 ```
 
+[⬆ Back to TOC](#-table-of-contents)
+
 ---
 
 ### 7. Simple Levels
@@ -198,6 +230,8 @@ Minimal complexity version - just levels and basic confirmation. Best for unders
 - Learning/testing
 - Simple entry/exit rules
 - Minimal configuration
+
+[⬆ Back to TOC](#-table-of-contents)
 
 ---
 
@@ -280,6 +314,8 @@ Edit `config.json`:
 npm run dev
 ```
 
+[⬆ Back to TOC](#-table-of-contents)
+
 ---
 
 ## 📊 Analyzer Types (for composition)
@@ -310,6 +346,8 @@ npm run dev
 - `MICRO_WALL_ANALYZER_NEW` - Small wall detection
 - `TICK_DELTA_ANALYZER_NEW` - Tick-level delta
 - And 5+ more...
+
+[⬆ Back to TOC](#-table-of-contents)
 
 ---
 
@@ -365,6 +403,8 @@ npm run dev
 }
 ```
 
+[⬆ Back to TOC](#-table-of-contents)
+
 ---
 
 ## 🎯 Strategy Selection Guide
@@ -377,6 +417,8 @@ npm run dev
 | **Whale Detection** | Whale Hunter | 5m-1H |
 | **Smart Money** | Liquidity-Based | 15m-1H |
 | **Test Ideas** | Simple Levels | 5m-1H |
+
+[⬆ Back to TOC](#-table-of-contents)
 
 ---
 
@@ -417,6 +459,8 @@ npm run dev
   "atrMultiplier": 2.0       // Wider ATR multiple
 }
 ```
+
+[⬆ Back to TOC](#-table-of-contents)
 
 ---
 
@@ -463,6 +507,8 @@ npm run dev
 - Max: 10% (very aggressive)
 - Recommended: 0.5-2%
 
+[⬆ Back to TOC](#-table-of-contents)
+
 ---
 
 ## ❓ FAQ
@@ -491,6 +537,8 @@ A: Yes, but not recommended. Filters prevent losing trades during bad conditions
 **Q: How do I know if my strategy is good?**
 A: Backtest it! Compare win rate, profit factor, and drawdown.
 
+[⬆ Back to TOC](#-table-of-contents)
+
 ---
 
 ## 📚 Learn More
@@ -498,6 +546,8 @@ A: Backtest it! Compare win rate, profit factor, and drawdown.
 - See [../README.md](../README.md) for overall bot documentation
 - Check [../../CLAUDE.md](../../CLAUDE.md) for developer guide
 - Read [../../MIGRATION_PLAN.md](../../MIGRATION_PLAN.md) for feature roadmap
+
+[⬆ Back to TOC](#-table-of-contents)
 
 ---
 

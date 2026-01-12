@@ -66,6 +66,27 @@ npm run dev
 
 ---
 
+## 📑 Table of Contents
+
+- [🎯 What Is This?](#-what-is-this)
+- [⚠️ Risk Warning](#-risk-warning-read-this)
+- [⚡ Quick Start](#-quick-start-5-minutes)
+- [🎮 What This Bot Does](#-what-this-bot-does)
+  - [Trading Strategies](#trading-strategies)
+  - [Smart Money Concepts](#smart-money-concepts-built-in)
+  - [Risk Management](#risk-management)
+- [🛠️ Configuration Guide](#️-configuration-guide)
+- [📊 System Architecture](#-system-architecture-visual)
+  - [4-Layer System](#how-it-works-4-layer-system)
+  - [Data Flow](#data-flow-from-candle-to-trade)
+- [✅ What Is Edison / ❌ What Is NOT](#-what-is-edison--what-is-not)
+- [📝 Common Commands](#-common-commands)
+- [🎯 Building Blocks Architecture](#-building-blocks-architecture)
+- [📋 Full Legal Disclaimer](#-full-legal-disclaimer)
+- [📄 License](#-license)
+
+---
+
 ## 🎮 What This Bot Does
 
 ### Trading Strategies
@@ -95,6 +116,8 @@ npm run dev
 - ✅ **Take Profits** - Multi-level exits (TP1, TP2, etc.)
 - ✅ **Trailing Stops** - Lock profits as price moves
 - ✅ **Filters** - Market structure, volatility, correlation checks
+
+[⬆ Back to TOC](#-table-of-contents)
 
 ---
 
@@ -146,6 +169,8 @@ BYBIT_TESTNET=true
 
 → [Read config.example.json](./config.example.json) for detailed explanation of each setting
 
+[⬆ Back to TOC](#-table-of-contents)
+
 ---
 
 ## 📊 System Architecture (Visual)
@@ -171,6 +196,8 @@ BYBIT_TESTNET=true
 └─────────────────────────────────────────────────────────┘
 ```
 
+[⬆ Back to TOC](#-table-of-contents)
+
 ### Data Flow: From Candle to Trade
 
 ```
@@ -193,6 +220,8 @@ Monitor: Watch for TP/SL hits
      ↓
 Exit and Log Trade
 ```
+
+[⬆ Back to TOC](#-table-of-contents)
 
 ---
 
@@ -221,6 +250,8 @@ Exit and Log Trade
 | **Ready to Use** | Requires configuration and testing first. |
 | **Magic** | It's code + logic. No magic, just algorithms. |
 
+[⬆ Back to TOC](#-table-of-contents)
+
 ---
 
 ## 📝 Common Commands
@@ -241,6 +272,8 @@ npm run analyze-journal          # View trading performance
 npm run analyze-losses           # Analyze losing trades
 npm run download-data XRPUSDT 2025-01-01 2025-01-31  # Download candles
 ```
+
+[⬆ Back to TOC](#-table-of-contents)
 
 ---
 
@@ -1044,6 +1077,8 @@ if (fastEMA > slowEMA && RSI < 70 && ATR > X) {
 
 That's it! Edison handles the orchestration, signal ranking, filtering, and execution automatically.
 
+[⬆ Back to TOC](#-table-of-contents)
+
 ---
 
 ## 📋 Full Legal Disclaimer
@@ -1103,6 +1138,8 @@ LEGAL:
 If you do not accept these risks, DO NOT RUN THIS BOT.
 ```
 
+[⬆ Back to TOC](#-table-of-contents)
+
 ---
 
 ## 📄 License
@@ -1114,6 +1151,8 @@ This project is licensed under the **MIT License** - see [LICENSE](LICENSE) file
 - ✅ Free to modify and distribute
 - ✅ Minimal restrictions
 - ⚠️ Use at your own risk (no warranty)
+
+[⬆ Back to TOC](#-table-of-contents)
 
 ---
 
