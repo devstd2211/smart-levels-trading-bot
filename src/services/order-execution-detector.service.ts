@@ -52,14 +52,20 @@ export class OrderExecutionDetectorService {
       closedSize: execData.closedSize,
     });
 
-    // Detect Take Profit: stopOrderType="UNKNOWN" + createType="CreateByUser" + closedSize > 0
+    // Detect Take Profit:
+    // - stopOrderType="PartialTakeProfit" (Bybit sends this for TP fills), OR
+    // - stopOrderType="UNKNOWN" + createType="CreateByUser" (legacy/fallback detection)
     const isTakeProfit =
-      execData.stopOrderType === 'UNKNOWN' &&
-      execData.createType === 'CreateByUser' &&
-      closedSize > 0;
+      execData.stopOrderType === 'PartialTakeProfit' ||
+      (execData.stopOrderType === 'UNKNOWN' &&
+        execData.createType === 'CreateByUser' &&
+        closedSize > 0);
 
-    // Detect Stop Loss: stopOrderType="StopLoss" or "Stop" (Bybit uses both)
-    const isStopLoss = execData.stopOrderType === 'StopLoss' || execData.stopOrderType === 'Stop';
+    // Detect Stop Loss: stopOrderType="StopLoss", "Stop", or "PartialStopLoss" (Bybit uses multiple formats)
+    const isStopLoss =
+      execData.stopOrderType === 'StopLoss' ||
+      execData.stopOrderType === 'Stop' ||
+      execData.stopOrderType === 'PartialStopLoss';
 
     // Detect Trailing Stop: stopOrderType="TrailingStop"
     const isTrailingStop = execData.stopOrderType === 'TrailingStop';
