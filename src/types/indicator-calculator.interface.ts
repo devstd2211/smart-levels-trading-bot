@@ -1,4 +1,4 @@
-import { Candle } from './candle.types';
+import { Candle } from './core';
 
 /**
  * Interface for indicator calculators

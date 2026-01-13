@@ -33,7 +33,7 @@ export class IndicatorCacheService implements IIndicatorCache {
 
     // If cache is full, evict oldest (first entry in Map)
     if (this.cache.size >= this.MAX_SIZE) {
-      const oldestKey = this.cache.keys().next().value;
+      const oldestKey = this.cache.keys().next().value as string;
       this.cache.delete(oldestKey);
     }
 

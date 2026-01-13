@@ -2,10 +2,10 @@ import { CandleProvider } from '../providers/candle.provider';
 import { IIndicatorCache } from '../types/indicator-cache.interface';
 import { IIndicatorCalculator } from '../types/indicator-calculator.interface';
 import { LoggerService } from './logger.service';
-import { Candle } from '../types';
+import { TimeframeRole } from '../types';
 
 interface PendingClose {
-  timeframe: string;
+  timeframe: TimeframeRole;
   closeTime: number;
 }
 
@@ -13,7 +13,7 @@ interface PendingClose {
  * Pre-calculates indicators on every candle close
  *
  * Architecture:
- * 1. Listens to candleClosed events from CandleProvider
+ * 1. Called by TradingOrchestrator on candle close
  * 2. Queues close events (handles race conditions from multiple timeframes)
  * 3. Processes queue sequentially (ensures proper order)
  * 4. Batches same-timestamp closes together
@@ -29,20 +29,20 @@ interface PendingClose {
  * Only knows about:
  * - IIndicatorCalculator interface
  * - IIndicatorCache interface
- * - CandleProvider events
+ * - CandleProvider
  */
 export class IndicatorPreCalculationService {
   private isCalculating = false;
   private pendingCloses: PendingClose[] = [];
   private onIndicatorsReadyCallback?: (
-    timeframe: string,
+    timeframe: TimeframeRole,
     closeTime: number
   ) => Promise<void>;
 
-  // Configuration (to be injected or set externally)
+  // Configuration
   private config = {
     timeframes: {
-      entry: '5m', // Will be set from external config
+      entry: 'ENTRY' as TimeframeRole,
     },
   };
 
@@ -51,19 +51,14 @@ export class IndicatorPreCalculationService {
     private cache: IIndicatorCache,
     private calculators: IIndicatorCalculator[],
     private logger: LoggerService,
-  ) {
-    // Listen to candle close events
-    this.candleProvider.on('candleClosed', (candle: Candle) => {
-      this.handleCandleClosed(candle);
-    });
-  }
+  ) {}
 
   /**
    * Register callback to be called when indicators are ready
    * Called by TradingOrchestrator during initialization
    */
   setOnIndicatorsReady(
-    callback: (timeframe: string, closeTime: number) => Promise<void>
+    callback: (timeframe: TimeframeRole, closeTime: number) => Promise<void>
   ): void {
     this.onIndicatorsReadyCallback = callback;
   }
@@ -71,19 +66,19 @@ export class IndicatorPreCalculationService {
   /**
    * Set entry timeframe (should be called from config)
    */
-  setEntryTimeframe(timeframe: string): void {
+  setEntryTimeframe(timeframe: TimeframeRole): void {
     this.config.timeframes.entry = timeframe;
   }
 
   /**
-   * Handle candle close event from CandleProvider
+   * Handle candle close - called by TradingOrchestrator
    * Queues the close and starts processing if not already processing
    */
-  private async handleCandleClosed(candle: Candle): Promise<void> {
+  async onCandleClosed(timeframe: TimeframeRole, closeTime: number): Promise<void> {
     // Add to queue
     this.pendingCloses.push({
-      timeframe: candle.timeframe,
-      closeTime: candle.closeTime,
+      timeframe,
+      closeTime,
     });
 
     // If already calculating, let it finish (and process queue)
@@ -133,12 +128,15 @@ export class IndicatorPreCalculationService {
           } catch (error) {
             this.logger.error(
               'Error in onIndicatorsReady callback:',
-              error
+              error instanceof Error ? { message: error.message } : {}
             );
           }
         }
       } catch (error) {
-        this.logger.error('Error processing candle close:', error);
+        this.logger.error(
+          'Error processing candle close:',
+          error instanceof Error ? { message: error.message } : {}
+        );
         // Continue processing queue even on error
       } finally {
         this.isCalculating = false;
@@ -149,12 +147,12 @@ export class IndicatorPreCalculationService {
   /**
    * Recalculate indicators affected by closing of specific timeframe
    */
-  private async recalculate(closedTimeframe: string): Promise<void> {
+  private async recalculate(closedTimeframe: TimeframeRole): Promise<void> {
     // Find calculators that depend on this timeframe
     const affectedCalculators = this.calculators.filter((calc) => {
       const config = calc.getConfig();
       return config.indicators.some((ind) =>
-        ind.timeframes.includes(closedTimeframe)
+        ind.timeframes.includes(closedTimeframe as unknown as string)
       );
     });
 
@@ -182,14 +180,24 @@ export class IndicatorPreCalculationService {
       }
 
       // Get candles for all required timeframes
-      const candlesByTf = new Map<string, Candle[]>();
+      const candlesByTf = new Map<string, any[]>();
       for (const [tf, minCount] of tfRequirements) {
-        const candles = await this.candleProvider.getCandles(tf, minCount);
-        if (!candles || candles.length === 0) {
-          this.logger.warn(`No candles available for ${tf}`);
+        try {
+          // Try to get candles - TF string might be different format
+          const candles = await this.candleProvider.getCandles(
+            tf as TimeframeRole,
+            minCount
+          );
+          if (!candles || candles.length === 0) {
+            this.logger.warn(`No candles available for ${tf}`);
+            continue;
+          }
+          candlesByTf.set(tf, candles);
+        } catch (err) {
+          this.logger.warn(`Failed to get candles for ${tf}:`,
+            err instanceof Error ? { message: err.message } : {});
           continue;
         }
-        candlesByTf.set(tf, candles);
       }
 
       // === INVALIDATE old data ===
@@ -198,7 +206,7 @@ export class IndicatorPreCalculationService {
         const config = calc.getConfig();
         config.indicators.forEach((ind) => {
           // Only invalidate if this indicator depends on closed timeframe
-          if (ind.timeframes.includes(closedTimeframe)) {
+          if (ind.timeframes.includes(closedTimeframe as unknown as string)) {
             ind.periods.forEach((period) => {
               const cacheKey = `${ind.name}-${period}-${closedTimeframe}`;
               this.cache.invalidate(cacheKey);
@@ -211,13 +219,13 @@ export class IndicatorPreCalculationService {
       const promises = affectedCalculators.map((calc) =>
         calc
           .calculate({
-            candlesByTimeframe: candlesByTf,
+            candlesByTimeframe: candlesByTf as any,
             timestamp: Date.now(),
           })
           .catch((error) => {
             this.logger.error(
               `Calculator ${calc.constructor.name} failed:`,
-              error
+              error instanceof Error ? { message: error.message } : {}
             );
             return new Map(); // Return empty, don't block others
           })
@@ -232,18 +240,18 @@ export class IndicatorPreCalculationService {
         });
       }
 
-      this.logger.debug(
-        `Recalculated indicators for ${closedTimeframe}`,
-        {
-          calculatorsRun: affectedCalculators.length,
-          entriesUpdated: Array.from(allResults).reduce(
-            (sum, m) => sum + m.size,
-            0
-          ),
-        }
-      );
+      this.logger.debug(`Recalculated indicators for ${closedTimeframe}`, {
+        calculatorsRun: affectedCalculators.length,
+        entriesUpdated: Array.from(allResults).reduce(
+          (sum, m) => sum + m.size,
+          0
+        ),
+      });
     } catch (error) {
-      this.logger.error(`Recalculation failed for ${closedTimeframe}:`, error);
+      this.logger.error(
+        `Recalculation failed for ${closedTimeframe}:`,
+        error instanceof Error ? { message: error.message } : {}
+      );
     }
   }
 }
