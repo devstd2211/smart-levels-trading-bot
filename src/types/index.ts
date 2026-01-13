@@ -193,6 +193,21 @@ export {
   validateIndicatorConfig,
 } from './config-new.types';
 
+// Re-export indicator types and enums
+export { IndicatorType, getAllIndicatorTypes, isValidIndicatorType } from './indicator-type.enum';
+export type { IIndicator } from './indicator.interface';
+
+// Re-export indicator loading types
+export type { IIndicatorMetadata } from '../services/indicator-registry.service';
+export { IndicatorRegistry } from '../services/indicator-registry.service';
+
+// Re-export indicator cache & calculator
+export type { IIndicatorCache } from './indicator-cache.interface';
+export type { IIndicatorCalculator } from './indicator-calculator.interface';
+
+// Re-export pre-calculation service interface
+export type { IIndicatorPreCalculationService } from './pre-calculation.interface';
+
 // Re-export architecture refactoring types
 export { ActionType } from './architecture.types';
 export type {
