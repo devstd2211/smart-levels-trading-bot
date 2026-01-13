@@ -39,16 +39,54 @@ export class LiquidityZoneAnalyzerNew {
     if (zone.hasHigh && !zone.hasLow) {
       // Pure HIGH zone: price was rejected at high prices
       direction = SignalDirectionEnum.SHORT; // Expect pullback from high
+
+      /**
+       * CONFIDENCE SCORING: Evidence-based calculation
+       *
+       * Why 0.25 baseline + 0.7 multiplier?
+       * - 0.25 baseline (25%): Even with no HIGH strength, we have some confidence in detection
+       *   (price behavior near highs with volume is meaningful)
+       * - 0.7 multiplier: Leaves 5% margin for unknown unknowns (Bayesian skepticism)
+       *
+       * Range: [25%, 95%]
+       * - strength=0: confidence = 25% (weak zone detected but low certainty)
+       * - strength=1: confidence = 95% (strong zone with multiple rejections)
+       *
+       * Applied because:
+       * ✓ Never overconfident in single analyzer output
+       * ✓ Allows weak signals to participate but with lower weight
+       * ✓ Preserves margin for edge cases and market uncertainty
+       */
       confidence = Math.round((0.25 + zone.highStrength * 0.7) * 100);
 
     } else if (zone.hasLow && !zone.hasHigh) {
       // Pure LOW zone: price was supported at low prices
       direction = SignalDirectionEnum.LONG; // Expect bounce from low
+
+      /**
+       * CONFIDENCE SCORING: Same logic as HIGH zone
+       * 0.25 baseline + 0.7 multiplier
+       * Range: [25%, 95%]
+       */
       confidence = Math.round((0.25 + zone.lowStrength * 0.7) * 100);
 
     } else if (zone.hasHigh && zone.hasLow) {
       // Both zones present: conflicting signals
       direction = SignalDirectionEnum.HOLD; // No clear direction
+
+      /**
+       * CONFIDENCE SCORING: Conflict penalty
+       * When both HIGH and LOW zones exist:
+       * - Use minimum strength (weakest signal wins)
+       * - Apply 0.4 multiplier (reduced from 0.7 due to conflict)
+       * - Range: [0%, 40%]
+       *
+       * Example:
+       * - highStrength=0.8, lowStrength=0.6
+       * - min(0.8, 0.6) * 0.4 = 0.6 * 0.4 = 0.24 = 24% confidence
+       * - Much lower than pure HIGH (95%) or pure LOW (95%)
+       * - Correctly reflects market uncertainty
+       */
       confidence = Math.round(Math.min(zone.highStrength, zone.lowStrength) * 0.4 * 100);
       if (this.logger) {
         this.logger.debug('[LIQUIDITY_ZONE] Both HIGH and LOW zones detected, conflicting signals');

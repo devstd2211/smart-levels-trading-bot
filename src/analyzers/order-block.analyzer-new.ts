@@ -49,6 +49,29 @@ export class OrderBlockAnalyzerNew {
 
     // FIX #2: Use proper confidence based on strength
     const direction = block.type === 'BULLISH' ? SignalDirectionEnum.LONG : SignalDirectionEnum.SHORT;
+
+    /**
+     * CONFIDENCE SCORING: Evidence-based calculation for Order Blocks
+     *
+     * Why 0.15 baseline + 0.8 multiplier?
+     * - 0.15 baseline (15%): Even with low strength, we detected a rejection pattern
+     *   (wick ratio >= 1.5x body) which has meaning
+     * - 0.8 multiplier: Maximum possible is 95% (Bayesian skepticism)
+     *
+     * Range: [15%, 95%]
+     * - strength=0: confidence = 15% (block detected but very weak)
+     * - strength=1: confidence = 95% (multiple strong rejections at same level, price near block)
+     *
+     * Why different from LiquidityZone?
+     * - Order blocks require explicit wick rejection (higher bar)
+     * - Start at 15% instead of 25% (harder to confirm)
+     * - But when strong, reach same 95% max (both analyzers equal weight)
+     *
+     * Applied because:
+     * ✓ Reflects SMC theory: rejections are meaningful pattern
+     * ✓ Distance penalty already applied in strength calculation
+     * ✓ Prevents overconfidence in noisy wicks
+     */
     const confidence = Math.round((0.15 + block.strength * 0.8) * 100);
 
     const signal: AnalyzerSignal = {
