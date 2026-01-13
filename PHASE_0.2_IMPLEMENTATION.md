@@ -1,9 +1,10 @@
 # Phase 0.2: Indicator Cache Implementation
 
-**Status:** Core files created, integration pending
-**Created:** 2026-01-13
+**Status:** ✅ Core implementation complete, build successful
+**Last Updated:** 2026-01-13 (Session 2 - Phase 0.2 completion)
 **Goal:** Pre-calculate indicators on candle close, read from cache during analysis
 **Expected Result:** -40-50% CPU usage reduction, 100% cache hit rate
+**Commit:** `fd5dec1` - Phase 0.2: Complete indicator cache system implementation
 
 ---
 
@@ -30,13 +31,14 @@
 - Invalidation support
 
 ✅ **`src/services/indicator-precalculation.service.ts`**
-- Listens to `candleClosed` events
+- Called explicitly via `onCandleClosed(timeframe, closeTime)` from TradingOrchestrator
 - Queues closes (handles race conditions from multiple TF)
 - Processes queue sequentially
-- Batches same-timestamp closes
+- Batches same-timestamp closes (prevents race conditions)
 - Invalidates + recalculates + stores in cache
-- Calls callback when ready
-- **20 lines core logic!**
+- Calls callback when entry timeframe is ready
+- **No hardcoded dependencies** - uses IIndicatorCalculator interfaces
+- **Core logic:** ~20 lines, rest is error handling
 
 ### 3. Indicator Calculators
 
@@ -193,10 +195,20 @@ candleProvider.on('candleClosed', (candle) => {
 
 ## ✅ Testing Checklist
 
-- [ ] `npm run build` - no errors
-- [ ] All new services compile
-- [ ] All calculators implement interface
-- [ ] All analyzers use cache only
+**Session 2 - Build & Core Implementation:**
+- [x] `npm run build` - no errors ✅ (2026-01-13 22:00)
+- [x] All new services compile ✅
+- [x] All calculators implement interface ✅
+- [x] Import paths correct ✅
+- [x] Type safety (no ANY types) ✅
+- [x] Error handling with instanceof Error ✅
+- [x] Git commit created ✅
+
+**Next Session - Integration & Testing:**
+- [ ] Update BotFactory/BotServices (initialize cache, calculators, precalc)
+- [ ] Update TradingOrchestrator (register callback)
+- [ ] Create cache-based analyzer versions (RsiAnalyzerNew, EmaAnalyzerNew, etc)
+- [ ] All analyzers use cache only (no recalculation)
 - [ ] Cache hit rate reported (should be ~100%)
 - [ ] Backtest: same results as before
 - [ ] Backtest: trade count identical
@@ -210,15 +222,17 @@ candleProvider.on('candleClosed', (candle) => {
 
 ## 🎯 Success Criteria
 
-All criteria must be met:
+**Completed (Session 2):**
+1. ✅ Code compiles: `npm run build` (success)
+2. ✅ Git commit created: `fd5dec1`
 
-1. ✅ Code compiles: `npm run build`
-2. ✅ All tests pass: `npm test`
-3. ✅ Backtest results IDENTICAL to before
-4. ✅ CPU usage reduced by 40-50%
-5. ✅ Cache hit rate > 95%
-6. ✅ No regressions (trades open/close at same times)
-7. ✅ Git commit created
+**Pending (Next Session - Integration phase):**
+3. ⏳ All tests pass: `npm test`
+4. ⏳ Backtest results IDENTICAL to before
+5. ⏳ CPU usage reduced by 40-50%
+6. ⏳ Cache hit rate > 95%
+7. ⏳ No regressions (trades open/close at same times)
+8. ⏳ Integration complete (BotFactory, TradingOrchestrator, analyzers)
 
 ---
 
@@ -317,6 +331,38 @@ CPU SAVINGS:
 
 ---
 
+## 📝 Session 2 Summary (2026-01-13)
+
+**What Was Done:**
+1. ✅ Fixed TypeScript compilation errors (9 errors resolved)
+2. ✅ Corrected import paths (candle.types → core)
+3. ✅ Fixed type casting issues (Map.keys() → string)
+4. ✅ Rewrote PreCalculationService architecture:
+   - Removed event listener pattern (CandleProvider.on)
+   - Added explicit `onCandleClosed(timeframe, closeTime)` method
+   - TradingOrchestrator now calls this method explicitly
+5. ✅ Proper error handling with instanceof Error checks
+6. ✅ Build verified: `npm run build` - SUCCESS
+7. ✅ Git commit & push: `fd5dec1`
+
+**Key Architectural Insight (from user feedback):**
+- PreCalculationService should NOT know about specific indicators
+- Instead, it receives IIndicatorCalculator interfaces
+- Each calculator declares what it produces via getConfig()
+- Queue + batch processing handles race conditions (1m + 5m close at same time)
+- Direct callback pattern (no EventBus) for speed and simplicity
+
+**Files in Production:**
+- `src/types/indicator-cache.interface.ts` - Cache contract
+- `src/types/indicator-calculator.interface.ts` - Calculator contract
+- `src/services/indicator-cache.service.ts` - LRU cache (500 entries)
+- `src/services/indicator-precalculation.service.ts` - Pre-calc orchestrator
+- `src/indicators/calculators/rsi.calculator.ts` - RSI calculator
+- `src/indicators/calculators/ema.calculator.ts` - EMA calculator
+
+---
+
 **Version:** 1.0
-**Status:** Awaiting integration and testing
-**Next:** Phase 0.3 (Decision Functions - extract to pure functions)
+**Status:** ✅ Core implementation complete, awaiting integration
+**Next:** Integration phase (BotFactory, TradingOrchestrator, cache-based analyzers)
+**Then:** Phase 0.3 (Decision Functions - extract to pure functions)
