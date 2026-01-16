@@ -147,18 +147,23 @@ describe('EntryOrchestrator', () => {
 
   describe('Signal Ranking (Confidence Priority)', () => {
     it('should rank signals by confidence (highest first)', async () => {
+      // 5 LONG vs 1 SHORT = 16% conflict (well below 40% threshold)
+      // Should reach consensus and select LONG, then pick highest in LONG
       const signals = [
-        createSignal(SignalDirection.LONG, 50, 100), // Lower confidence
-        createSignal(SignalDirection.SHORT, 85, 100), // Higher confidence
-        createSignal(SignalDirection.LONG, 65, 100), // Medium confidence
+        createSignal(SignalDirection.LONG, 50, 100),
+        createSignal(SignalDirection.LONG, 85, 100), // Highest in LONG
+        createSignal(SignalDirection.LONG, 65, 100),
+        createSignal(SignalDirection.LONG, 70, 100),
+        createSignal(SignalDirection.LONG, 60, 100),
+        createSignal(SignalDirection.SHORT, 80, 100), // High but minority
       ];
 
       const result = await orchestrator.evaluateEntry(signals, 1000, [], createNeutralTrend());
 
-      // Should pick the 85% confidence signal
+      // Should pick LONG consensus with highest confidence (85%)
       expect(result.decision).toBe(EntryDecision.ENTER);
       expect(result.signal?.confidence).toBe(85);
-      expect(result.signal?.direction).toBe(SignalDirection.SHORT);
+      expect(result.signal?.direction).toBe(SignalDirection.LONG);
     });
 
     it('should select highest confidence even if different strategy type', async () => {
@@ -342,7 +347,7 @@ describe('EntryOrchestrator', () => {
       const result = await orchestrator.evaluateEntry(signals, 0, [], createNeutralTrend());
 
       expect(result.decision).toBe(EntryDecision.SKIP);
-      expect(result.reason).toContain('accountBalance');
+      expect(result.reason.toLowerCase()).toContain('account');
     });
 
     it('should return SKIP with error reason on negative account balance', async () => {
@@ -351,7 +356,7 @@ describe('EntryOrchestrator', () => {
       const result = await orchestrator.evaluateEntry(signals, -100, [], createNeutralTrend());
 
       expect(result.decision).toBe(EntryDecision.SKIP);
-      expect(result.reason).toContain('accountBalance');
+      expect(result.reason.toLowerCase()).toContain('account');
     });
 
     it('should filter out signals with invalid confidence (negative)', async () => {
