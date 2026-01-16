@@ -696,20 +696,96 @@ Phase 0.3 is COMPLETE. Next phases:
 - ✅ Tests: **2641/2683 passing** (all new tests passing)
 - ✅ Git: **Last commit:** `5abe38c` (Exit event handler)
 
-### Before Starting Phase 0.4
+### Phase 0.4: Action Queue ⏳ IN PROGRESS
 
-- [ ] Understand Phase 0.4 goal: Action Queue (decouple execution from decision)
-- [ ] Review ActionQueue pattern in ARCHITECTURE_IMPLEMENTATION_GUIDE.md
-- [ ] Have 5-7 hours blocked for Phase 0.4
-- [ ] Git repository clean (current status: ✅ clean)
-- [ ] Tests passing: `npm test` (current: ✅ 2641/2683)
-- [ ] Build working: `npm run build` (current: ✅ no errors)
+**Status:** Core implementation DONE, Type safety improvements PENDING
 
-**Ready for Phase 0.4? Start planning!**
+**Commit:** `2f81bdc` - Phase 0.4: Action Queue Service (FIFO with retry logic)
+
+**Completed:**
+- [x] ActionQueueService: FIFO queue with retry logic
+- [x] 4 Action Handlers: OpenPositionHandler, ClosePercentHandler, UpdateSLHandler, ActivateTrailingHandler
+- [x] TradingOrchestrator integration: enqueueOpenPositionAction(), enqueueExitActions()
+- [x] Build: ✅ No TypeScript errors
+- [x] Git commit: Created with detailed message
+
+**Files Created:**
+- `src/services/action-queue.service.ts` (200 LOC)
+- `src/action-handlers/open-position.handler.ts` (80 LOC)
+- `src/action-handlers/close-percent.handler.ts` (106 LOC)
+- `src/action-handlers/update-stop-loss.handler.ts` (103 LOC)
+- `src/action-handlers/activate-trailing.handler.ts` (106 LOC)
+- `src/action-handlers/index.ts` (5 LOC)
+
+### ⚠️ CRITICAL: Type Safety Issues (MUST FIX IN NEXT SESSION)
+
+**Problem:** Handlers currently use `as any` casts (4 places) to work around type mismatches:
+1. `close-percent.handler.ts:56` - ExitAction type mismatch
+2. `update-stop-loss.handler.ts:53` - ExitAction type mismatch
+3. `activate-trailing.handler.ts:56` - ExitAction type mismatch
+4. `architecture.types.ts:64` - Signal type is `Record<string, any>`
+
+**Root Cause:**
+- `ExitAction` enum/type from core.ts doesn't match action object structure
+- `Signal` vs `AggregatedSignal` type mismatch in OpenPositionAction
+- Generic `Record<string, any>` used instead of strict types
+
+**Next Session Priority - Type Safety Refactoring:**
+
+```typescript
+// BEFORE (❌ with any casts)
+const exitAction: ExitAction = {
+  action: 'CLOSE_PERCENT' as any,
+  percent: action.percent,
+} as any;
+
+// AFTER (✅ strict types)
+// Option 1: Create proper ExitActionDTO interface
+interface ExitActionDTO {
+  action: ExitActionType;
+  percent?: number;
+  newStopLoss?: number;
+  trailingPercent?: number;
+  reason?: string;
+}
+
+// Option 2: Use proper action object builders
+class ExitActionBuilder {
+  static closePercent(percent: number): ExitActionDTO { ... }
+  static updateSL(price: number): ExitActionDTO { ... }
+}
+```
+
+**Files to fix (in order of priority):**
+1. Define proper `ExitActionDTO` interface in `src/types/architecture.types.ts`
+2. Fix `OpenPositionAction.signal` type - use proper Signal interface
+3. Update all 3 handlers to use strict types (remove `as any`)
+4. Add unit tests for handlers with proper typing
+5. Run full test suite: `npm test`
 
 ---
 
-**Version:** 1.1 (Updated for Phase 0.3 Completion)
+## ✅ Current Status
+
+### Completed Phases ✅
+
+- [x] Phase 0.1: Architecture Types
+- [x] Phase 0.2: Indicator Cache (core)
+- [x] Infrastructure: Registry + Loader (config-driven indicators)
+- [x] Phase 0.2 Integration: Config-driven indicator loading with DI
+- [x] Phase 0.3 Part 1: Entry decision functions (pure function extraction)
+- [x] Phase 0.3 Part 2: Exit event handler (config-driven, event-based)
+- [x] Phase 0.4: Action Queue Service (CORE - type safety pending)
+
+### Build Status
+
+- ✅ TypeScript: **0 errors** (but 4 `as any` casts present)
+- ✅ Tests: **2641/2683 passing**
+- ✅ Git: **Last commit:** `2f81bdc` (Phase 0.4 Action Queue)
+
+---
+
+**Version:** 1.2 (Updated for Phase 0.4 Start)
 **Last Updated:** 2026-01-16
-**Status:** Phase 0.3 ✅ COMPLETE | Phase 0.4 NEXT
-**Architecture Stage:** Decision Functions Complete | Action Queue Planning
+**Status:** Phase 0.4 ⏳ IN PROGRESS (Type safety pending) | Phase 1 NEXT
+**Architecture Stage:** Action Queue Core Complete | Type Safety Refactoring Required
