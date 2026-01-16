@@ -21,6 +21,7 @@ import type { VolumeAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import { VolumeIndicatorNew } from '../indicators/volume.indicator-new';
 import type { LoggerService } from '../services/logger.service';
+import type { IIndicator } from '../types/indicator.interface';
 
 // ============================================================================
 // CONSTANTS
@@ -48,10 +49,15 @@ export class VolumeAnalyzerNew {
   /**
    * Constructor with ConfigNew
    * STRICT - Throws if config is invalid
+   *
+   * @param config Analyzer configuration
+   * @param logger Logger service (optional)
+   * @param indicatorDI Volume indicator instance via DI (optional, will create if not provided)
    */
   constructor(
     config: VolumeAnalyzerConfigNew,
     private logger?: LoggerService,
+    indicatorDI?: IIndicator | null,
   ) {
     // Validate analyzer config
     if (typeof config.enabled !== 'boolean') {
@@ -72,11 +78,19 @@ export class VolumeAnalyzerNew {
     this.priority = config.priority;
     this.neutralConfidence = config.neutralConfidence;
 
-    // Create Volume indicator with standard period
-    this.indicator = new VolumeIndicatorNew({
-      enabled: true,
-      period: 14, // Standard volume period
-    });
+    // Use injected indicator if provided (DI), otherwise create new one
+    if (indicatorDI && indicatorDI instanceof VolumeIndicatorNew) {
+      this.indicator = indicatorDI;
+      this.logger?.info('[VOLUME_ANALYZER] Using injected Volume indicator via DI');
+    } else {
+      // Fallback: Create Volume indicator with standard period
+      this.logger?.info('[VOLUME_ANALYZER] Creating new Volume indicator with period 14');
+
+      this.indicator = new VolumeIndicatorNew({
+        enabled: true,
+        period: 14, // Standard volume period
+      });
+    }
   }
 
   /**

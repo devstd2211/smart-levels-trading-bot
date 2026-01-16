@@ -22,6 +22,7 @@ import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import { validateIndicatorConfig } from '../types/config-new.types';
 import { EMAIndicatorNew } from '../indicators/ema.indicator-new';
 import type { LoggerService } from '../services/logger.service';
+import type { IIndicator } from '../types/indicator.interface';
 
 // ============================================================================
 // CONSTANTS
@@ -50,10 +51,15 @@ export class EmaAnalyzerNew {
   /**
    * Constructor with ConfigNew
    * STRICT - Throws if config is invalid
+   *
+   * @param config Analyzer configuration
+   * @param logger Logger service (optional)
+   * @param indicatorDI EMA indicator instance via DI (optional, will create if not provided)
    */
   constructor(
     config: EmaAnalyzerConfigNew,
     private logger?: LoggerService,
+    indicatorDI?: IIndicator | null,
   ) {
     // Validate analyzer config
     if (typeof config.enabled !== 'boolean') {
@@ -101,23 +107,28 @@ export class EmaAnalyzerNew {
     this.minConfidence = config.minConfidence;
     this.maxConfidence = config.maxConfidence;
 
-    // Create EMA indicator with periods from config (or defaults if not provided)
-    const fastPeriod = (config as any).fastPeriod || 9;
-    const slowPeriod = (config as any).slowPeriod || 21;
+    // Use injected indicator if provided (DI), otherwise create new one
+    if (indicatorDI && indicatorDI instanceof EMAIndicatorNew) {
+      this.indicator = indicatorDI;
+      this.logger?.info('[EMA_ANALYZER] Using injected EMA indicator via DI');
+    } else {
+      // Fallback: Create EMA indicator with periods from config (or defaults if not provided)
+      const fastPeriod = (config as any).fastPeriod || 9;
+      const slowPeriod = (config as any).slowPeriod || 21;
 
-    this.logger?.info('[EMA_ANALYZER] Initializing with periods', {
-      fastPeriod,
-      slowPeriod,
-      configKeys: Object.keys(config as any),
-    });
+      this.logger?.info('[EMA_ANALYZER] Creating new EMA indicator with periods', {
+        fastPeriod,
+        slowPeriod,
+      });
 
-    this.indicator = new EMAIndicatorNew({
-      enabled: true,
-      fastPeriod,
-      slowPeriod,
-      baseConfidence: 0,
-      strengthMultiplier: 0,
-    });
+      this.indicator = new EMAIndicatorNew({
+        enabled: true,
+        fastPeriod,
+        slowPeriod,
+        baseConfidence: 0,
+        strengthMultiplier: 0,
+      });
+    }
   }
 
   /**

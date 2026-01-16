@@ -19,6 +19,7 @@ import type { StochasticAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import { StochasticIndicatorNew } from '../indicators/stochastic.indicator-new';
 import type { LoggerService } from '../services/logger.service';
+import type { IIndicator } from '../types/indicator.interface';
 
 // ============================================================================
 // CONSTANTS
@@ -48,10 +49,15 @@ export class StochasticAnalyzerNew {
   /**
    * Constructor with ConfigNew
    * STRICT - Throws if config is invalid
+   *
+   * @param config Analyzer configuration
+   * @param logger Logger service (optional)
+   * @param indicatorDI Stochastic indicator instance via DI (optional, will create if not provided)
    */
   constructor(
     config: StochasticAnalyzerConfigNew,
     private logger?: LoggerService,
+    indicatorDI?: IIndicator | null,
   ) {
     // Validate analyzer config
     if (typeof config.enabled !== 'boolean') {
@@ -76,12 +82,23 @@ export class StochasticAnalyzerNew {
     this.kPeriod = config.kPeriod;
     this.dPeriod = config.dPeriod;
 
-    // Create Stochastic indicator
-    this.indicator = new StochasticIndicatorNew({
-      enabled: true,
-      kPeriod: this.kPeriod,
-      dPeriod: this.dPeriod,
-    });
+    // Use injected indicator if provided (DI), otherwise create new one
+    if (indicatorDI && indicatorDI instanceof StochasticIndicatorNew) {
+      this.indicator = indicatorDI;
+      this.logger?.info('[STOCHASTIC_ANALYZER] Using injected Stochastic indicator via DI');
+    } else {
+      // Fallback: Create Stochastic indicator with configured parameters
+      this.logger?.info('[STOCHASTIC_ANALYZER] Creating new Stochastic indicator', {
+        kPeriod: this.kPeriod,
+        dPeriod: this.dPeriod,
+      });
+
+      this.indicator = new StochasticIndicatorNew({
+        enabled: true,
+        kPeriod: this.kPeriod,
+        dPeriod: this.dPeriod,
+      });
+    }
   }
 
   /**

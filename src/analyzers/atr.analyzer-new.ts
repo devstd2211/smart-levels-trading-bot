@@ -21,6 +21,7 @@ import type { AtrAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import { ATRIndicatorNew } from '../indicators/atr.indicator-new';
 import type { LoggerService } from '../services/logger.service';
+import type { IIndicator } from '../types/indicator.interface';
 
 // ============================================================================
 // CONSTANTS
@@ -49,10 +50,15 @@ export class AtrAnalyzerNew {
   /**
    * Constructor with ConfigNew
    * STRICT - Throws if config is invalid
+   *
+   * @param config Analyzer configuration
+   * @param logger Logger service (optional)
+   * @param indicatorDI ATR indicator instance via DI (optional, will create if not provided)
    */
   constructor(
     config: AtrAnalyzerConfigNew,
     private logger?: LoggerService,
+    indicatorDI?: IIndicator | null,
   ) {
     // Validate analyzer config
     if (typeof config.enabled !== 'boolean') {
@@ -77,13 +83,21 @@ export class AtrAnalyzerNew {
     this.confidenceMultiplier = config.confidenceMultiplier;
     this.maxConfidence = config.maxConfidence;
 
-    // Create ATR indicator with default config
-    this.indicator = new ATRIndicatorNew({
-      enabled: true,
-      period: 14, // Standard ATR period
-      minimumATR: 0.5,
-      maximumATR: 50,
-    });
+    // Use injected indicator if provided (DI), otherwise create new one
+    if (indicatorDI && indicatorDI instanceof ATRIndicatorNew) {
+      this.indicator = indicatorDI;
+      this.logger?.info('[ATR_ANALYZER] Using injected ATR indicator via DI');
+    } else {
+      // Fallback: Create ATR indicator with default config
+      this.logger?.info('[ATR_ANALYZER] Creating new ATR indicator with default period 14');
+
+      this.indicator = new ATRIndicatorNew({
+        enabled: true,
+        period: 14, // Standard ATR period
+        minimumATR: 0.5,
+        maximumATR: 50,
+      });
+    }
   }
 
   /**

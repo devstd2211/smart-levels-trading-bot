@@ -15,6 +15,8 @@
 import { LoggerService } from './logger.service';
 import { SwingPointDetectorService } from './swing-point-detector.service';
 import { StrategyAnalyzerConfig } from '../types/strategy-config.types';
+import { IIndicator } from '../types/indicator.interface';
+import { IndicatorType } from '../types/indicator-type.enum';
 
 // Lazy-load analyzer types for type safety
 type AnalyzerInstance = any; // Will be typed as specific analyzer interfaces in real code
@@ -42,11 +44,43 @@ export class AnalyzerRegistryService {
   private loadedAnalyzers: Map<string, AnalyzerInstance> = new Map();
   private analyzerClasses: Map<string, any> = new Map();
   private swingPointDetector: SwingPointDetectorService;
+  private indicators: Map<IndicatorType, IIndicator> = new Map();
 
   constructor(private logger: LoggerService) {
     this.initializeAnalyzerMap();
     // Initialize SwingPointDetectorService for analyzers that need it
     this.swingPointDetector = new SwingPointDetectorService(this.logger, 2);
+  }
+
+  /**
+   * Set indicators to be used by analyzers
+   * Called by TradingOrchestrator after indicators are loaded from config
+   * @param indicators Map of loaded indicator instances
+   */
+  setIndicators(indicators: Map<IndicatorType, IIndicator>): void {
+    this.indicators = indicators;
+    this.logger.debug('📊 Indicators set in AnalyzerRegistry', {
+      count: indicators.size,
+      types: Array.from(indicators.keys()),
+    });
+  }
+
+  /**
+   * Get a specific indicator instance by type
+   * Used when initializing analyzers that need specific indicators
+   * @param type Indicator type (enum, not string!)
+   * @returns Indicator instance or null if not loaded
+   */
+  getIndicator(type: IndicatorType): IIndicator | null {
+    return this.indicators.get(type) || null;
+  }
+
+  /**
+   * Get all loaded indicators
+   * @returns Map of all indicator instances
+   */
+  getAllIndicators(): Map<IndicatorType, IIndicator> {
+    return this.indicators;
   }
 
   /**
@@ -184,13 +218,17 @@ export class AnalyzerRegistryService {
       // Build analyzer-specific config by merging defaults and strategy params
       const analyzerConfig2 = this.buildAnalyzerConfig(config, analyzerConfig);
 
-      // Create instance - some analyzers need additional services injected
+      // Create instance - some analyzers need additional services/indicators injected
       let instance;
       if (analyzerName === 'LEVEL_ANALYZER_NEW') {
         // LevelAnalyzer needs SwingPointDetectorService for better level detection
         instance = new AnalyzerClass(analyzerConfig2, this.logger, this.swingPointDetector);
+      } else if (this.isBasicAnalyzer(analyzerName)) {
+        // Basic 6 analyzers receive their corresponding indicator through DI
+        const indicator = this.getIndicatorForAnalyzer(analyzerName);
+        instance = new AnalyzerClass(analyzerConfig2, this.logger, indicator);
       } else {
-        // Standard analyzers only need config and logger
+        // Advanced analyzers only need config and logger
         instance = new AnalyzerClass(analyzerConfig2, this.logger);
       }
 
@@ -295,6 +333,51 @@ export class AnalyzerRegistryService {
    */
   isAnalyzerAvailable(name: string): boolean {
     return this.analyzerClasses.has(name);
+  }
+
+  /**
+   * Check if analyzer is one of the 6 basic analyzers that use indicators
+   * @param analyzerName Name of the analyzer
+   * @returns true if basic analyzer (EMA, RSI, ATR, Volume, Stochastic, Bollinger Bands)
+   */
+  private isBasicAnalyzer(analyzerName: string): boolean {
+    const basicAnalyzers = [
+      'EMA_ANALYZER_NEW',
+      'RSI_ANALYZER_NEW',
+      'ATR_ANALYZER_NEW',
+      'VOLUME_ANALYZER_NEW',
+      'STOCHASTIC_ANALYZER_NEW',
+      'BOLLINGER_BANDS_ANALYZER_NEW',
+    ];
+    return basicAnalyzers.includes(analyzerName);
+  }
+
+  /**
+   * Get the indicator instance for a basic analyzer
+   * Maps analyzer names to their corresponding IndicatorType
+   * @param analyzerName Name of the basic analyzer
+   * @returns Indicator instance or null if not available
+   */
+  private getIndicatorForAnalyzer(analyzerName: string): IIndicator | null {
+    const analyzerToIndicatorType: Record<string, IndicatorType> = {
+      EMA_ANALYZER_NEW: IndicatorType.EMA,
+      RSI_ANALYZER_NEW: IndicatorType.RSI,
+      ATR_ANALYZER_NEW: IndicatorType.ATR,
+      VOLUME_ANALYZER_NEW: IndicatorType.VOLUME,
+      STOCHASTIC_ANALYZER_NEW: IndicatorType.STOCHASTIC,
+      BOLLINGER_BANDS_ANALYZER_NEW: IndicatorType.BOLLINGER_BANDS,
+    };
+
+    const indicatorType = analyzerToIndicatorType[analyzerName];
+    if (!indicatorType) {
+      return null;
+    }
+
+    const indicator = this.getIndicator(indicatorType);
+    if (!indicator) {
+      this.logger.warn(`Indicator ${indicatorType} not available for ${analyzerName}`);
+    }
+    return indicator;
   }
 
   /**

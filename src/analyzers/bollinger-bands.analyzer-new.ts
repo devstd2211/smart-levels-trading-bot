@@ -21,6 +21,7 @@ import type { BollingerBandsAnalyzerConfigNew } from '../types/config-new.types'
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import { BollingerBandsIndicatorNew } from '../indicators/bollinger-bands.indicator-new';
 import type { LoggerService } from '../services/logger.service';
+import type { IIndicator } from '../types/indicator.interface';
 
 // ============================================================================
 // CONSTANTS
@@ -53,10 +54,15 @@ export class BollingerBandsAnalyzerNew {
   /**
    * Constructor with ConfigNew
    * STRICT - Throws if config is invalid
+   *
+   * @param config Analyzer configuration
+   * @param logger Logger service (optional)
+   * @param indicatorDI Bollinger Bands indicator instance via DI (optional, will create if not provided)
    */
   constructor(
     config: BollingerBandsAnalyzerConfigNew,
     private logger?: LoggerService,
+    indicatorDI?: IIndicator | null,
   ) {
     // Validate analyzer config
     if (typeof config.enabled !== 'boolean') {
@@ -81,12 +87,23 @@ export class BollingerBandsAnalyzerNew {
     this.period = config.period;
     this.stdDev = config.stdDev;
 
-    // Create Bollinger Bands indicator
-    this.indicator = new BollingerBandsIndicatorNew({
-      enabled: true,
-      period: this.period,
-      stdDev: this.stdDev,
-    });
+    // Use injected indicator if provided (DI), otherwise create new one
+    if (indicatorDI && indicatorDI instanceof BollingerBandsIndicatorNew) {
+      this.indicator = indicatorDI;
+      this.logger?.info('[BOLLINGER_BANDS_ANALYZER] Using injected Bollinger Bands indicator via DI');
+    } else {
+      // Fallback: Create Bollinger Bands indicator with configured parameters
+      this.logger?.info('[BOLLINGER_BANDS_ANALYZER] Creating new Bollinger Bands indicator', {
+        period: this.period,
+        stdDev: this.stdDev,
+      });
+
+      this.indicator = new BollingerBandsIndicatorNew({
+        enabled: true,
+        period: this.period,
+        stdDev: this.stdDev,
+      });
+    }
   }
 
   /**

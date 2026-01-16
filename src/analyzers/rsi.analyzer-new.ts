@@ -21,6 +21,7 @@ import type { RsiAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import { RSIIndicatorNew } from '../indicators/rsi.indicator-new';
 import type { LoggerService } from '../services/logger.service';
+import type { IIndicator } from '../types/indicator.interface';
 
 // ============================================================================
 // CONSTANTS
@@ -50,10 +51,15 @@ export class RsiAnalyzerNew {
   /**
    * Constructor with ConfigNew
    * STRICT - Throws if config is invalid
+   *
+   * @param config Analyzer configuration
+   * @param logger Logger service (optional)
+   * @param indicatorDI RSI indicator instance via DI (optional, will create if not provided)
    */
   constructor(
     config: RsiAnalyzerConfigNew,
     private logger?: LoggerService,
+    indicatorDI?: IIndicator | null,
   ) {
     // Validate analyzer config
     if (typeof config.enabled !== 'boolean') {
@@ -89,22 +95,32 @@ export class RsiAnalyzerNew {
     this.overbought = config.overbought;
     this.maxConfidence = config.maxConfidence;
 
-    // Create RSI indicator with configured parameters
-    this.indicator = new RSIIndicatorNew({
-      enabled: true,
-      period: this.period,
-      oversold: this.oversold,
-      overbought: this.overbought,
-      extreme: {
-        low: 10,
-        high: 90,
-      },
-      neutralZone: {
-        min: this.oversold,
-        max: this.overbought,
-      },
-      maxConfidence: this.maxConfidence,
-    });
+    // Use injected indicator if provided (DI), otherwise create new one
+    if (indicatorDI && indicatorDI instanceof RSIIndicatorNew) {
+      this.indicator = indicatorDI;
+      this.logger?.info('[RSI_ANALYZER] Using injected RSI indicator via DI');
+    } else {
+      // Fallback: Create RSI indicator with configured parameters
+      this.logger?.info('[RSI_ANALYZER] Creating new RSI indicator with period', {
+        period: this.period,
+      });
+
+      this.indicator = new RSIIndicatorNew({
+        enabled: true,
+        period: this.period,
+        oversold: this.oversold,
+        overbought: this.overbought,
+        extreme: {
+          low: 10,
+          high: 90,
+        },
+        neutralZone: {
+          min: this.oversold,
+          max: this.overbought,
+        },
+        maxConfidence: this.maxConfidence,
+      });
+    }
   }
 
   /**

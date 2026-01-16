@@ -43,6 +43,9 @@ import { TimeframeWeightingService } from './timeframe-weighting.service';
 import { AnalyzerRegistryService } from './analyzer-registry.service';
 import { FilterOrchestrator } from '../orchestrators/filter.orchestrator';
 import { MTFSnapshotGate } from './mtf-snapshot-gate.service';
+import { IndicatorRegistry } from './indicator-registry.service';
+import { IndicatorLoader } from '../loaders/indicator.loader';
+import { IndicatorType } from '../types/indicator-type.enum';
 
 // ============================================================================
 // TYPES
@@ -54,6 +57,8 @@ import { MTFSnapshotGate } from './mtf-snapshot-gate.service';
 
 export class TradingOrchestrator {
   // Core services
+  private indicatorRegistry: IndicatorRegistry | null = null;
+  private indicatorLoader: IndicatorLoader | null = null;
   private analyzerRegistry: AnalyzerRegistryService | null = null;
   private filterOrchestrator: FilterOrchestrator | null = null;
   private currentContext: TradingContext | null = null;
@@ -85,10 +90,18 @@ export class TradingOrchestrator {
     private riskManager: RiskManager,
   ) {
 
+    // Initialize indicator loading infrastructure
+    this.indicatorRegistry = new IndicatorRegistry();
+    this.registerAllIndicators();
+    this.indicatorLoader = new IndicatorLoader(this.indicatorRegistry, this.logger);
+
     // Initialize new black-box services
     this.analyzerRegistry = new AnalyzerRegistryService(this.logger);
     const filterConfig = (this.config as any).filters || {};
     this.filterOrchestrator = new FilterOrchestrator(this.logger, filterConfig);
+
+    // Load indicators from config and pass to analyzer registry
+    void this.loadIndicatorsAndInitializeAnalyzers();
 
     // Initialize MTF Snapshot Gate (fixes race condition)
     this.snapshotGate = new MTFSnapshotGate(this.logger);
@@ -130,6 +143,92 @@ export class TradingOrchestrator {
     // ContextAnalyzer is archived - replaced by TrendAnalyzer
     // currentContext is now populated by updateTrendContext() on PRIMARY candle close
     this.logger.info('🔄 Trading context will be initialized on first PRIMARY candle close (TrendAnalyzer)');
+  }
+
+  /**
+   * Register all available indicator types in the registry
+   * Called during construction to populate the IndicatorRegistry
+   */
+  private registerAllIndicators(): void {
+    if (!this.indicatorRegistry) return;
+
+    this.indicatorRegistry.register(IndicatorType.EMA, {
+      type: IndicatorType.EMA,
+      name: 'Exponential Moving Average',
+      description: 'Fast and slow EMA for trend analysis',
+      enabled: true,
+    });
+
+    this.indicatorRegistry.register(IndicatorType.RSI, {
+      type: IndicatorType.RSI,
+      name: 'Relative Strength Index',
+      description: 'RSI for overbought/oversold conditions',
+      enabled: true,
+    });
+
+    this.indicatorRegistry.register(IndicatorType.ATR, {
+      type: IndicatorType.ATR,
+      name: 'Average True Range',
+      description: 'ATR for volatility measurement',
+      enabled: true,
+    });
+
+    this.indicatorRegistry.register(IndicatorType.VOLUME, {
+      type: IndicatorType.VOLUME,
+      name: 'Volume',
+      description: 'Volume analysis',
+      enabled: true,
+    });
+
+    this.indicatorRegistry.register(IndicatorType.STOCHASTIC, {
+      type: IndicatorType.STOCHASTIC,
+      name: 'Stochastic Oscillator',
+      description: 'Stochastic for momentum analysis',
+      enabled: true,
+    });
+
+    this.indicatorRegistry.register(IndicatorType.BOLLINGER_BANDS, {
+      type: IndicatorType.BOLLINGER_BANDS,
+      name: 'Bollinger Bands',
+      description: 'Bollinger Bands for volatility and support/resistance',
+      enabled: true,
+    });
+
+    this.logger.debug('📋 Indicator Registry initialized with 6 indicators');
+  }
+
+  /**
+   * Load indicators from config and pass to AnalyzerRegistry
+   * This ensures analyzers have access to all loaded indicators through DI
+   */
+  private async loadIndicatorsAndInitializeAnalyzers(): Promise<void> {
+    try {
+      if (!this.indicatorLoader || !this.analyzerRegistry) {
+        this.logger.warn('Indicator loading skipped - loader or registry not initialized');
+        return;
+      }
+
+      const indicatorsConfig = (this.config as any).indicators || {};
+      this.logger.info('📊 Loading indicators from config', {
+        configKeys: Object.keys(indicatorsConfig),
+      });
+
+      const indicators = await this.indicatorLoader.loadIndicators(indicatorsConfig);
+
+      // Pass loaded indicators to AnalyzerRegistry so analyzers can receive them
+      this.analyzerRegistry.setIndicators(indicators);
+
+      this.logger.info('✅ Indicators loaded and passed to AnalyzerRegistry', {
+        count: indicators.size,
+        types: Array.from(indicators.keys()),
+      });
+    } catch (error) {
+      this.logger.error('❌ Failed to load indicators:', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // Don't throw - allow bot to continue without indicators
+      // Analyzers will handle missing indicators gracefully
+    }
   }
 
   /**
