@@ -176,10 +176,10 @@ export class LevelAnalyzerNew {
     const signal: AnalyzerSignal = {
       source: 'LEVEL_ANALYZER',
       direction,
-      confidence: Math.round(confidence),
+      confidence: Math.round(confidence * 100),
       weight: this.weight,
       priority: this.priority,
-      score: (confidence / 100) * this.weight,
+      score: confidence * this.weight,
     };
 
     // Log signal with reason

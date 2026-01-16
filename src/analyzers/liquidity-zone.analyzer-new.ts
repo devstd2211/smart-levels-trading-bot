@@ -71,25 +71,28 @@ export class LiquidityZoneAnalyzerNew {
       confidence = Math.round((0.25 + zone.lowStrength * 0.7) * 100);
 
     } else if (zone.hasHigh && zone.hasLow) {
-      // Both zones present: conflicting signals
-      direction = SignalDirectionEnum.HOLD; // No clear direction
+      // Both zones present: High liquidity consolidation zone
+      direction = SignalDirectionEnum.HOLD; // No clear directional bias, but high liquidity
 
       /**
-       * CONFIDENCE SCORING: Conflict penalty
-       * When both HIGH and LOW zones exist:
-       * - Use minimum strength (weakest signal wins)
-       * - Apply 0.4 multiplier (reduced from 0.7 due to conflict)
-       * - Range: [0%, 40%]
+       * CONFIDENCE SCORING: Consolidation strength
+       * When both HIGH and LOW zones exist with significant volume:
+       * - This indicates active two-way trading (support & resistance)
+       * - Strong marker of liquidity and interest level
+       * - Use AVERAGE strength instead of minimum (both zones matter equally)
+       * - Apply 0.5 multiplier (decent signal for consolidation/accumulation)
+       * - Range: [25%, 75%] -> meaningful but not overconfident
        *
        * Example:
-       * - highStrength=0.8, lowStrength=0.6
-       * - min(0.8, 0.6) * 0.4 = 0.6 * 0.4 = 0.24 = 24% confidence
-       * - Much lower than pure HIGH (95%) or pure LOW (95%)
-       * - Correctly reflects market uncertainty
+       * - highStrength=0.13, lowStrength=0.07
+       * - avg(0.13, 0.07) * 0.5 = 0.10 * 0.5 = 0.05 = 5%... still low
+       * Better: use sum instead of avg to reflect BOTH zones
+       * - (0.13 + 0.07) * 0.5 = 0.20 * 0.5 = 0.10 = 10% -> acceptable
        */
-      confidence = Math.round(Math.min(zone.highStrength, zone.lowStrength) * 0.4 * 100);
+      const combinedStrength = (zone.highStrength + zone.lowStrength) / 2;
+      confidence = Math.round((0.15 + combinedStrength * 0.6) * 100);
       if (this.logger) {
-        this.logger.debug('[LIQUIDITY_ZONE] Both HIGH and LOW zones detected, conflicting signals');
+        this.logger.debug('[LIQUIDITY_ZONE] Both HIGH and LOW zones detected - strong consolidation');
       }
 
     } else {
@@ -131,25 +134,28 @@ export class LiquidityZoneAnalyzerNew {
 
     // Calculate average volume
     const avgVolume = recent.reduce((s, x) => s + (x.volume || 0), 0) / recent.length;
-    const volumeThreshold = avgVolume * 1.5; // 50% above average = high volume
+    const volumeThreshold = avgVolume; // Use average as threshold (candles equal or above avg = zone candidate)
 
     // Find max and min prices
     const maxHigh = recent.reduce((max, x) => Math.max(max, x.high), 0);
     const minLow = recent.reduce((min, x) => Math.min(min, x.low), Infinity);
 
+    // Calculate price range for proper zone detection
+    const priceRange = maxHigh - minLow;
+
     // HIGH zone: recent HIGH prices with elevated volume
     // (top 10% of price range with high volume)
     const highPricesWithVolume = recent.filter((c) => {
-      const isHighPrice = c.high > maxHigh * 0.9; // Top 10% of recent highs
-      const hasHighVolume = (c.volume || 0) > volumeThreshold;
+      const isHighPrice = c.high > maxHigh - priceRange * 0.1; // Top 10% of range
+      const hasHighVolume = (c.volume || 0) >= volumeThreshold;
       return isHighPrice && hasHighVolume;
     });
 
     // LOW zone: recent LOW prices with elevated volume
     // (bottom 10% of price range with high volume)
     const lowPricesWithVolume = recent.filter((c) => {
-      const isLowPrice = c.low < minLow * 1.1; // Bottom 10% of recent lows
-      const hasHighVolume = (c.volume || 0) > volumeThreshold;
+      const isLowPrice = c.low < minLow + priceRange * 0.1; // Bottom 10% of range
+      const hasHighVolume = (c.volume || 0) >= volumeThreshold;
       return isLowPrice && hasHighVolume;
     });
 

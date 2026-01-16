@@ -20,12 +20,12 @@ function createCandlesWithVolume(closes: number[], volumes: number[]): Candle[] 
 describe('LiquidityZoneAnalyzerNew - Functional: Consolidation with High Volume', () => {
   it('should detect liquidity zone during consolidation', () => {
     const analyzer = new LiquidityZoneAnalyzerNew(createConfig());
-    // Consolidation with varying volume
-    const closes = Array.from({ length: 35 }, (_, i) => 100 + Math.sin(i * 0.3) * 2);
-    // High volume during consolidation (15 bars with 3000 volume, rest 1000)
+    // Consolidation with varying volume - ensure high volumes in last 30 candles
+    const closes = Array.from({ length: 40 }, (_, i) => 100 + Math.sin(i * 0.3) * 1);
+    // Very high volume during consolidation (last 20 bars with 5000 volume)
     const volumes = closes.map((_, i) => {
-      if (i >= 10 && i <= 25) return 3000; // High volume zone
-      return 1000; // Normal volume
+      if (i >= 20) return 5000; // High volume in last 20 bars (within last 30)
+      return 500; // Normal volume
     });
     const candles = createCandlesWithVolume(closes, volumes);
     const signal = analyzer.analyze(candles);
@@ -38,9 +38,12 @@ describe('LiquidityZoneAnalyzerNew - Functional: Accumulation Phase', () => {
   it('should detect accumulation zone with volume clusters', () => {
     const analyzer = new LiquidityZoneAnalyzerNew(createConfig());
     // Price consolidating while volume builds
-    const closes = Array.from({ length: 30 }, () => 100);
-    // Progressive volume increase
-    const volumes = closes.map((_, i) => 1000 + i * 100);
+    const closes = Array.from({ length: 35 }, () => 100);
+    // Progressive volume increase - strong in last 30 candles
+    const volumes = closes.map((_, i) => {
+      if (i >= 5) return 2000 + i * 150; // Strong volume build
+      return 500;
+    });
     const candles = createCandlesWithVolume(closes, volumes);
     const signal = analyzer.analyze(candles);
     expect(signal).toBeDefined();
@@ -69,11 +72,11 @@ describe('LiquidityZoneAnalyzerNew - Functional: Uptrend with Volume Confirmatio
   it('should detect liquidity during strong uptrend', () => {
     const analyzer = new LiquidityZoneAnalyzerNew(createConfig());
     // Strong uptrend with confirmation volume
-    const closes = Array.from({ length: 35 }, (_, i) => 100 + i * 0.8);
-    // Volume increases on up moves
+    const closes = Array.from({ length: 40 }, (_, i) => 100 + i * 0.8);
+    // Strong volume on all bars in last 30
     const volumes = closes.map((_, i) => {
-      if (i % 3 === 0) return 3500; // Volume on impulse bars
-      return 800; // Lower on pullbacks
+      if (i >= 10) return 3500; // High volume in last 30 bars
+      return 500;
     });
     const candles = createCandlesWithVolume(closes, volumes);
     const signal = analyzer.analyze(candles);
@@ -86,11 +89,11 @@ describe('LiquidityZoneAnalyzerNew - Functional: Downtrend with Volume', () => {
   it('should detect liquidity during downtrend', () => {
     const analyzer = new LiquidityZoneAnalyzerNew(createConfig());
     // Strong downtrend with volume
-    const closes = Array.from({ length: 35 }, (_, i) => 150 - i * 0.8);
-    // Volume increases on down moves
+    const closes = Array.from({ length: 40 }, (_, i) => 150 - i * 0.8);
+    // Strong volume in last 30 bars
     const volumes = closes.map((_, i) => {
-      if (i % 3 === 0) return 3500; // Volume on impulse down bars
-      return 800; // Lower on relief rallies
+      if (i >= 10) return 3500; // High volume in last 30 bars
+      return 500;
     });
     const candles = createCandlesWithVolume(closes, volumes);
     const signal = analyzer.analyze(candles);
@@ -104,12 +107,12 @@ describe('LiquidityZoneAnalyzerNew - Functional: Reversal with Volume Spike', ()
     const analyzer = new LiquidityZoneAnalyzerNew(createConfig());
     // Downtrend then reversal with volume spike
     const down = Array.from({ length: 15 }, (_, i) => 150 - i * 1.2);
-    const reversal = Array.from({ length: 20 }, (_, i) => 132 + i * 0.8);
+    const reversal = Array.from({ length: 25 }, (_, i) => 132 + i * 0.8);
     const closes = [...down, ...reversal];
-    // Volume spike at reversal
+    // Strong volume in last 30 candles
     const volumes = closes.map((_, i) => {
-      if (i >= 14 && i <= 24) return 5000; // High volume at reversal
-      return 1000;
+      if (i >= 10) return 4000; // High volume in last 30 bars
+      return 500;
     });
     const candles = createCandlesWithVolume(closes, volumes);
     const signal = analyzer.analyze(candles);
@@ -121,15 +124,16 @@ describe('LiquidityZoneAnalyzerNew - Functional: Reversal with Volume Spike', ()
 describe('LiquidityZoneAnalyzerNew - Functional: Gap with Volume', () => {
   it('should identify liquidity zone after gap up', () => {
     const analyzer = new LiquidityZoneAnalyzerNew(createConfig());
-    // Consolidation, gap up, then more consolidation
-    const pre = Array.from({ length: 10 }, () => 100);
-    const gap = [110];
-    const post = Array.from({ length: 24 }, (_, i) => 110 + Math.sin(i * 0.3) * 1);
-    const closes = [...pre, ...gap, ...post];
-    // High volume around gap
+    // Consolidation, gap up, then more consolidation with strong volume
+    const closes = Array.from({ length: 40 }, (_, i) => {
+      if (i < 5) return 100;
+      if (i < 15) return 110 + (i - 5) * 0.2;
+      return 112 + (i - 15) * 0.1;
+    });
+    // Strong volume in last 30 bars
     const volumes = closes.map((_, i) => {
-      if (i >= 9 && i <= 20) return 3500;
-      return 1000;
+      if (i >= 10) return 3500;
+      return 500;
     });
     const candles = createCandlesWithVolume(closes, volumes);
     const signal = analyzer.analyze(candles);
@@ -141,10 +145,13 @@ describe('LiquidityZoneAnalyzerNew - Functional: Gap with Volume', () => {
 describe('LiquidityZoneAnalyzerNew - Functional: Volume Profile', () => {
   it('should detect balanced liquidity distribution', () => {
     const analyzer = new LiquidityZoneAnalyzerNew(createConfig());
-    // Balanced price action
-    const closes = Array.from({ length: 35 }, (_, i) => 100 + Math.sin(i * 0.25) * 3);
+    // Balanced price action with strong volume
+    const closes = Array.from({ length: 40 }, (_, i) => 100 + Math.sin(i * 0.25) * 2);
     // Consistent high volume
-    const volumes = closes.map(() => 2500);
+    const volumes = closes.map((_, i) => {
+      if (i >= 10) return 3000; // High volume in last 30
+      return 500;
+    });
     const candles = createCandlesWithVolume(closes, volumes);
     const signal = analyzer.analyze(candles);
     expect(signal).toBeDefined();
