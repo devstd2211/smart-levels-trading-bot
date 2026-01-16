@@ -46,6 +46,12 @@ import { MTFSnapshotGate } from './mtf-snapshot-gate.service';
 import { IndicatorRegistry } from './indicator-registry.service';
 import { IndicatorLoader } from '../loaders/indicator.loader';
 import { IndicatorType } from '../types/indicator-type.enum';
+import { ActionQueueService } from './action-queue.service';
+import { IActionHandler, ActionType, OpenPositionAction, ClosePercentAction, UpdateStopLossAction, ActivateTrailingAction } from '../types/architecture.types';
+import { OpenPositionHandler } from '../action-handlers/open-position.handler';
+import { ClosePercentHandler } from '../action-handlers/close-percent.handler';
+import { UpdateStopLossHandler } from '../action-handlers/update-stop-loss.handler';
+import { ActivateTrailingHandler } from '../action-handlers/activate-trailing.handler';
 
 // ============================================================================
 // TYPES
@@ -69,6 +75,10 @@ export class TradingOrchestrator {
   private exitOrchestrator: ExitOrchestrator | null = null;
   private positionExitingService: PositionExitingService | null = null;
 
+  // Action Queue (Phase 0.4)
+  private actionQueue: ActionQueueService | null = null;
+  private actionHandlers: IActionHandler[] = [];
+
   // Entry decision tracking (for PRIMARY->ENTRY refinement)
   private pendingEntryDecision: any = null;
 
@@ -88,6 +98,7 @@ export class TradingOrchestrator {
     private telegram: TelegramService | null,
     private logger: LoggerService,
     private riskManager: RiskManager,
+    private positionExitingServiceInject?: PositionExitingService | null,
   ) {
 
     // Initialize indicator loading infrastructure
@@ -113,8 +124,49 @@ export class TradingOrchestrator {
       this.filterOrchestrator,
     );
 
+    // Initialize Action Queue (Phase 0.4)
+    this.actionQueue = new ActionQueueService();
+    this.initializeActionHandlers();
+
     // Initialize context on startup (async)
     void this.initializeContext();
+  }
+
+  /**
+   * Initialize action handlers for the queue
+   * Called during construction to set up handlers
+   */
+  private initializeActionHandlers(): void {
+    if (!this.actionQueue || !this.positionManager) return;
+
+    // Use injected PositionExitingService if provided
+    if (this.positionExitingServiceInject) {
+      this.positionExitingService = this.positionExitingServiceInject;
+    }
+
+    // If no PositionExitingService is available, handlers will be created without exit handlers
+    if (!this.positionExitingService) {
+      this.logger.warn('⚠️ PositionExitingService not available - exit handlers will not work');
+    }
+
+    // Create and register all action handlers
+    this.actionHandlers = [
+      new OpenPositionHandler(this.positionManager, this.logger),
+    ];
+
+    // Only add exit handlers if PositionExitingService is available
+    if (this.positionExitingService) {
+      this.actionHandlers.push(
+        new ClosePercentHandler(this.positionExitingService, this.positionManager, this.logger),
+        new UpdateStopLossHandler(this.positionExitingService, this.positionManager, this.logger),
+        new ActivateTrailingHandler(this.positionExitingService, this.positionManager, this.logger),
+      );
+    }
+
+    this.logger.debug('✅ Action handlers initialized', {
+      handlerCount: this.actionHandlers.length,
+      handlers: this.actionHandlers.map(h => h.name),
+    });
   }
 
   /**
@@ -466,26 +518,8 @@ export class TradingOrchestrator {
                   transition: exitResult.stateTransition,
                 });
 
-                for (const action of exitResult.actions) {
-                  try {
-                    await this.positionExitingService.executeExitAction(
-                      currentPosition,
-                      action,
-                      candle.close,
-                      'Orchestrator decision',
-                      ExitType.MANUAL,
-                    );
-
-                    this.logger.info('✅ Exit action executed', {
-                      actionType: action.action,
-                    });
-                  } catch (actionError) {
-                    this.logger.error('Failed to execute exit action', {
-                      actionType: action.action,
-                      error: actionError instanceof Error ? actionError.message : String(actionError),
-                    });
-                  }
-                }
+                // Enqueue exit actions through action queue (Phase 0.4)
+                await this.enqueueExitActions(exitResult.actions);
               }
             } catch (exitEvalError) {
               this.logger.error('Failed to evaluate exit conditions', {
@@ -587,8 +621,8 @@ export class TradingOrchestrator {
                   htfBias: currentHTFBias,
                 });
 
-                // Actually open the position (signal already enriched earlier)
-                await this.positionManager.openPosition(this.pendingEntryDecision.signal);
+                // Enqueue position opening through action queue (Phase 0.4)
+                await this.enqueueOpenPositionAction(this.pendingEntryDecision.signal);
 
                 // Clear pending decision and snapshot once position opened
                 this.pendingEntryDecision = null;
@@ -919,5 +953,210 @@ export class TradingOrchestrator {
    */
   getCurrentContext(): TradingContext | null {
     return this.currentContext;
+  }
+
+  /**
+   * Enqueue and process an OpenPositionAction
+   * Called when entry signal is ready to be executed
+   */
+  async enqueueOpenPositionAction(signal: any): Promise<void> {
+    if (!this.actionQueue) {
+      this.logger.warn('Action queue not initialized - calling openPosition directly');
+      await this.positionManager.openPosition(signal);
+      return;
+    }
+
+    // Extract position parameters from signal
+    const entryPrice = signal.price || signal.entryPrice || 0;
+    const stopLoss = signal.stopLoss || entryPrice * 0.98;
+    const takeProfits = signal.takeProfits ? signal.takeProfits.map((tp: any) => tp.price || 0) : [];
+    const leverage = signal.leverage || 1;
+    const symbol = signal.symbol || 'XRPUSDT';
+
+    const action: OpenPositionAction = {
+      id: '',
+      type: ActionType.OPEN_POSITION,
+      timestamp: Date.now(),
+      priority: 'HIGH',
+      metadata: {
+        source: 'EntryOrchestrator',
+      },
+      signal: signal as any,
+      positionSize: 0, // Will be calculated by handler
+      stopLoss,
+      takeProfits,
+      leverage,
+      symbol,
+    };
+
+    await this.actionQueue.enqueue(action);
+    this.logger.debug('📤 OpenPositionAction enqueued', {
+      actionId: action.id,
+      signal: signal.type,
+      entryPrice,
+      stopLoss,
+    });
+
+    // Process action queue
+    await this.processActionQueue();
+  }
+
+  /**
+   * Enqueue exit actions from ExitOrchestrator
+   */
+  async enqueueExitActions(actions: any[]): Promise<void> {
+    if (!this.actionQueue) {
+      this.logger.warn('Action queue not initialized - executing exit actions directly');
+      const currentPosition = this.positionManager.getCurrentPosition();
+      if (currentPosition && this.positionExitingService) {
+        for (const action of actions) {
+          try {
+            await this.positionExitingService.executeExitAction(
+              currentPosition,
+              action,
+              0, // price would come from action metadata
+              'Orchestrator decision',
+              ExitType.MANUAL,
+            );
+          } catch (error) {
+            this.logger.error('Failed to execute exit action', {
+              action: action.action,
+              error: error instanceof Error ? error.message : String(error),
+            });
+          }
+        }
+      }
+      return;
+    }
+
+    // Convert exit actions to queue actions
+    const currentPosition = this.positionManager.getCurrentPosition();
+    if (!currentPosition) return;
+
+    for (const action of actions) {
+      let queueAction: any = null;
+
+      switch (action.action) {
+        case 'CLOSE_PERCENT':
+          queueAction = {
+            id: '',
+            type: ActionType.CLOSE_PERCENT,
+            timestamp: Date.now(),
+            priority: 'HIGH',
+            metadata: {
+              source: 'ExitOrchestrator',
+            },
+            positionId: currentPosition.id,
+            percent: action.percent,
+            reason: action.reason || 'TP hit',
+          } as ClosePercentAction;
+          break;
+
+        case 'UPDATE_SL':
+        case 'MOVE_SL_TO_BREAKEVEN':
+          queueAction = {
+            id: '',
+            type: ActionType.UPDATE_STOP_LOSS,
+            timestamp: Date.now(),
+            priority: 'HIGH',
+            metadata: {
+              source: 'ExitOrchestrator',
+            },
+            positionId: currentPosition.id,
+            newStopLossPrice: action.newStopLoss || action.price,
+            reason: action.reason || 'SL update',
+          } as UpdateStopLossAction;
+          break;
+
+        case 'ACTIVATE_TRAILING':
+          queueAction = {
+            id: '',
+            type: ActionType.ACTIVATE_TRAILING,
+            timestamp: Date.now(),
+            priority: 'HIGH',
+            metadata: {
+              source: 'ExitOrchestrator',
+            },
+            positionId: currentPosition.id,
+            trailingPercent: action.trailingPercent || 1,
+          } as ActivateTrailingAction;
+          break;
+
+        case 'CLOSE_ALL':
+        case 'CLOSE_POSITION':
+          // For now, close all with 100%
+          queueAction = {
+            id: '',
+            type: ActionType.CLOSE_PERCENT,
+            timestamp: Date.now(),
+            priority: 'HIGH',
+            metadata: {
+              source: 'ExitOrchestrator',
+            },
+            positionId: currentPosition.id,
+            percent: 100,
+            reason: action.reason || 'Full close',
+          } as ClosePercentAction;
+          break;
+      }
+
+      if (queueAction) {
+        await this.actionQueue.enqueue(queueAction);
+        this.logger.debug('📤 Exit action enqueued', {
+          actionType: action.action,
+        });
+      }
+    }
+
+    // Process action queue
+    await this.processActionQueue();
+  }
+
+  /**
+   * Process all pending actions in the queue
+   */
+  private async processActionQueue(): Promise<void> {
+    if (!this.actionQueue) {
+      this.logger.warn('Action queue not initialized');
+      return;
+    }
+
+    try {
+      this.logger.debug('🔄 Processing action queue', {
+        queueSize: this.actionQueue.size(),
+      });
+
+      const results = await this.actionQueue.process(this.actionHandlers);
+
+      for (const result of results) {
+        if (result.success) {
+          this.logger.info('✅ Action processed successfully', {
+            actionId: result.actionId,
+            metadata: result.metadata,
+          });
+        } else {
+          this.logger.error('❌ Action processing failed', {
+            actionId: result.actionId,
+            error: result.error?.message,
+          });
+        }
+      }
+
+      this.logger.debug('✅ Action queue processing complete', {
+        processed: results.length,
+        remaining: this.actionQueue.size(),
+      });
+    } catch (error) {
+      this.logger.error('Error processing action queue', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Get action queue for monitoring
+   */
+  getActionQueue(): ActionQueueService | null {
+    return this.actionQueue;
   }
 }
