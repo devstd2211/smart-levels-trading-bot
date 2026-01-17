@@ -40,6 +40,16 @@ export interface IExchangeMarketData {
   getExchangeTime(): Promise<number>;
 
   /**
+   * Get server time (same as getExchangeTime, alternative name)
+   */
+  getServerTime(): Promise<number>;
+
+  /**
+   * Get current price (same as getLatestPrice, alternative name)
+   */
+  getCurrentPrice(): Promise<number>;
+
+  /**
    * Get symbol precision info (decimal places for price/quantity)
    */
   getSymbolPrecision(symbol: string): Promise<{
@@ -118,6 +128,11 @@ export interface IExchangePositions {
   updateStopLoss(params: UpdateStopLossParams): Promise<void>;
 
   /**
+   * Update take profit for partial position (Bybit specific)
+   */
+  updateTakeProfitPartial?(params: { price: number; size: number; index?: number }): Promise<void>;
+
+  /**
    * Activate trailing stop
    */
   activateTrailing(params: ActivateTrailingParams): Promise<void>;
@@ -193,6 +208,11 @@ export interface IExchangeOrders {
    * Cancel all hanging orders
    */
   cancelAllOrders(symbol: string): Promise<void>;
+
+  /**
+   * Cancel all conditional orders (stop loss, take profit)
+   */
+  cancelAllConditionalOrders(): Promise<void>;
 }
 
 // ============================================================================
@@ -246,6 +266,11 @@ export interface IExchange
    * Exchange name identifier
    */
   readonly name: string;
+
+  /**
+   * Get trading symbol
+   */
+  getSymbol?(): string;
 
   /**
    * Connect to exchange (if needed)

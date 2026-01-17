@@ -189,11 +189,11 @@ export class BybitService {
     return this.marketData.getCandles(symbolOrLimit, interval, limit);
   }
 
-  async getCurrentPrice() {
+  async getCurrentPrice(): Promise<number> {
     return this.marketData.getCurrentPrice();
   }
 
-  async getServerTime() {
+  async getServerTime(): Promise<number> {
     return this.marketData.getServerTime();
   }
 
@@ -251,7 +251,7 @@ export class BybitService {
     return this.orders.updateTakeProfit(orderId, newPrice);
   }
 
-  async updateTakeProfitPartial(params: { price: number; size: number; index?: number }) {
+  async updateTakeProfitPartial(params: { price: number; size: number; index?: number }): Promise<void> {
     return this.orders.updateTakeProfitPartial(params);
   }
 
@@ -316,7 +316,7 @@ export class BybitService {
    * Get trading symbol
    * Delegates to BybitBase.getSymbol()
    */
-  getSymbol() {
+  getSymbol(): string {
     return this.base.getSymbol();
   }
 
@@ -335,4 +335,5 @@ export class BybitService {
   roundPrice(price: number) {
     return this.base.roundPrice(price);
   }
+
 }
