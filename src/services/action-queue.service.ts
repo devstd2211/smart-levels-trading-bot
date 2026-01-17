@@ -8,8 +8,8 @@
  * - Preventing race conditions with isProcessing flag
  */
 
+import { randomUUID } from 'crypto';
 import { IAction, IActionQueue, ActionResult, IActionHandler, AnyAction } from '../types/architecture.types';
-import { v4 as uuid } from 'uuid';
 
 export class ActionQueueService implements IActionQueue {
   private queue: IAction[] = [];
@@ -26,7 +26,7 @@ export class ActionQueueService implements IActionQueue {
    */
   async enqueue(action: IAction): Promise<void> {
     if (!action.id) {
-      action.id = uuid();
+      action.id = randomUUID();
     }
     if (!action.timestamp) {
       action.timestamp = Date.now();

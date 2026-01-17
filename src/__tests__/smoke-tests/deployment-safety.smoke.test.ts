@@ -12,8 +12,8 @@ describe('SMOKE TESTS: Deployment Safety Checks', () => {
     it('should verify all core modules can be imported', () => {
       const modules = [
         { path: '../../services/trading-orchestrator.service', name: 'TradingOrchestrator' },
-        { path: '../../services/trade-execution.service', name: 'TradeExecutionService' },
-        { path: '../../services/entry-logic.service', name: 'EntryLogicService' },
+        { path: '../../services/action-queue.service', name: 'ActionQueueService' },
+        { path: '../../services/analyzer-registry.service', name: 'AnalyzerRegistry' },
         { path: '../../orchestrators/entry.orchestrator', name: 'EntryOrchestrator' },
         { path: '../../orchestrators/exit.orchestrator', name: 'ExitOrchestrator' },
         { path: '../../services/position-lifecycle.service', name: 'PositionLifecycleService' },
@@ -142,8 +142,8 @@ describe('SMOKE TESTS: Deployment Safety Checks', () => {
   describe('Data Flow Pipelines', () => {
     it('should verify entry pipeline services exist', () => {
       const entryPipeline = [
-        { file: '../../services/entry-logic.service', name: 'EntryLogicService' },
-        { file: '../../services/trade-execution.service', name: 'TradeExecutionService' },
+        { file: '../../services/action-queue.service', name: 'ActionQueueService' },
+        { file: '../../services/analyzer-registry.service', name: 'AnalyzerRegistry' },
         { file: '../../orchestrators/entry.orchestrator', name: 'EntryOrchestrator' },
         { file: '../../services/position-lifecycle.service', name: 'PositionLifecycleService' },
       ];
@@ -168,8 +168,8 @@ describe('SMOKE TESTS: Deployment Safety Checks', () => {
 
     it('should verify analysis services exist', () => {
       const analysisPipeline = [
-        { file: '../../services/signal-processing.service', name: 'SignalProcessingService' },
-        { file: '../../services/analyzer-registration.service', name: 'AnalyzerRegistrationService' },
+        { file: '../../services/analyzer-registry.service', name: 'AnalyzerRegistry' },
+        { file: '../../services/indicator-registry.service', name: 'IndicatorRegistry' },
         { file: '../../services/multi-timeframe-trend.service', name: 'MultiTimeframeTrendService' },
       ];
 
@@ -203,8 +203,8 @@ describe('SMOKE TESTS: Deployment Safety Checks', () => {
     it('should verify services have error handling', () => {
       const criticalServices = [
         { file: '../../services/trading-orchestrator.service', name: 'TradingOrchestrator' },
-        { file: '../../services/entry-logic.service', name: 'EntryLogicService' },
-        { file: '../../services/trade-execution.service', name: 'TradeExecutionService' },
+        { file: '../../services/action-queue.service', name: 'ActionQueueService' },
+        { file: '../../orchestrators/entry.orchestrator', name: 'EntryOrchestrator' },
       ];
 
       criticalServices.forEach(({ file, name }) => {
@@ -262,19 +262,19 @@ describe('SMOKE TESTS: Deployment Safety Checks', () => {
       expect(code).toContain('ExitOrchestrator');
     });
 
-    it('should verify TradeExecutionService checks EntryOrchestrator', () => {
-      const Module = require('../../services/trade-execution.service') as any;
-      const code = Module.TradeExecutionService.toString();
+    it('should verify ActionQueueService checks handlers', () => {
+      const Module = require('../../services/action-queue.service') as any;
+      const code = Module.ActionQueueService.toString();
 
-      // Must validate EntryOrchestrator is available
-      expect(code).toContain('entryOrchestrator');
-      expect(code).toContain('CRITICAL');
+      // Must have handler execution logic
+      expect(code).toContain('handler');
+      expect(code).toContain('process');
     });
 
     it('should verify logging is available in critical services', () => {
       const criticalServices = [
         '../../services/trading-orchestrator.service',
-        '../../services/entry-logic.service',
+        '../../services/action-queue.service',
         '../../orchestrators/entry.orchestrator',
         '../../orchestrators/exit.orchestrator',
       ];
