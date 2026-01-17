@@ -226,9 +226,8 @@ export class BotServices {
     const rawBybitService = new BybitService(config.exchange, this.logger);
     this.bybitService = new BybitServiceAdapter(rawBybitService, this.logger);
 
-    // Note: TimeService.setBybitService expects BybitService, not IExchange
-    // Keep reference to raw service for backward compatibility
-    this.timeService.setBybitService(rawBybitService);
+    // TimeService now accepts IExchange interface
+    this.timeService.setBybitService(this.bybitService);
 
     // 4. Initialize journal and stats
     this.journal = new TradingJournalService(
@@ -244,7 +243,7 @@ export class BotServices {
     this.realityCheck = new RealityCheckService(this.logger);
 
     // 5. Initialize data providers
-    // NOTE: CandleProvider still expects BybitService (Phase 2 update pending)
+    // NOTE: CandleProvider still uses BybitService (Phase 2.5+ will migrate to IExchange)
     this.timeframeProvider = new TimeframeProvider(config.timeframes);
     this.candleProvider = new CandleProvider(
       this.timeframeProvider,
@@ -403,7 +402,9 @@ export class BotServices {
 
     const exitTypeDetectorService = new ExitTypeDetectorService(this.logger);
     const pnlCalculatorService = new PositionPnLCalculatorService();
-    // NOTE: Phase 2 - PositionSyncService still expects BybitService
+    // NOTE: PositionSyncService and PositionMonitorService still use BybitService
+    // They require BybitService-specific methods (getActiveOrders, verifyProtectionSet, etc.)
+    // Phase 2.5+ will extend IExchange with these methods
     const positionSyncService = new PositionSyncService(
       rawBybitService,
       this.positionManager,
@@ -413,7 +414,6 @@ export class BotServices {
       this.positionExitingService,
     );
 
-    // NOTE: Phase 2 - PositionMonitorService still expects BybitService
     this.positionMonitor = new PositionMonitorService(
       rawBybitService,
       this.positionManager,
@@ -471,7 +471,7 @@ export class BotServices {
       btcEnabled: orchestratorConfig.btcConfirmation?.enabled,
     });
 
-    // NOTE: Phase 2 - TradingOrchestrator still expects BybitService
+    // NOTE: TradingOrchestrator still uses BybitService (Phase 2.5+ will migrate to IExchange)
     this.tradingOrchestrator = new TradingOrchestrator(
       orchestratorConfig,
       this.candleProvider,

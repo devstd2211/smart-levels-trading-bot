@@ -10,7 +10,7 @@
  */
 
 import { LoggerService } from '../types';
-import { BybitService } from './bybit';
+import type { IExchange } from '../interfaces/IExchange';
 
 /**
  * Sync info return type
@@ -29,7 +29,7 @@ export class TimeService {
   private logger: LoggerService;
   private syncInterval: number;
   private maxSyncFailures: number;
-  private bybitService?: BybitService;
+  private bybitService?: IExchange;
 
   private timeOffset: number = 0; // разница между локальным временем и временем биржи
   private lastSyncTime: number = 0;
@@ -58,7 +58,7 @@ export class TimeService {
   /**
    * Set Bybit service for time synchronization
    */
-  public setBybitService(bybitService: BybitService): void {
+  public setBybitService(bybitService: IExchange): void {
     this.bybitService = bybitService;
   }
 

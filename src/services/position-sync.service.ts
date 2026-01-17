@@ -49,8 +49,11 @@ export class PositionSyncService {
     });
 
     try {
-      // Get order history to determine exitType
-      const orderHistory = await this.bybitService.getOrderHistory(20);
+      // Get order history to determine exitType (optional method)
+      let orderHistory: any[] = [];
+      if (this.bybitService.getOrderHistory) {
+        orderHistory = await this.bybitService.getOrderHistory(20);
+      }
       const exitType = this.exitTypeDetectorService.determineExitTypeFromHistory(orderHistory, position);
 
       // Get current price for PnL calculation
