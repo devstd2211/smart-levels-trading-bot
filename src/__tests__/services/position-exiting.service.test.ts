@@ -12,6 +12,7 @@
  */
 
 import { PositionExitingService } from '../../services/position-exiting.service';
+import { ExitActionDTO } from '../../types/architecture.types';
 import {
   Position,
   PositionSide,
@@ -192,7 +193,7 @@ describe('PositionExitingService', () => {
   describe('executeExitAction()', () => {
     it('should route CLOSE_PERCENT action to closePartialPosition', async () => {
       const position = createMockPosition();
-      const action = { action: ExitAction.CLOSE_PERCENT, percent: 50 };
+      const action: ExitActionDTO = { action: ExitAction.CLOSE_PERCENT, percent: 50 };
 
       const result = await service.executeExitAction(
         position,
@@ -208,7 +209,7 @@ describe('PositionExitingService', () => {
 
     it('should route CLOSE_ALL action to closeFullPosition', async () => {
       const position = createMockPosition();
-      const action = { action: ExitAction.CLOSE_ALL };
+      const action: ExitActionDTO = { action: ExitAction.CLOSE_ALL };
 
       const result = await service.executeExitAction(
         position,
@@ -225,7 +226,7 @@ describe('PositionExitingService', () => {
 
     it('should route UPDATE_SL action to updateStopLoss', async () => {
       const position = createMockPosition();
-      const action = { action: ExitAction.UPDATE_SL, newStopLoss: 101 };
+      const action: ExitActionDTO = { action: ExitAction.UPDATE_SL, newStopLoss: 101 };
 
       const result = await service.executeExitAction(
         position,
@@ -242,7 +243,7 @@ describe('PositionExitingService', () => {
 
     it('should route ACTIVATE_TRAILING action to activateTrailingStop', async () => {
       const position = createMockPosition();
-      const action = { action: ExitAction.ACTIVATE_TRAILING, trailingDistance: 2 };
+      const action: ExitActionDTO = { action: ExitAction.ACTIVATE_TRAILING, trailingPercent: 2 };
 
       const result = await service.executeExitAction(
         position,
@@ -258,7 +259,7 @@ describe('PositionExitingService', () => {
 
     it('should return false for unknown action', async () => {
       const position = createMockPosition();
-      const action = { action: 'UNKNOWN_ACTION' };
+      const action: ExitActionDTO = { action: 'UNKNOWN_ACTION' as any };
 
       const result = await service.executeExitAction(
         position,
@@ -274,7 +275,7 @@ describe('PositionExitingService', () => {
 
     it('should skip action if position already closed', async () => {
       const position = createMockPosition({ status: 'CLOSED' });
-      const action = { action: ExitAction.CLOSE_PERCENT, percent: 50 };
+      const action: ExitActionDTO = { action: ExitAction.CLOSE_PERCENT, percent: 50 };
 
       const result = await service.executeExitAction(
         position,
@@ -289,7 +290,7 @@ describe('PositionExitingService', () => {
     });
 
     it('should handle null position gracefully', async () => {
-      const action = { action: ExitAction.CLOSE_ALL };
+      const action: ExitActionDTO = { action: ExitAction.CLOSE_ALL };
 
       const result = await service.executeExitAction(
         null as any,
@@ -705,7 +706,7 @@ describe('PositionExitingService', () => {
 
       const result = await service.executeExitAction(
         position,
-        { action: ExitAction.ACTIVATE_TRAILING, trailingDistance: 2 },
+        { action: ExitAction.ACTIVATE_TRAILING, trailingPercent: 2 },
         110,
         'TP2_HIT',
         ExitType.TAKE_PROFIT_2,
@@ -724,7 +725,7 @@ describe('PositionExitingService', () => {
 
       const result = await service.executeExitAction(
         position,
-        { action: ExitAction.ACTIVATE_TRAILING, trailingDistance: 2 },
+        { action: ExitAction.ACTIVATE_TRAILING, trailingPercent: 2 },
         90,
         'TP2_HIT',
         ExitType.TAKE_PROFIT_2,
@@ -743,7 +744,7 @@ describe('PositionExitingService', () => {
 
       await service.executeExitAction(
         position,
-        { action: ExitAction.ACTIVATE_TRAILING, trailingDistance: 2 },
+        { action: ExitAction.ACTIVATE_TRAILING, trailingPercent: 2 },
         110,
         'TP2_HIT',
         ExitType.TAKE_PROFIT_2,
@@ -758,7 +759,7 @@ describe('PositionExitingService', () => {
 
       const result = await service.executeExitAction(
         position,
-        { action: ExitAction.ACTIVATE_TRAILING, trailingDistance: 2 },
+        { action: ExitAction.ACTIVATE_TRAILING, trailingPercent: 2 },
         110,
         'TP2_HIT',
         ExitType.TAKE_PROFIT_2,

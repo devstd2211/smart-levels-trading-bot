@@ -118,7 +118,7 @@ export enum ActionType {
  */
 export interface OpenPositionAction extends IAction {
   type: ActionType.OPEN_POSITION;
-  signal: Signal; // Proper Signal object with entry parameters
+  signal: Signal; // Signal object from decision engine (entry parameters)
   positionSize: number;
   stopLoss: number;
   takeProfits: number[];

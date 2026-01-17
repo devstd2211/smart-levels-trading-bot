@@ -58,7 +58,7 @@ export class ClosePercentHandler implements IActionHandler {
       // Call position exiting service to execute exit action
       await this.positionExitingService.executeExitAction(
         position,
-        exitAction as any, // Note: PositionExitingService expects legacy ExitAction type
+        exitAction,
         currentPrice,
         action.reason,
         ExitType.MANUAL,

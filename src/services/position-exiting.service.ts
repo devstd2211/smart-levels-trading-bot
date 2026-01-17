@@ -29,6 +29,7 @@ import {
   RiskManagementConfig,
   Config,
 } from '../types';
+import { ExitActionDTO } from '../types/architecture.types';
 import { BybitService } from './bybit';
 import { TelegramService } from './telegram.service';
 import { TradingJournalService } from './trading-journal.service';
@@ -68,7 +69,7 @@ export class PositionExitingService {
    */
   async executeExitAction(
     position: Position,
-    action: any, // ExitAction
+    action: ExitActionDTO,
     exitPrice: number,
     exitReason: string,
     exitType: ExitType,
@@ -96,7 +97,7 @@ export class PositionExitingService {
           return await this.updateStopLoss(position, action.newStopLoss);
 
         case ExitAction.ACTIVATE_TRAILING:
-          return await this.activateTrailingStop(position, action.trailingDistance, exitPrice);
+          return await this.activateTrailingStop(position, (action as any).trailingPercent, exitPrice);
 
         default:
           this.logger.warn('Unknown exit action', { action: action.action });
