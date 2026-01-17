@@ -25,6 +25,7 @@ import {
   BotEventBus,
   PositionExitingService,
 } from './index';
+import { BybitServiceAdapter } from './bybit/bybit-service.adapter';
 import { RiskManager } from './risk-manager.service';
 import { OrderExecutionDetectorService } from './order-execution-detector.service';
 import { WebSocketAuthenticationService } from './websocket-authentication.service';
@@ -60,7 +61,7 @@ export class BotServices {
   readonly metrics: BotMetricsService;
   readonly telegram: TelegramService;
   readonly timeService: TimeService;
-  readonly bybitService: BybitService;
+  readonly bybitService: IExchange;
 
   // Data & Providers
   readonly timeframeProvider: TimeframeProvider;
@@ -221,9 +222,13 @@ export class BotServices {
       config.system.timeSyncMaxFailures,
     );
 
-    // 3. Initialize exchange service
-    this.bybitService = new BybitService(config.exchange, this.logger);
-    this.timeService.setBybitService(this.bybitService);
+    // 3. Initialize exchange service with adapter wrapper
+    const rawBybitService = new BybitService(config.exchange, this.logger);
+    this.bybitService = new BybitServiceAdapter(rawBybitService, this.logger);
+
+    // Note: TimeService.setBybitService expects BybitService, not IExchange
+    // Keep reference to raw service for backward compatibility
+    this.timeService.setBybitService(rawBybitService);
 
     // 4. Initialize journal and stats
     this.journal = new TradingJournalService(
@@ -239,10 +244,11 @@ export class BotServices {
     this.realityCheck = new RealityCheckService(this.logger);
 
     // 5. Initialize data providers
+    // NOTE: CandleProvider still expects BybitService (Phase 2 update pending)
     this.timeframeProvider = new TimeframeProvider(config.timeframes);
     this.candleProvider = new CandleProvider(
       this.timeframeProvider,
-      this.bybitService,
+      rawBybitService,
       this.logger,
       config.exchange.symbol,
     );
@@ -256,7 +262,9 @@ export class BotServices {
           if (config.compoundInterest?.useVirtualBalance) {
             return this.journal.getVirtualBalance();
           }
-          return await this.bybitService.getBalance();
+          // IExchange.getBalance() returns AccountBalance, extract walletBalance
+          const balance = await this.bybitService.getBalance();
+          return balance.walletBalance;
         },
       );
     }
@@ -333,6 +341,7 @@ export class BotServices {
     const riskManager = new RiskManager(riskManagerConfig, this.logger);
 
     // 8. Initialize position management
+    // NOTE: Phase 1.2 - Update PositionLifecycleService to use IExchange
     this.positionManager = new PositionLifecycleService(
       this.bybitService,
       config.trading,
@@ -348,6 +357,7 @@ export class BotServices {
     );
 
     // 8.5 Initialize position exiting service (depends on bybit, journal, configs, positionManager)
+    // NOTE: Phase 1.3 - Update PositionExitingService to use IExchange
     this.positionExitingService = new PositionExitingService(
       this.bybitService,
       this.telegram,
@@ -393,8 +403,9 @@ export class BotServices {
 
     const exitTypeDetectorService = new ExitTypeDetectorService(this.logger);
     const pnlCalculatorService = new PositionPnLCalculatorService();
+    // NOTE: Phase 2 - PositionSyncService still expects BybitService
     const positionSyncService = new PositionSyncService(
-      this.bybitService,
+      rawBybitService,
       this.positionManager,
       exitTypeDetectorService,
       this.telegram,
@@ -402,8 +413,9 @@ export class BotServices {
       this.positionExitingService,
     );
 
+    // NOTE: Phase 2 - PositionMonitorService still expects BybitService
     this.positionMonitor = new PositionMonitorService(
-      this.bybitService,
+      rawBybitService,
       this.positionManager,
       config.riskManagement,
       this.telegram,
@@ -459,11 +471,12 @@ export class BotServices {
       btcEnabled: orchestratorConfig.btcConfirmation?.enabled,
     });
 
+    // NOTE: Phase 2 - TradingOrchestrator still expects BybitService
     this.tradingOrchestrator = new TradingOrchestrator(
       orchestratorConfig,
       this.candleProvider,
       this.timeframeProvider,
-      this.bybitService,
+      rawBybitService,
       this.positionManager,
       this.telegram,
       this.logger,

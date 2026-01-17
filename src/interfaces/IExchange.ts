@@ -57,6 +57,11 @@ export interface IExchangeMarketData {
     quantityPrecision: number;
     minOrderQty: number;
   }>;
+
+  /**
+   * Resync time with exchange server
+   */
+  resyncTime?(): Promise<void>;
 }
 
 // ============================================================================
@@ -213,6 +218,21 @@ export interface IExchangeOrders {
    * Cancel all conditional orders (stop loss, take profit)
    */
   cancelAllConditionalOrders(): Promise<void>;
+
+  /**
+   * Set trailing stop loss
+   */
+  setTrailingStop?(params: { side: string; activationPrice: number; trailingPercent: number }): Promise<void>;
+
+  /**
+   * Update take profit order
+   */
+  updateTakeProfit?(orderId: string, newPrice: number): Promise<void>;
+
+  /**
+   * Get order history
+   */
+  getOrderHistory?(limit?: number): Promise<any[]>;
 }
 
 // ============================================================================

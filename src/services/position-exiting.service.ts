@@ -30,7 +30,7 @@ import {
   Config,
 } from '../types';
 import { ExitActionDTO } from '../types/architecture.types';
-import { BybitService } from './bybit';
+import type { IExchange } from '../interfaces/IExchange';
 import { TelegramService } from './telegram.service';
 import { TradingJournalService } from './trading-journal.service';
 import { SessionStatsService } from './session-stats.service';
@@ -44,7 +44,7 @@ import { DECIMAL_PLACES, PERCENT_MULTIPLIER, TIME_UNITS, TIME_MULTIPLIERS } from
 
 export class PositionExitingService {
   constructor(
-    private readonly bybitService: BybitService,
+    private readonly bybitService: IExchange,
     private readonly telegram: TelegramService,
     private readonly logger: LoggerService,
     private readonly journal: TradingJournalService,
@@ -139,8 +139,13 @@ export class PositionExitingService {
         remainingQuantity: (position.quantity - quantityToClose).toFixed(8),
       });
 
-      // Close on exchange
-      await this.bybitService.closePosition(position.side, quantityToClose);
+      // Close on exchange using IExchange interface
+      // Calculate percentage to close (quantityToClose is the amount, position.quantity is total)
+      const percentageToClose = (quantityToClose / position.quantity) * 100;
+      await this.bybitService.closePosition({
+        positionId: position.id,
+        percentage: percentageToClose,
+      });
 
       // Update position quantity
       position.quantity -= quantityToClose;
@@ -218,7 +223,10 @@ export class PositionExitingService {
 
       // Try to close on exchange, but don't fail if already closed by SL/TP
       try {
-        await this.bybitService.closePosition(position.side, position.quantity);
+        await this.bybitService.closePosition({
+          positionId: position.id,
+          percentage: 100, // Close fully
+        });
       } catch (closeError) {
         const errorMsg = closeError instanceof Error ? closeError.message : String(closeError);
         // If position is already zero, this is expected (closed by SL/TP on exchange)
@@ -351,7 +359,10 @@ export class PositionExitingService {
         newSL: newStopLoss.toFixed(8),
       });
 
-      await this.bybitService.updateStopLoss(newStopLoss);
+      await this.bybitService.updateStopLoss({
+        positionId: position.id,
+        newPrice: newStopLoss,
+      });
       position.stopLoss.price = newStopLoss;
       position.stopLoss.updatedAt = Date.now();
 
@@ -384,7 +395,10 @@ export class PositionExitingService {
         initialTrailingPrice: trailingPrice.toFixed(8),
       });
 
-      await this.bybitService.updateStopLoss(trailingPrice);
+      await this.bybitService.updateStopLoss({
+        positionId: position.id,
+        newPrice: trailingPrice,
+      });
 
       position.stopLoss.price = trailingPrice;
       position.stopLoss.isTrailing = true;
@@ -551,7 +565,10 @@ export class PositionExitingService {
       newSL: breakevenPrice.toFixed(DECIMAL_PLACES.PRICE),
     });
 
-    await this.bybitService.updateStopLoss(breakevenPrice);
+    await this.bybitService.updateStopLoss({
+      positionId: position.id,
+      newPrice: breakevenPrice,
+    });
     position.stopLoss.price = breakevenPrice;
     position.stopLoss.isBreakeven = true;
     position.stopLoss.updatedAt = Date.now();
@@ -577,12 +594,14 @@ export class PositionExitingService {
       activationPrice: currentPrice.toFixed(DECIMAL_PLACES.PRICE),
     });
 
-    // Activate trailing on exchange
-    await this.bybitService.setTrailingStop({
-      side: position.side,
-      activationPrice: currentPrice,
-      trailingPercent: this.riskConfig.trailingStopPercent,
-    });
+    // Activate trailing on exchange (optional method)
+    if (this.bybitService.setTrailingStop) {
+      await this.bybitService.setTrailingStop({
+        side: position.side === PositionSide.LONG ? 'Buy' : 'Sell',
+        activationPrice: currentPrice,
+        trailingPercent: this.riskConfig.trailingStopPercent,
+      });
+    }
 
     // Update position state
     position.stopLoss.isTrailing = true;
@@ -625,7 +644,10 @@ export class PositionExitingService {
         return;
       }
 
-      await this.bybitService.updateStopLoss(trailingStop);
+      await this.bybitService.updateStopLoss({
+        positionId: position.id,
+        newPrice: trailingStop,
+      });
       position.stopLoss.price = trailingStop;
       position.stopLoss.updatedAt = Date.now();
 
@@ -678,7 +700,9 @@ export class PositionExitingService {
         return;
       }
 
-      await this.bybitService.updateTakeProfit(tp3.orderId, newTP3Price);
+      if (this.bybitService.updateTakeProfit) {
+        await this.bybitService.updateTakeProfit(tp3.orderId, newTP3Price);
+      }
       tp3.price = newTP3Price;
 
       this.logger.debug('📈 TP3 updated', {
@@ -722,7 +746,10 @@ export class PositionExitingService {
         return;
       }
 
-      await this.bybitService.updateStopLoss(bbStop);
+      await this.bybitService.updateStopLoss({
+        positionId: position.id,
+        newPrice: bbStop,
+      });
       position.stopLoss.price = bbStop;
       position.stopLoss.updatedAt = Date.now();
 

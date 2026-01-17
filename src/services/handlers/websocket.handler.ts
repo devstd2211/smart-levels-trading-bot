@@ -13,9 +13,9 @@
  */
 
 import { LoggerService, Position, ExitType, OrderFilledEvent, TakeProfitFilledEvent, StopLossFilledEvent } from '../../types';
+import type { IExchange } from '../../interfaces/IExchange';
 import { PositionLifecycleService } from '../position-lifecycle.service';
 import { PositionExitingService } from '../position-exiting.service';
-import { BybitService } from '../bybit';
 import { WebSocketManagerService } from '../websocket-manager.service';
 import { TradingJournalService } from '../trading-journal.service';
 import { TelegramService } from '../telegram.service';
@@ -44,7 +44,7 @@ export class WebSocketEventHandler {
   constructor(
     private positionManager: PositionLifecycleService,
     private positionExitingService: PositionExitingService,
-    private bybitService: BybitService,
+    private bybitService: IExchange,
     private webSocketManager: WebSocketManagerService,
     private journal: TradingJournalService,
     private telegram: TelegramService,

@@ -39,7 +39,7 @@ import {
   ExitType,
   SessionTradeRecord,
 } from '../types';
-import { BybitService } from './bybit';
+import type { IExchange } from '../interfaces/IExchange';
 import { BotEventBus } from './event-bus';
 import { TelegramService } from './telegram.service';
 import { TradingJournalService } from './trading-journal.service';
@@ -66,7 +66,7 @@ export class PositionLifecycleService {
   private entryConfirmation: EntryConfirmationManager;
 
   constructor(
-    private readonly bybitService: BybitService,
+    private readonly bybitService: IExchange,
     private readonly tradingConfig: TradingConfig,
     private readonly riskConfig: RiskManagementConfig,
     private readonly telegram: TelegramService,
@@ -164,30 +164,37 @@ export class PositionLifecycleService {
       let tpOrderIds: (string | undefined)[] = [];
 
       try {
-        // Get first TP level (or undefined if no TPs)
-        const firstTP = signal.takeProfits && signal.takeProfits.length > 0
-          ? signal.takeProfits[0].price
-          : undefined;
+        // Convert PositionSide to IExchange side format
+        const exchangeSide: 'Buy' | 'Sell' = side === PositionSide.LONG ? 'Buy' : 'Sell';
 
-        // Open position WITH atomic SL and first TP protection
-        orderId = await this.bybitService.openPosition({
-          side,
+        // Get all TP levels for IExchange interface
+        const tpPrices = signal.takeProfits && signal.takeProfits.length > 0
+          ? signal.takeProfits.map(tp => tp.price)
+          : [];
+
+        // Open position WITH atomic SL and TP protection
+        const openedPosition = await this.bybitService.openPosition({
+          symbol: this.bybitService.getSymbol?.() || 'UNKNOWN',
+          side: exchangeSide,
           quantity: sizingResult.quantity,
           leverage: this.tradingConfig.leverage,
           stopLoss: actualStopLoss, // CRITICAL: SL set atomically with position
-          takeProfit: firstTP, // First TP set atomically (optional)
+          takeProfits: tpPrices, // All TPs set atomically (IExchange expects array)
         });
+
+        // Extract orderId from the returned Position object
+        orderId = openedPosition.id;
 
         this.logger.info('✅ Position opened WITH atomic SL/TP protection', {
           orderId,
           side: side === PositionSide.LONG ? 'LONG' : 'SHORT',
           quantity: sizingResult.quantity,
           slSet: true,
-          tpSet: firstTP !== undefined,
+          tpSet: tpPrices.length > 0,
         });
 
-        // Store first TP order ID
-        if (firstTP !== undefined) {
+        // Store first TP order ID if TPs were set
+        if (tpPrices.length > 0) {
           tpOrderIds.push(orderId);
         }
 
@@ -202,11 +209,13 @@ export class PositionLifecycleService {
             const tpSize = sizingResult.quantity / signal.takeProfits.length;
 
             try {
-              await this.bybitService.updateTakeProfitPartial({
-                price: tp.price,
-                size: tpSize,
-                index: i,
-              });
+              if (this.bybitService.updateTakeProfitPartial) {
+                await this.bybitService.updateTakeProfitPartial({
+                  price: tp.price,
+                  size: tpSize,
+                  index: i,
+                });
+              }
 
               this.logger.debug(`✅ TP${i + 1} set`, {
                 price: tp.price,
@@ -232,13 +241,14 @@ export class PositionLifecycleService {
       // ===================================================================
       const timestamp = Date.now();
       const sideName = side === PositionSide.LONG ? 'Buy' : 'Sell';
-      const exchangeId = `${this.bybitService['symbol']}_${sideName}`;
+      const symbol = this.bybitService.getSymbol?.() || 'UNKNOWN';
+      const exchangeId = `${symbol}_${sideName}`;
       const journalId = `${exchangeId}_${timestamp}`;
 
       const position: Position = {
         id: exchangeId,
         journalId,
-        symbol: this.bybitService['symbol'],
+        symbol: symbol,
         side,
         quantity: sizingResult.quantity,
         entryPrice: signal.price,
@@ -434,7 +444,7 @@ export class PositionLifecycleService {
    */
   addPendingSignal(signal: Signal, keyLevel: number): string {
     return this.entryConfirmation.addPending({
-      symbol: this.bybitService['symbol'],
+      symbol: this.bybitService.getSymbol?.() || 'UNKNOWN',
       direction: signal.direction,
       keyLevel,
       detectedAt: Date.now(),

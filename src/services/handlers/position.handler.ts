@@ -12,10 +12,10 @@
  */
 
 import { LoggerService, Position, ExitType, PositionSide } from '../../types';
+import type { IExchange } from '../../interfaces/IExchange';
 import { PositionLifecycleService } from '../position-lifecycle.service';
 import { PositionExitingService } from '../position-exiting.service';
 import { TelegramService } from '../telegram.service';
-import { BybitService } from '../bybit';
 import { StopLossHitEvent, TakeProfitHitEvent, TimeBasedExitEvent } from '../../types';
 
 const DECIMAL_PLACES = {
@@ -36,7 +36,7 @@ export class PositionEventHandler {
   constructor(
     private positionManager: PositionLifecycleService,
     private positionExitingService: PositionExitingService,
-    private bybitService: BybitService,
+    private bybitService: IExchange,
     private telegram: TelegramService,
     private logger: LoggerService,
   ) {}
@@ -121,8 +121,11 @@ export class PositionEventHandler {
 
     // Close position on exchange - let positionClosed event handle recording
     try {
-      // Type cast side: event.position.side comes from FIAT layer and should be a valid PositionSide
-      await this.bybitService.closePosition(event.position.side as unknown as PositionSide, event.position.quantity);
+      // Use IExchange interface to close position (100% close)
+      await this.bybitService.closePosition({
+        positionId: event.position.id,
+        percentage: 100,
+      });
 
       this.logger.info('⏰ Time-based exit: Position closed on exchange', {
         positionId: event.position.id,
