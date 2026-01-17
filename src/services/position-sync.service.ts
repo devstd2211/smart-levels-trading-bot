@@ -9,7 +9,7 @@
  */
 
 import { Position, PositionSide, LoggerService, BybitOrder, isStopLossOrder, isTakeProfitOrder, ExitType } from '../types';
-import { BybitService } from './bybit';
+import type { IExchange } from '../interfaces/IExchange';
 import { PositionLifecycleService } from './position-lifecycle.service';
 import { ExitTypeDetectorService } from './exit-type-detector.service';
 import { TelegramService } from './telegram.service';
@@ -29,7 +29,7 @@ const DEEP_SYNC_MIN_AGE_MS = 120000; // 2 minutes
 
 export class PositionSyncService {
   constructor(
-    private readonly bybitService: BybitService,
+    private readonly bybitService: IExchange,
     private readonly positionManager: PositionLifecycleService,
     private readonly exitTypeDetectorService: ExitTypeDetectorService,
     private readonly telegram: TelegramService,
@@ -124,7 +124,7 @@ export class PositionSyncService {
       });
 
       // 1. Verify position still exists on exchange
-      const exchangePos = await this.bybitService.getPosition();
+      const exchangePos = await this.bybitService.getPosition(position.id);
 
       if (exchangePos === null || exchangePos.quantity === POSITION_SIZE_ZERO) {
         // Position closed on exchange - already handled by syncClosedPosition
@@ -133,6 +133,11 @@ export class PositionSyncService {
       }
 
       // 2. Verify TP/SL orders still active
+      if (!this.bybitService.getActiveOrders) {
+        this.logger.warn('⚠️ getActiveOrders not available, skipping protection check');
+        return;
+      }
+
       const activeOrders = await this.bybitService.getActiveOrders();
 
       // Check for Stop Loss order
@@ -173,7 +178,7 @@ export class PositionSyncService {
         });
 
         // FIX: Verify position still exists before emergency close (race condition)
-        const preClosePos = await this.bybitService.getPosition();
+        const preClosePos = await this.bybitService.getPosition(position.id);
         if (preClosePos === null || preClosePos.quantity === POSITION_SIZE_ZERO) {
           // Position already closed on exchange during deep sync check
           this.logger.warn('⚠️ Position already closed on exchange (race condition avoided)', {
@@ -193,7 +198,7 @@ export class PositionSyncService {
 
         // Emergency close
         try {
-          await this.bybitService.closePosition(position.side, position.quantity);
+          await this.bybitService.closePosition({ positionId: position.id, percentage: 100 });
           this.logger.warn('✅ Unprotected position closed successfully (deep sync)');
         } catch (closeError) {
           // Check if error is due to zero position (race condition)

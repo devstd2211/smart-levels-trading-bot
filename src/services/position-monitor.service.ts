@@ -13,7 +13,7 @@ import { TIME_MULTIPLIERS, INTEGER_MULTIPLIERS, POSITION_MONITOR_INTERVAL_MS } f
  */
 
 import { EventEmitter } from 'events';
-import { BybitService } from './bybit';
+import type { IExchange } from '../interfaces/IExchange';
 import { PositionLifecycleService } from './position-lifecycle.service';
 import { Position, PositionSide, RiskManagementConfig, LoggerService } from '../types';
 import { isCriticalApiError } from '../utils/error-helper';
@@ -39,7 +39,7 @@ export class PositionMonitorService extends EventEmitter {
   private criticalErrorEmitted = false; // Prevent duplicate critical error handling
 
   constructor(
-    private readonly bybitService: BybitService,
+    private readonly bybitService: IExchange,
     private readonly positionManager: PositionLifecycleService,
     private readonly riskConfig: RiskManagementConfig,
     private readonly telegram: TelegramService,
@@ -133,7 +133,7 @@ export class PositionMonitorService extends EventEmitter {
       }
 
       // 2. SAFETY CHECK: Verify position exists on exchange
-      const exchangePosition = await this.bybitService.getPosition();
+      const exchangePosition = await this.bybitService.getPosition(currentPosition.id);
 
       if (exchangePosition === null || exchangePosition.quantity === POSITION_SIZE_ZERO) {
         // Double-check: position might have been closed by WebSocket during async call
@@ -153,7 +153,15 @@ export class PositionMonitorService extends EventEmitter {
       // After first successful verification, we rely on trailing stop or manual management
       if (!currentPosition.protectionVerifiedOnce) {
         this.logger.debug('🔍 Initial protection verification check...');
-        const protection = await this.bybitService.verifyProtectionSet(currentPosition.side);
+        // Convert PositionSide enum to string format for IExchange interface
+        const sideStr = currentPosition.side === PositionSide.LONG ? 'Buy' : 'Sell';
+
+        if (!this.bybitService.verifyProtectionSet) {
+          this.logger.warn('⚠️ verifyProtectionSet not available, skipping protection check');
+          return;
+        }
+
+        const protection = await this.bybitService.verifyProtectionSet(sideStr);
 
         if (!protection.verified) {
           this.logger.error('🚨 UNPROTECTED POSITION DETECTED - CLOSING IMMEDIATELY!', {
@@ -168,7 +176,7 @@ export class PositionMonitorService extends EventEmitter {
 
           // Close position immediately - no emergency protection attempts
           try {
-            await this.bybitService.closePosition(currentPosition.side, currentPosition.quantity);
+            await this.bybitService.closePosition({ positionId: currentPosition.id, percentage: 100 });
 
             await this.telegram.sendAlert(
               '🚨 UNPROTECTED POSITION CLOSED @ market price!\n' +

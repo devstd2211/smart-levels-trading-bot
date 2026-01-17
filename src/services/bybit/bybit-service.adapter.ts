@@ -821,6 +821,43 @@ export class BybitServiceAdapter implements IExchange {
   }
 
   /**
+   * Get active orders (stop loss and take profit orders)
+   * MATCHES IExchange - delegates to BybitService
+   */
+  async getActiveOrders(): Promise<any[]> {
+    return this.bybitService.getActiveOrders();
+  }
+
+  /**
+   * Verify if protection (SL/TP) is set for position
+   * MATCHES IExchange - delegates to BybitService
+   */
+  async verifyProtectionSet(side: string): Promise<any> {
+    // Convert 'Buy'/'Sell' to PositionSide enum for BybitService
+    const positionSide: PositionSide = side === 'Buy' || side === 'LONG'
+      ? PositionSide.LONG
+      : PositionSide.SHORT;
+
+    return this.bybitService.verifyProtectionSet(positionSide);
+  }
+
+  /**
+   * Round quantity to exchange minimum precision
+   * MATCHES IExchange - delegates to BybitService
+   */
+  roundQuantity(qty: number): number {
+    return this.bybitService.roundQuantity(qty);
+  }
+
+  /**
+   * Round price to exchange price precision
+   * MATCHES IExchange - delegates to BybitService
+   */
+  roundPrice(price: number): number {
+    return this.bybitService.roundPrice(price);
+  }
+
+  /**
    * Calculate precision from step value
    * Helper method to convert step/tick values to decimal precision
    * Example: 0.01 → precision 2, 0.0001 → precision 4

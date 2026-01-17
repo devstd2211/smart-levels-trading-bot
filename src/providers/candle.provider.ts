@@ -6,9 +6,9 @@
  */
 
 import { Candle, TimeframeRole, LoggerService } from '../types';
+import type { IExchange } from '../interfaces/IExchange';
 import { ArrayLRUCache } from '../utils/lru-cache';
 import { TimeframeProvider } from './timeframe.provider';
-import { BybitService } from '../services/bybit';
 import { MULTIPLIERS } from '../constants';
 
 interface CacheMetrics {
@@ -23,7 +23,7 @@ export class CandleProvider {
 
   constructor(
     private timeframeProvider: TimeframeProvider,
-    private bybitService: BybitService,
+    private bybitService: IExchange,
     private logger: LoggerService,
     private symbol: string,
   ) {
@@ -90,7 +90,11 @@ export class CandleProvider {
     try {
       this.logger.info(`Loading ${limit} candles for ${role} (${interval}m)...`);
 
-      const candles = await this.bybitService.getCandles(this.symbol, interval, limit);
+      const candles = await this.bybitService.getCandles({
+        symbol: this.symbol,
+        timeframe: interval,
+        limit,
+      });
       const cache = this.caches.get(role);
 
       if (!cache) {

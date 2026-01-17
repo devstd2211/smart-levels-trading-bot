@@ -29,7 +29,7 @@ import { TrendBias, SignalDirection } from '../types/enums';
 // PHASE 4: ContextAnalyzer archived to src/archive/phase4-integration/
 // Replaced by TrendAnalyzer (PRIMARY component)
 import { CandleProvider } from '../providers/candle.provider';
-import { BybitService } from './bybit';
+import type { IExchange } from '../interfaces/IExchange';
 import { PositionLifecycleService } from './position-lifecycle.service';
 import { TelegramService } from './telegram.service';
 import { TimeframeProvider } from '../providers/timeframe.provider';
@@ -93,7 +93,7 @@ export class TradingOrchestrator {
     private config: OrchestratorConfig,
     private candleProvider: CandleProvider,
     private timeframeProvider: TimeframeProvider,
-    private bybitService: BybitService,
+    private bybitService: IExchange,
     private positionManager: PositionLifecycleService,
     private telegram: TelegramService | null,
     private logger: LoggerService,

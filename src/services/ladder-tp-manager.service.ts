@@ -26,7 +26,7 @@ import {
   LadderTpLevel,
   Position,
 } from '../types';
-import { BybitService } from './bybit/bybit.service';
+import type { IExchange } from '../interfaces/IExchange';
 
 // ============================================================================
 // CONSTANTS
@@ -41,7 +41,7 @@ import { BybitService } from './bybit/bybit.service';
 export class LadderTpManagerService {
   constructor(
     private config: LadderTpManagerConfig,
-    private bybitService: BybitService,
+    private bybitService: IExchange,
     private logger: LoggerService,
   ) {
     this.logger.info('LadderTpManagerService initialized', {
@@ -175,8 +175,11 @@ export class LadderTpManagerService {
         targetPrice: level.targetPrice,
       });
 
-      // Execute partial close via Bybit
-      await this.bybitService.closePosition(position.side, closeQty);
+      // Execute partial close via Bybit (convert quantity to percentage)
+      await this.bybitService.closePosition({
+        positionId: position.id,
+        percentage: level.closePercent,
+      });
 
       this.logger.info(`✅ TP${level.level} partial close executed`, {
         level: level.level,
@@ -216,7 +219,10 @@ export class LadderTpManagerService {
       });
 
       // Update SL via Bybit API
-      await this.bybitService.updateStopLoss(breakeven);
+      await this.bybitService.updateStopLoss({
+        positionId: position.id,
+        newPrice: breakeven,
+      });
 
       this.logger.info('✅ SL moved to breakeven', {
         slPrice: breakeven,
@@ -278,7 +284,10 @@ export class LadderTpManagerService {
       });
 
       // Update SL via Bybit API
-      await this.bybitService.updateStopLoss(newSlPrice);
+      await this.bybitService.updateStopLoss({
+        positionId: position.id,
+        newPrice: newSlPrice,
+      });
 
       this.logger.info('✅ Trailing SL updated', {
         slPrice: newSlPrice,

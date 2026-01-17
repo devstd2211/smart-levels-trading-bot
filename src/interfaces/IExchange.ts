@@ -6,6 +6,7 @@
  */
 
 import type { Candle, Position } from '../types/core';
+import type { ProtectionVerification } from '../types';
 
 // ============================================================================
 // CANDLE & MARKET DATA
@@ -311,4 +312,30 @@ export interface IExchange
    * Health check
    */
   healthCheck(): Promise<boolean>;
+
+  // ============================================================================
+  // HELPER METHODS (Exchange-Specific Utilities)
+  // ============================================================================
+
+  /**
+   * Get active orders (stop loss and take profit orders)
+   */
+  getActiveOrders?(): Promise<any[]>;
+
+  /**
+   * Verify if protection (SL/TP) is set for position
+   */
+  verifyProtectionSet?(side: string): Promise<ProtectionVerification>;
+
+  /**
+   * Round quantity to exchange minimum precision
+   * Example: 0.123456789 → 0.123456 (6 decimal places for BTC)
+   */
+  roundQuantity?(qty: number): number;
+
+  /**
+   * Round price to exchange price precision
+   * Example: 45123.456789 → 45123.45 (2 decimal places)
+   */
+  roundPrice?(price: number): number;
 }

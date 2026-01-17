@@ -243,11 +243,11 @@ export class BotServices {
     this.realityCheck = new RealityCheckService(this.logger);
 
     // 5. Initialize data providers
-    // NOTE: CandleProvider still uses BybitService (Phase 2.5+ will migrate to IExchange)
+    // CandleProvider uses IExchange interface (Phase 2.5 migration complete)
     this.timeframeProvider = new TimeframeProvider(config.timeframes);
     this.candleProvider = new CandleProvider(
       this.timeframeProvider,
-      rawBybitService,
+      this.bybitService,
       this.logger,
       config.exchange.symbol,
     );
