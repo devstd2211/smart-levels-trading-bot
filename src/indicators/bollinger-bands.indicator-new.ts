@@ -27,7 +27,9 @@
 
 import type { Candle } from '../types/core';
 import type { BollingerBandsConfigNew } from '../types/config-new.types';
+import type { IIndicator } from '../types/indicator.interface';
 import { validateIndicatorConfig } from '../types/config-new.types';
+import { IndicatorType } from '../types/indicator-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -39,7 +41,7 @@ const MIN_CANDLES_FOR_BOLLINGER = 1; // Need at least 1 candle
 // BOLLINGER BANDS CALCULATOR - NEW VERSION
 // ============================================================================
 
-export class BollingerBandsIndicatorNew {
+export class BollingerBandsIndicatorNew implements IIndicator {
   private readonly enabled: boolean;
   private readonly period: number;
   private readonly stdDev: number;
@@ -402,5 +404,33 @@ export class BollingerBandsIndicatorNew {
       period: this.period,
       stdDev: this.stdDev,
     };
+  }
+
+  // ============================================================================
+  // IIndicator Interface Methods
+  // ============================================================================
+
+  /**
+   * Get indicator type
+   */
+  getType(): string {
+    return IndicatorType.BOLLINGER_BANDS;
+  }
+
+  /**
+   * Check if indicator has enough data to calculate
+   */
+  isReady(candles: Candle[]): boolean {
+    if (!Array.isArray(candles)) {
+      return false;
+    }
+    return candles.length >= this.getMinCandlesRequired();
+  }
+
+  /**
+   * Get minimum candles required for calculation
+   */
+  getMinCandlesRequired(): number {
+    return this.period;
   }
 }

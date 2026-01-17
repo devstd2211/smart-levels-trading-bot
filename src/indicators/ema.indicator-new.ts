@@ -15,8 +15,10 @@
 
 import type { Candle } from '../types/core';
 import type { EmaIndicatorConfigNew } from '../types/config-new.types';
+import type { IIndicator } from '../types/indicator.interface';
 import { INTEGER_MULTIPLIERS } from '../constants';
 import { validateIndicatorConfig } from '../types/config-new.types';
+import { IndicatorType } from '../types/indicator-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -29,7 +31,7 @@ const MULTIPLIER_DENOMINATOR_OFFSET = INTEGER_MULTIPLIERS.ONE;
 // EMA CALCULATOR - NEW VERSION
 // ============================================================================
 
-export class EMAIndicatorNew {
+export class EMAIndicatorNew implements IIndicator {
   private readonly fastPeriod: number;
   private readonly slowPeriod: number;
   private readonly enabled: boolean;
@@ -237,5 +239,33 @@ export class EMAIndicatorNew {
       baseConfidence: this.baseConfidence,
       strengthMultiplier: this.strengthMultiplier,
     };
+  }
+
+  // ============================================================================
+  // IIndicator Interface Methods
+  // ============================================================================
+
+  /**
+   * Get indicator type
+   */
+  getType(): string {
+    return IndicatorType.EMA;
+  }
+
+  /**
+   * Check if indicator has enough data to calculate
+   */
+  isReady(candles: Candle[]): boolean {
+    if (!Array.isArray(candles)) {
+      return false;
+    }
+    return candles.length >= this.getMinCandlesRequired();
+  }
+
+  /**
+   * Get minimum candles required for calculation
+   */
+  getMinCandlesRequired(): number {
+    return this.slowPeriod;
   }
 }

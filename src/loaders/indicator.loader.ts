@@ -66,9 +66,7 @@ export class IndicatorLoader {
           fastPeriod: config.ema.fastPeriod,
           slowPeriod: config.ema.slowPeriod,
         });
-        // TODO: EMAIndicatorNew needs to implement IIndicator
-        // For now, cast to any (will be fixed in Phase 1)
-        indicators.set(IndicatorType.EMA, new EMAIndicatorNew(config.ema) as any);
+        indicators.set(IndicatorType.EMA, new EMAIndicatorNew(config.ema));
       }
 
       if (config.rsi?.enabled) {
@@ -76,7 +74,7 @@ export class IndicatorLoader {
         this.logger.debug('Loading RSI indicator', {
           period: config.rsi.period,
         });
-        indicators.set(IndicatorType.RSI, new RSIIndicatorNew(config.rsi) as any);
+        indicators.set(IndicatorType.RSI, new RSIIndicatorNew(config.rsi));
       }
 
       if (config.atr?.enabled) {
@@ -84,7 +82,7 @@ export class IndicatorLoader {
         this.logger.debug('Loading ATR indicator', {
           period: config.atr.period,
         });
-        indicators.set(IndicatorType.ATR, new ATRIndicatorNew(config.atr) as any);
+        indicators.set(IndicatorType.ATR, new ATRIndicatorNew(config.atr));
       }
 
       if (config.volume?.enabled) {
@@ -92,19 +90,19 @@ export class IndicatorLoader {
         this.logger.debug('Loading Volume indicator', {
           period: config.volume.period,
         });
-        indicators.set(IndicatorType.VOLUME, new VolumeIndicatorNew(config.volume) as any);
+        indicators.set(IndicatorType.VOLUME, new VolumeIndicatorNew(config.volume));
       }
 
       if (config.stochastic?.enabled) {
         this.validateRegistration(IndicatorType.STOCHASTIC);
         this.logger.debug('Loading Stochastic indicator');
-        indicators.set(IndicatorType.STOCHASTIC, new StochasticIndicatorNew(config.stochastic) as any);
+        indicators.set(IndicatorType.STOCHASTIC, new StochasticIndicatorNew(config.stochastic));
       }
 
       if (config.bollingerBands?.enabled) {
         this.validateRegistration(IndicatorType.BOLLINGER_BANDS);
         this.logger.debug('Loading Bollinger Bands indicator');
-        indicators.set(IndicatorType.BOLLINGER_BANDS, new BollingerBandsIndicatorNew(config.bollingerBands) as any);
+        indicators.set(IndicatorType.BOLLINGER_BANDS, new BollingerBandsIndicatorNew(config.bollingerBands));
       }
 
       this.logger.info(`📊 Loaded ${indicators.size} indicators`, {

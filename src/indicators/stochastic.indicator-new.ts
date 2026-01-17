@@ -24,7 +24,9 @@
 
 import type { Candle } from '../types/core';
 import type { StochasticIndicatorConfigNew } from '../types/config-new.types';
+import type { IIndicator } from '../types/indicator.interface';
 import { validateIndicatorConfig } from '../types/config-new.types';
+import { IndicatorType } from '../types/indicator-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -37,7 +39,7 @@ const STOCHASTIC_RANGE = 100; // 0-100 scale
 // STOCHASTIC CALCULATOR - NEW VERSION
 // ============================================================================
 
-export class StochasticIndicatorNew {
+export class StochasticIndicatorNew implements IIndicator {
   private readonly enabled: boolean;
   private readonly kPeriod: number;
   private readonly dPeriod: number;
@@ -369,5 +371,33 @@ export class StochasticIndicatorNew {
       kPeriod: this.kPeriod,
       dPeriod: this.dPeriod,
     };
+  }
+
+  // ============================================================================
+  // IIndicator Interface Methods
+  // ============================================================================
+
+  /**
+   * Get indicator type
+   */
+  getType(): string {
+    return IndicatorType.STOCHASTIC;
+  }
+
+  /**
+   * Check if indicator has enough data to calculate
+   */
+  isReady(candles: Candle[]): boolean {
+    if (!Array.isArray(candles)) {
+      return false;
+    }
+    return candles.length >= this.getMinCandlesRequired();
+  }
+
+  /**
+   * Get minimum candles required for calculation
+   */
+  getMinCandlesRequired(): number {
+    return this.kPeriod;
   }
 }

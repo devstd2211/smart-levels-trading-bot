@@ -17,7 +17,9 @@
 
 import type { Candle } from '../types/core';
 import type { VolumeIndicatorConfigNew } from '../types/config-new.types';
+import type { IIndicator } from '../types/indicator.interface';
 import { validateIndicatorConfig } from '../types/config-new.types';
+import { IndicatorType } from '../types/indicator-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -30,7 +32,7 @@ const MIN_VOLUME_VALUE = 0.00001; // Minimum volume threshold to avoid division 
 // VOLUME CALCULATOR - NEW VERSION
 // ============================================================================
 
-export class VolumeIndicatorNew {
+export class VolumeIndicatorNew implements IIndicator {
   private readonly enabled: boolean;
   private readonly period: number;
 
@@ -294,5 +296,33 @@ export class VolumeIndicatorNew {
       enabled: this.enabled,
       period: this.period,
     };
+  }
+
+  // ============================================================================
+  // IIndicator Interface Methods
+  // ============================================================================
+
+  /**
+   * Get indicator type
+   */
+  getType(): string {
+    return IndicatorType.VOLUME;
+  }
+
+  /**
+   * Check if indicator has enough data to calculate
+   */
+  isReady(candles: Candle[]): boolean {
+    if (!Array.isArray(candles)) {
+      return false;
+    }
+    return candles.length >= this.getMinCandlesRequired();
+  }
+
+  /**
+   * Get minimum candles required for calculation
+   */
+  getMinCandlesRequired(): number {
+    return this.period;
   }
 }

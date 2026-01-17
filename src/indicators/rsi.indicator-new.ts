@@ -18,7 +18,9 @@
 
 import type { Candle } from '../types/core';
 import type { RsiIndicatorConfigNew } from '../types/config-new.types';
+import type { IIndicator } from '../types/indicator.interface';
 import { validateIndicatorConfig } from '../types/config-new.types';
+import { IndicatorType } from '../types/indicator-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -32,7 +34,7 @@ const RSI_NEUTRAL_FALLBACK = 70; // When avgLoss = 0
 // RSI CALCULATOR - NEW VERSION
 // ============================================================================
 
-export class RSIIndicatorNew {
+export class RSIIndicatorNew implements IIndicator {
   private readonly enabled: boolean;
   private readonly period: number;
   private readonly oversold: number;
@@ -328,5 +330,33 @@ export class RSIIndicatorNew {
       neutralZone: this.neutralZone,
       maxConfidence: this.maxConfidence,
     };
+  }
+
+  // ============================================================================
+  // IIndicator Interface Methods
+  // ============================================================================
+
+  /**
+   * Get indicator type
+   */
+  getType(): string {
+    return IndicatorType.RSI;
+  }
+
+  /**
+   * Check if indicator has enough data to calculate
+   */
+  isReady(candles: Candle[]): boolean {
+    if (!Array.isArray(candles)) {
+      return false;
+    }
+    return candles.length >= this.getMinCandlesRequired();
+  }
+
+  /**
+   * Get minimum candles required for calculation
+   */
+  getMinCandlesRequired(): number {
+    return this.period + 1;
   }
 }

@@ -20,7 +20,9 @@
 
 import type { Candle } from '../types/core';
 import type { AtrIndicatorConfigNew } from '../types/config-new.types';
+import type { IIndicator } from '../types/indicator.interface';
 import { validateIndicatorConfig } from '../types/config-new.types';
+import { IndicatorType } from '../types/indicator-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -32,7 +34,7 @@ const MIN_CANDLES_FOR_TR = 2; // Need at least 2 candles for TR calculation
 // ATR CALCULATOR - NEW VERSION
 // ============================================================================
 
-export class ATRIndicatorNew {
+export class ATRIndicatorNew implements IIndicator {
   private readonly enabled: boolean;
   private readonly period: number;
   private readonly minimumATR: number;
@@ -299,5 +301,33 @@ export class ATRIndicatorNew {
       minimumATR: this.minimumATR,
       maximumATR: this.maximumATR,
     };
+  }
+
+  // ============================================================================
+  // IIndicator Interface Methods
+  // ============================================================================
+
+  /**
+   * Get indicator type
+   */
+  getType(): string {
+    return IndicatorType.ATR;
+  }
+
+  /**
+   * Check if indicator has enough data to calculate
+   */
+  isReady(candles: Candle[]): boolean {
+    if (!Array.isArray(candles)) {
+      return false;
+    }
+    return candles.length >= this.getMinCandlesRequired();
+  }
+
+  /**
+   * Get minimum candles required for calculation
+   */
+  getMinCandlesRequired(): number {
+    return this.period + 1;
   }
 }
