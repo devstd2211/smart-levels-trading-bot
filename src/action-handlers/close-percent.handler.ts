@@ -4,7 +4,7 @@
  * Executes the action to close a percentage of position
  */
 
-import { IActionHandler, ClosePercentAction, ActionResult, ActionType } from '../types/architecture.types';
+import { IActionHandler, ClosePercentAction, ActionResult, ActionType, ClosePercentExitActionDTO } from '../types/architecture.types';
 import { PositionExitingService } from '../services/position-exiting.service';
 import { PositionLifecycleService } from '../services/position-lifecycle.service';
 import { LoggerService } from '../services/logger.service';
@@ -48,17 +48,17 @@ export class ClosePercentHandler implements IActionHandler {
       // Get current price from metadata or use entry price
       const currentPrice = action.metadata?.currentPrice || position.entryPrice;
 
-      // Create exit action object
-      const exitAction: ExitAction = {
-        action: 'CLOSE_PERCENT' as any,
+      // Create exit action object with strict typing
+      const exitAction: ClosePercentExitActionDTO = {
+        action: ExitAction.CLOSE_PERCENT,
         percent: action.percent,
         reason: action.reason || 'Action queue triggered close',
-      } as any;
+      };
 
       // Call position exiting service to execute exit action
       await this.positionExitingService.executeExitAction(
         position,
-        exitAction,
+        exitAction as any, // Note: PositionExitingService expects legacy ExitAction type
         currentPrice,
         action.reason,
         ExitType.MANUAL,

@@ -12,6 +12,63 @@ import { SignalDirection, EntryDecision, PositionState, ExitAction } from './enu
 import type { Position, Signal, AggregatedSignal, Candle } from './core';
 
 // ============================================================================
+// EXIT ACTION DTOs - Proper types for exit actions
+// ============================================================================
+
+/**
+ * DTO for CLOSE_PERCENT exit action
+ */
+export interface ClosePercentExitActionDTO {
+  action: ExitAction.CLOSE_PERCENT;
+  percent: number; // 0-100
+  reason?: string;
+}
+
+/**
+ * DTO for UPDATE_SL exit action
+ */
+export interface UpdateSLExitActionDTO {
+  action: ExitAction.UPDATE_SL;
+  newStopLoss: number;
+  reason?: string;
+}
+
+/**
+ * DTO for ACTIVATE_TRAILING exit action
+ */
+export interface ActivateTrailingExitActionDTO {
+  action: ExitAction.ACTIVATE_TRAILING;
+  trailingPercent: number;
+  reason?: string;
+}
+
+/**
+ * DTO for MOVE_SL_TO_BREAKEVEN exit action
+ */
+export interface MoveSLToBEExitActionDTO {
+  action: ExitAction.MOVE_SL_TO_BREAKEVEN;
+  reason?: string;
+}
+
+/**
+ * DTO for CLOSE_ALL exit action
+ */
+export interface CloseAllExitActionDTO {
+  action: ExitAction.CLOSE_ALL;
+  reason?: string;
+}
+
+/**
+ * Union type of all exit action DTOs
+ */
+export type ExitActionDTO =
+  | ClosePercentExitActionDTO
+  | UpdateSLExitActionDTO
+  | ActivateTrailingExitActionDTO
+  | MoveSLToBEExitActionDTO
+  | CloseAllExitActionDTO;
+
+// ============================================================================
 // LAYER 2: ACTION QUEUE SYSTEM
 // ============================================================================
 
@@ -61,7 +118,7 @@ export enum ActionType {
  */
 export interface OpenPositionAction extends IAction {
   type: ActionType.OPEN_POSITION;
-  signal: AggregatedSignal;
+  signal: Signal; // Proper Signal object with entry parameters
   positionSize: number;
   stopLoss: number;
   takeProfits: number[];

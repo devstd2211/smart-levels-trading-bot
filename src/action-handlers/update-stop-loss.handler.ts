@@ -4,7 +4,7 @@
  * Executes the action to update position stop loss
  */
 
-import { IActionHandler, UpdateStopLossAction, ActionResult, ActionType } from '../types/architecture.types';
+import { IActionHandler, UpdateStopLossAction, ActionResult, ActionType, UpdateSLExitActionDTO } from '../types/architecture.types';
 import { PositionExitingService } from '../services/position-exiting.service';
 import { PositionLifecycleService } from '../services/position-lifecycle.service';
 import { LoggerService } from '../services/logger.service';
@@ -45,17 +45,17 @@ export class UpdateStopLossHandler implements IActionHandler {
         throw new Error(`Position ${action.positionId} not found or not current`);
       }
 
-      // Create exit action object for SL update
-      const exitAction: ExitAction = {
-        action: 'UPDATE_SL' as any,
+      // Create exit action object with strict typing
+      const exitAction: UpdateSLExitActionDTO = {
+        action: ExitAction.UPDATE_SL,
         newStopLoss: action.newStopLossPrice,
         reason: action.reason || 'Action queue triggered SL update',
-      } as any;
+      };
 
       // Call position exiting service to execute exit action
       await this.positionExitingService.executeExitAction(
         position,
-        exitAction,
+        exitAction as any, // Note: PositionExitingService expects legacy ExitAction type
         action.newStopLossPrice,
         action.reason,
         ExitType.MANUAL,

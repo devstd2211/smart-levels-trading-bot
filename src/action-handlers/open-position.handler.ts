@@ -39,9 +39,8 @@ export class OpenPositionHandler implements IActionHandler {
       });
 
       // Call position lifecycle service to open position
-      // OpenPositionAction stores the signal - pass it directly to open position
-      const signal = openAction.signal as unknown as Signal;
-      const position = await this.positionLifecycleService.openPosition(signal);
+      // OpenPositionAction stores the signal as generic Record - convert to Signal
+      const position = await this.positionLifecycleService.openPosition(openAction.signal);
 
       const processingTime = Date.now() - startTime;
       this.logger.info(`[${this.name}] Position opened successfully`, {

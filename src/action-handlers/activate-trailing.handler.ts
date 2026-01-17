@@ -4,7 +4,7 @@
  * Executes the action to activate trailing stop for position
  */
 
-import { IActionHandler, ActivateTrailingAction, ActionResult, ActionType } from '../types/architecture.types';
+import { IActionHandler, ActivateTrailingAction, ActionResult, ActionType, ActivateTrailingExitActionDTO } from '../types/architecture.types';
 import { PositionExitingService } from '../services/position-exiting.service';
 import { PositionLifecycleService } from '../services/position-lifecycle.service';
 import { LoggerService } from '../services/logger.service';
@@ -48,17 +48,17 @@ export class ActivateTrailingHandler implements IActionHandler {
       // Get current price from metadata or use entry price
       const currentPrice = action.metadata?.currentPrice || position.entryPrice;
 
-      // Create exit action object for trailing activation
-      const exitAction: ExitAction = {
-        action: 'ACTIVATE_TRAILING' as any,
+      // Create exit action object with strict typing
+      const exitAction: ActivateTrailingExitActionDTO = {
+        action: ExitAction.ACTIVATE_TRAILING,
         trailingPercent: action.trailingPercent,
         reason: 'Action queue triggered trailing activation',
-      } as any;
+      };
 
       // Call position exiting service to execute exit action
       await this.positionExitingService.executeExitAction(
         position,
-        exitAction,
+        exitAction as any, // Note: PositionExitingService expects legacy ExitAction type
         currentPrice,
         'Activate trailing',
         ExitType.MANUAL,
