@@ -162,7 +162,7 @@ export class BybitServiceAdapter implements IExchange {
     try {
       // BybitService.getCandles(symbolOrLimit?, interval?, limit?)
       // IExchange expects: { symbol, timeframe, limit }
-      const candles = await this.bybitService.getCandles(params.limit, params.timeframe, params.limit);
+      const candles = await this.bybitService.getCandles(params.symbol, params.timeframe, params.limit);
 
       if (!Array.isArray(candles)) {
         this.logger.warn('⚠️ getCandles returned non-array', {
