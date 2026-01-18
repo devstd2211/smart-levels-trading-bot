@@ -34,5 +34,15 @@ export interface IIndicatorCache {
   getStats(): {
     size: number;
     capacity: number;
+    hits: number;
+    misses: number;
+    hitRate: number;
+    evictions: number;
+    totalRequests: number;
   };
+
+  /**
+   * Reset all metrics
+   */
+  resetMetrics?(): void;
 }
