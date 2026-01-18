@@ -33,6 +33,7 @@ import {
   LadderTpManagerService,
 } from '../types';
 import { BybitService } from '../services/bybit/bybit.service';
+import { IExchange } from '../interfaces/IExchange';
 
 // ============================================================================
 // SCALPING LADDER TP STRATEGY
@@ -56,7 +57,7 @@ export class ScalpingLadderTpStrategy implements IStrategy {
 
   constructor(
     private config: ScalpingLadderTpConfig,
-    private bybitService: BybitService,
+    private bybitService: IExchange,
     private logger: LoggerService,
   ) {
     this.priority = config.priority;

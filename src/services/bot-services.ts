@@ -402,11 +402,10 @@ export class BotServices {
 
     const exitTypeDetectorService = new ExitTypeDetectorService(this.logger);
     const pnlCalculatorService = new PositionPnLCalculatorService();
-    // NOTE: PositionSyncService and PositionMonitorService still use BybitService
-    // They require BybitService-specific methods (getActiveOrders, verifyProtectionSet, etc.)
-    // Phase 2.5+ will extend IExchange with these methods
+    // PositionSyncService and PositionMonitorService now use IExchange interface
+    // The adapter provides all necessary methods (getActiveOrders, verifyProtectionSet, etc.)
     const positionSyncService = new PositionSyncService(
-      rawBybitService,
+      this.bybitService,
       this.positionManager,
       exitTypeDetectorService,
       this.telegram,
@@ -415,7 +414,7 @@ export class BotServices {
     );
 
     this.positionMonitor = new PositionMonitorService(
-      rawBybitService,
+      this.bybitService,
       this.positionManager,
       config.riskManagement,
       this.telegram,
@@ -476,7 +475,7 @@ export class BotServices {
       orchestratorConfig,
       this.candleProvider,
       this.timeframeProvider,
-      rawBybitService,
+      this.bybitService,
       this.positionManager,
       this.telegram,
       this.logger,

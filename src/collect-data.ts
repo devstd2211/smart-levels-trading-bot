@@ -11,6 +11,8 @@
 import { LoggerService, LogLevel, DataCollectionConfig, Config } from './types';
 import { DataCollectorService } from './services/data-collector.service';
 import { BybitService } from './services/bybit';
+import { BybitServiceAdapter } from './services/bybit/bybit-service.adapter';
+import { IExchange } from './interfaces/IExchange';
 import { TimeService } from './services/time.service';
 import { INTEGER_MULTIPLIERS, TIME_INTERVALS } from './constants';
 import * as fs from 'fs';
@@ -75,8 +77,9 @@ async function main() {
     compression: config.dataCollection.database.compression,
   });
 
-  // Initialize BybitService for time synchronization
-  const bybitService = new BybitService(config.exchange, logger);
+  // Initialize BybitService and wrap with adapter for IExchange interface
+  const rawBybitService = new BybitService(config.exchange, logger);
+  const bybitService: IExchange = new BybitServiceAdapter(rawBybitService, logger);
 
   // Initialize TimeService
   const timeService = new TimeService(
@@ -125,7 +128,9 @@ async function main() {
   try {
     // Initialize BybitService - load symbol precision
     logger.info('Initializing Bybit API...');
-    await bybitService.initialize();
+    if (bybitService.initialize) {
+      await bybitService.initialize();
+    }
     logger.info('✅ Bybit API initialized');
 
     // Synchronize time with exchange

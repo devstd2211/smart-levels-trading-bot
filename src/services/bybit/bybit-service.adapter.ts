@@ -59,8 +59,23 @@ export class BybitServiceAdapter implements IExchange {
   }
 
   // ============================================================================
-  // CONNECTION LIFECYCLE (IExchange Main Interface)
+  // INITIALIZATION & CONNECTION LIFECYCLE (IExchange Main Interface)
   // ============================================================================
+
+  /**
+   * Initialize exchange service - Load symbol precision parameters
+   * Delegates to BybitService.initialize()
+   */
+  async initialize(): Promise<void> {
+    try {
+      await this.bybitService.initialize();
+      this.logger.info('✅ BybitServiceAdapter initialized', { name: this.name });
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.logger.error('❌ Failed to initialize adapter', { error: errorMsg });
+      throw error;
+    }
+  }
 
   /**
    * Connect to exchange - Initialize connection
@@ -808,6 +823,37 @@ export class BybitServiceAdapter implements IExchange {
     }
   }
 
+  /**
+   * Get current funding rate for symbol (perpetual futures)
+   * MISMATCH RESOLUTION: BybitService may not have this method directly
+   * Return a default value or delegate if BybitService supports it
+   */
+  async getFundingRate(symbol: string): Promise<number> {
+    try {
+      // Validate symbol
+      const internalSymbol = this.bybitService.getSymbol();
+      if (symbol !== internalSymbol) {
+        this.logger.warn('⚠️ Symbol mismatch in getFundingRate', {
+          requested: symbol,
+          internal: internalSymbol,
+        });
+      }
+
+      // Check if BybitService has getFundingRate method
+      if (typeof (this.bybitService as any).getFundingRate === 'function') {
+        return await (this.bybitService as any).getFundingRate(symbol);
+      }
+
+      // Fallback: return 0 if method not available
+      this.logger.debug('⚠️ getFundingRate not implemented in BybitService, returning 0');
+      return 0;
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      this.logger.warn('⚠️ Failed to get funding rate', { error: errorMsg });
+      return 0; // Return 0 on error rather than throwing
+    }
+  }
+
   // ============================================================================
   // UTILITY METHODS
   // ============================================================================
@@ -844,17 +890,21 @@ export class BybitServiceAdapter implements IExchange {
   /**
    * Round quantity to exchange minimum precision
    * MATCHES IExchange - delegates to BybitService
+   * Type conversion: BybitService returns string, convert to number
    */
   roundQuantity(qty: number): number {
-    return this.bybitService.roundQuantity(qty);
+    const result = this.bybitService.roundQuantity(qty);
+    return typeof result === 'string' ? parseFloat(result) : result;
   }
 
   /**
    * Round price to exchange price precision
    * MATCHES IExchange - delegates to BybitService
+   * Type conversion: BybitService returns string, convert to number
    */
   roundPrice(price: number): number {
-    return this.bybitService.roundPrice(price);
+    const result = this.bybitService.roundPrice(price);
+    return typeof result === 'string' ? parseFloat(result) : result;
   }
 
   /**

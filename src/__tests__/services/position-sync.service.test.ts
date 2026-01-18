@@ -5,6 +5,7 @@
 
 import { PositionSyncService } from '../../services/position-sync.service';
 import { BybitService } from '../../services/bybit';
+import { IExchange } from '../../interfaces/IExchange';
 import { PositionLifecycleService } from '../../services/position-lifecycle.service';
 import { ExitTypeDetectorService } from '../../services/exit-type-detector.service';
 import { TelegramService } from '../../services/telegram.service';
@@ -96,7 +97,7 @@ describe('PositionSyncService', () => {
     logger = createMockLogger();
 
     service = new PositionSyncService(
-      mockBybit as unknown as BybitService,
+      mockBybit as unknown as IExchange,
       mockPositionManager as unknown as PositionLifecycleService,
       mockExitTypeDetector as unknown as ExitTypeDetectorService,
       mockTelegram as unknown as TelegramService,
@@ -155,7 +156,7 @@ describe('PositionSyncService', () => {
         closeFullPosition: jest.fn().mockResolvedValue(undefined),
       };
       const syncService = new PositionSyncService(
-        mockBybit as unknown as BybitService,
+        mockBybit as unknown as IExchange,
         mockPositionManager as unknown as PositionLifecycleService,
         mockExitTypeDetector as unknown as ExitTypeDetectorService,
         mockTelegram as unknown as TelegramService,
@@ -448,7 +449,7 @@ describe('PositionSyncService', () => {
       };
 
       const serviceLocal = new PositionSyncService(
-        mockBybit as unknown as BybitService,
+        mockBybit as unknown as IExchange,
         mockPositionManagerLocal as unknown as PositionLifecycleService,
         mockExitTypeDetector as unknown as ExitTypeDetectorService,
         mockTelegram as unknown as TelegramService,

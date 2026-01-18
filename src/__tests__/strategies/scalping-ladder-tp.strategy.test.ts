@@ -14,6 +14,7 @@
 
 import { ScalpingLadderTpStrategy } from '../../strategies/scalping-ladder-tp.strategy';
 import { BybitService } from '../../services/bybit/bybit.service';
+import { IExchange } from '../../interfaces/IExchange';
 import {
   LoggerService,
   LogLevel,
@@ -29,7 +30,7 @@ import {
 // MOCKS
 // ============================================================================
 
-const createMockBybitService = (): jest.Mocked<BybitService> => {
+const createMockBybitService = (): jest.Mocked<IExchange> => {
   return {
     closePosition: jest.fn(),
     updateStopLoss: jest.fn(),
@@ -114,7 +115,7 @@ const createMockPosition = (
 
 describe('ScalpingLadderTpStrategy', () => {
   let strategy: ScalpingLadderTpStrategy;
-  let bybitService: jest.Mocked<BybitService>;
+  let bybitService: jest.Mocked<IExchange>;
   let logger: LoggerService;
   let config: ScalpingLadderTpConfig;
 

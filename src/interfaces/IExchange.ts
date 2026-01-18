@@ -268,6 +268,11 @@ export interface IExchangeAccount {
    * Set leverage
    */
   setLeverage(symbol: string, leverage: number): Promise<void>;
+
+  /**
+   * Get current funding rate for symbol (perpetual futures)
+   */
+  getFundingRate?(symbol: string): Promise<number>;
 }
 
 // ============================================================================
@@ -287,6 +292,12 @@ export interface IExchange
    * Exchange name identifier
    */
   readonly name: string;
+
+  /**
+   * Initialize exchange service (load symbol precision, etc)
+   * Must be called before trading
+   */
+  initialize?(): Promise<void>;
 
   /**
    * Get trading symbol

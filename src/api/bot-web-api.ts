@@ -229,24 +229,18 @@ export class BotWebAPI {
   async getFundingRate(symbol: string): Promise<any> {
     try {
       // Try to get from Bybit API
-      const fundingData = await this.services.bybitService.getFundingRate(symbol);
+      // IExchange.getFundingRate() returns number or is optional
+      const fundingRate = this.services.bybitService.getFundingRate
+        ? await this.services.bybitService.getFundingRate(symbol)
+        : 0;
 
-      if (!fundingData) {
-        return {
-          symbol,
-          current: 0,
-          predicted: 0,
-          nextFundingTime: Date.now() + 8 * 60 * 60 * 1000, // 8 hours from now
-          lastFundingTime: Date.now(),
-        };
-      }
-
+      // fundingRate is a number (current funding rate percentage)
       return {
         symbol,
-        current: fundingData.fundingRate || 0,
-        predicted: fundingData.fundingRate || 0, // Predicted same as current (Bybit doesn't provide predicted)
-        nextFundingTime: fundingData.nextFundingTime || Date.now() + 8 * 60 * 60 * 1000,
-        lastFundingTime: fundingData.timestamp || Date.now(),
+        current: fundingRate || 0,
+        predicted: fundingRate || 0, // Predicted same as current (Bybit doesn't provide predicted)
+        nextFundingTime: Date.now() + 8 * 60 * 60 * 1000, // 8 hours from now (Bybit funds every 8h)
+        lastFundingTime: Date.now(),
       };
     } catch (error) {
       this.logger.error('Error getting funding rate', { error, symbol });

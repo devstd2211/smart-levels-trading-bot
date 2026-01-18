@@ -171,8 +171,9 @@ export class BotInitializer {
     try {
       this.logger.info('🔄 Checking for open positions to restore...');
 
-      // Fetch current position from exchange
-      const exchangePosition = await this.services.bybitService.getPosition();
+      // Fetch all open positions from exchange (BybitService is single-position, so max 1)
+      const openPositions = await this.services.bybitService.getOpenPositions();
+      const exchangePosition = openPositions.length > 0 ? openPositions[0] : null;
 
       if (exchangePosition === null || exchangePosition.quantity === 0) {
         this.logger.debug('✅ No open positions found on exchange - clean state');
@@ -262,7 +263,9 @@ export class BotInitializer {
    */
   private async initializeBybit(): Promise<void> {
     this.logger.info('Initializing Bybit service...');
-    await this.services.bybitService.initialize();
+    if (this.services.bybitService.initialize) {
+      await this.services.bybitService.initialize();
+    }
     this.logger.debug('✅ Bybit service initialized');
   }
 
@@ -316,7 +319,9 @@ export class BotInitializer {
       try {
         // Task 1: Re-synchronize time with Bybit server
         // CRITICAL: Prevents timestamp drift accumulation
-        await this.services.bybitService.resyncTime();
+        if (this.services.bybitService.resyncTime) {
+          await this.services.bybitService.resyncTime();
+        }
 
         // Task 2: Cleanup hanging conditional orders
         // CRITICAL FIX: Check both currentPosition AND isOpeningPosition flag
@@ -388,11 +393,11 @@ export class BotInitializer {
         lookbackCandles: btcConfig.lookbackCandles,
       });
 
-      const btcCandles = await this.services.bybitService.getCandles(
-        btcConfig.symbol,
-        btcConfig.timeframe,
-        btcConfig.lookbackCandles || 100,
-      );
+      const btcCandles = await this.services.bybitService.getCandles({
+        symbol: btcConfig.symbol,
+        timeframe: btcConfig.timeframe,
+        limit: btcConfig.lookbackCandles || 100,
+      });
 
       this.services.btcCandles1m = btcCandles;
 
