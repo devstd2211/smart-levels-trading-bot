@@ -22,6 +22,8 @@ import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import { ATRIndicatorNew } from '../indicators/atr.indicator-new';
 import type { LoggerService } from '../services/logger.service';
 import type { IIndicator } from '../types/indicator.interface';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -36,7 +38,7 @@ const MAX_ATR_ESTIMATE = 100; // Upper bound for ATR value (for scaling)
 // ATR ANALYZER - NEW VERSION
 // ============================================================================
 
-export class AtrAnalyzerNew {
+export class AtrAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
@@ -297,6 +299,58 @@ export class AtrAnalyzerNew {
       },
     };
   }
+
+  // ===== INTERFACE IMPLEMENTATION (IAnalyzer) =====
+
+  /**
+   * Get analyzer type name
+   * @returns AnalyzerType.ATR
+   */
+  getType(): string {
+    return AnalyzerType.ATR;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   * @param candles Array of candles
+   * @returns true if enough candles, false otherwise
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_ATR;
+  }
+
+  /**
+   * Get minimum candles required for analysis
+   * @returns Min candle count needed
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_ATR;
+  }
+
+  /**
+   * Get analyzer weight (contribution to final decision)
+   * @returns Weight 0.0-1.0
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority (execution order)
+   * @returns Priority 1-10 (higher = more important)
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence this analyzer can produce
+   * @returns Max confidence 0.0-1.0
+   */
+  getMaxConfidence(): number {
+    return this.maxConfidence;
+  }
+
 
   /**
    * Reset analyzer state

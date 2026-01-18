@@ -22,6 +22,8 @@ import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import { RSIIndicatorNew } from '../indicators/rsi.indicator-new';
 import type { LoggerService } from '../services/logger.service';
 import type { IIndicator } from '../types/indicator.interface';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -35,7 +37,7 @@ const NEUTRAL_CONFIDENCE_MULTIPLIER = 0.3; // Neutral zone gets 30% of max confi
 // RSI ANALYZER - NEW VERSION
 // ============================================================================
 
-export class RsiAnalyzerNew {
+export class RsiAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
@@ -327,12 +329,65 @@ export class RsiAnalyzerNew {
     this.initialized = false;
   }
 
+  // ===== INTERFACE IMPLEMENTATION (IAnalyzer) =====
+
+  /**
+   * Get analyzer type name
+   * @returns AnalyzerType.RSI
+   */
+  getType(): string {
+    return AnalyzerType.RSI;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   * @param candles Array of candles
+   * @returns true if enough candles, false otherwise
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_RSI;
+  }
+
+  /**
+   * Get minimum candles required for analysis
+   * @returns Min candle count needed
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_RSI;
+  }
+
   /**
    * Check if analyzer is enabled
    */
   isEnabled(): boolean {
     return this.enabled;
   }
+
+  /**
+   * Get analyzer weight (contribution to final decision)
+   * @returns Weight 0.0-1.0
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority (execution order)
+   * @returns Priority 1-10 (higher = more important)
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence this analyzer can produce
+   * @returns Max confidence 0.0-1.0
+   */
+  getMaxConfidence(): number {
+    return this.maxConfidence;
+  }
+
+  // ===== EXISTING METHODS =====
 
   /**
    * Get config values

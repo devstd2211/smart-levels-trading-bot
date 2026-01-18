@@ -22,6 +22,8 @@ import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import { BollingerBandsIndicatorNew } from '../indicators/bollinger-bands.indicator-new';
 import type { LoggerService } from '../services/logger.service';
 import type { IIndicator } from '../types/indicator.interface';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -39,7 +41,7 @@ const SQUEEZE_THRESHOLD = 5; // Bandwidth < 5% = squeezing
 // BOLLINGER BANDS ANALYZER - NEW VERSION
 // ============================================================================
 
-export class BollingerBandsAnalyzerNew {
+export class BollingerBandsAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
@@ -365,6 +367,58 @@ export class BollingerBandsAnalyzerNew {
       },
     };
   }
+
+  // ===== INTERFACE IMPLEMENTATION (IAnalyzer) =====
+
+  /**
+   * Get analyzer type name
+   * @returns AnalyzerType.BOLLINGER_BANDS
+   */
+  getType(): string {
+    return AnalyzerType.BOLLINGER_BANDS;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   * @param candles Array of candles
+   * @returns true if enough candles, false otherwise
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_BOLLINGER_BANDS;
+  }
+
+  /**
+   * Get minimum candles required for analysis
+   * @returns Min candle count needed
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_BOLLINGER_BANDS;
+  }
+
+  /**
+   * Get analyzer weight (contribution to final decision)
+   * @returns Weight 0.0-1.0
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority (execution order)
+   * @returns Priority 1-10 (higher = more important)
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence this analyzer can produce
+   * @returns Max confidence 0.0-1.0
+   */
+  getMaxConfidence(): number {
+    return 0.95;
+  }
+
 
   /**
    * Reset analyzer state

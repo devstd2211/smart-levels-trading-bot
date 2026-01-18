@@ -22,6 +22,8 @@ import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import { VolumeIndicatorNew } from '../indicators/volume.indicator-new';
 import type { LoggerService } from '../services/logger.service';
 import type { IIndicator } from '../types/indicator.interface';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -36,7 +38,7 @@ const LOW_STRENGTH_THRESHOLD = 35; // 0-100 scale
 // VOLUME ANALYZER - NEW VERSION
 // ============================================================================
 
-export class VolumeAnalyzerNew {
+export class VolumeAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
@@ -281,6 +283,58 @@ export class VolumeAnalyzerNew {
       },
     };
   }
+
+  // ===== INTERFACE IMPLEMENTATION (IAnalyzer) =====
+
+  /**
+   * Get analyzer type name
+   * @returns AnalyzerType.VOLUME
+   */
+  getType(): string {
+    return AnalyzerType.VOLUME;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   * @param candles Array of candles
+   * @returns true if enough candles, false otherwise
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_VOLUME;
+  }
+
+  /**
+   * Get minimum candles required for analysis
+   * @returns Min candle count needed
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_VOLUME;
+  }
+
+  /**
+   * Get analyzer weight (contribution to final decision)
+   * @returns Weight 0.0-1.0
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority (execution order)
+   * @returns Priority 1-10 (higher = more important)
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence this analyzer can produce
+   * @returns Max confidence 0.0-1.0
+   */
+  getMaxConfidence(): number {
+    return 0.95;
+  }
+
 
   /**
    * Reset analyzer state

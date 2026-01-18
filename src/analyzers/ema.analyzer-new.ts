@@ -23,6 +23,8 @@ import { validateIndicatorConfig } from '../types/config-new.types';
 import { EMAIndicatorNew } from '../indicators/ema.indicator-new';
 import type { LoggerService } from '../services/logger.service';
 import type { IIndicator } from '../types/indicator.interface';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -35,7 +37,7 @@ const MINIMUM_EMA_GAP_PERCENT = 0.01; // 0.01% minimum gap to register signal
 // EMA ANALYZER - NEW VERSION
 // ============================================================================
 
-export class EmaAnalyzerNew {
+export class EmaAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
@@ -313,12 +315,65 @@ export class EmaAnalyzerNew {
     this.initialized = false;
   }
 
+  // ===== INTERFACE IMPLEMENTATION (IAnalyzer) =====
+
+  /**
+   * Get analyzer type name
+   * @returns AnalyzerType.EMA
+   */
+  getType(): string {
+    return AnalyzerType.EMA;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   * @param candles Array of candles
+   * @returns true if enough candles, false otherwise
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_EMA;
+  }
+
+  /**
+   * Get minimum candles required for analysis
+   * @returns Min candle count needed
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_EMA;
+  }
+
   /**
    * Check if analyzer is enabled
    */
   isEnabled(): boolean {
     return this.enabled;
   }
+
+  /**
+   * Get analyzer weight (contribution to final decision)
+   * @returns Weight 0.0-1.0
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority (execution order)
+   * @returns Priority 1-10 (higher = more important)
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence this analyzer can produce
+   * @returns Max confidence 0.0-1.0
+   */
+  getMaxConfidence(): number {
+    return this.maxConfidence;
+  }
+
+  // ===== EXISTING METHODS =====
 
   /**
    * Get config values
