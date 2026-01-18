@@ -26,6 +26,9 @@ import {
   PositionExitingService,
 } from './index';
 import { BybitServiceAdapter } from './bybit/bybit-service.adapter';
+import { IndicatorCacheService } from './indicator-cache.service';
+import { IndicatorPreCalculationService } from './indicator-precalculation.service';
+import { CalculatorFactory } from '../factories/calculator.factory';
 import { RiskManager } from './risk-manager.service';
 import { OrderExecutionDetectorService } from './order-execution-detector.service';
 import { WebSocketAuthenticationService } from './websocket-authentication.service';
@@ -67,6 +70,10 @@ export class BotServices {
   readonly timeframeProvider: TimeframeProvider;
   readonly candleProvider: CandleProvider;
   btcCandles1m: Candle[] = []; // BTC 1-minute candles for correlation analysis
+
+  // Indicator Cache System (Phase 0.2 Integration)
+  readonly indicatorCache: IndicatorCacheService;
+  readonly indicatorPreCalc: IndicatorPreCalculationService;
 
   // Analysis & Orchestration
   readonly tradingOrchestrator: TradingOrchestrator;
@@ -251,6 +258,24 @@ export class BotServices {
       this.logger,
       config.exchange.symbol,
     );
+
+    // 5.5 Initialize Indicator Cache System (Phase 0.2 Integration)
+    this.indicatorCache = new IndicatorCacheService();
+    this.logger.info('📊 Indicator cache initialized', {
+      capacity: this.indicatorCache.getStats().capacity,
+    });
+
+    // 5.6 Initialize Pre-calculation Service
+    const calculators = CalculatorFactory.createAllCalculators();
+    this.indicatorPreCalc = new IndicatorPreCalculationService(
+      this.candleProvider,
+      this.indicatorCache,
+      calculators,
+      this.logger,
+    );
+    this.logger.info('🔄 Pre-calculation service initialized', {
+      calculators: calculators.length,
+    });
 
     // 6. Initialize optional services
     if (config.compoundInterest && config.compoundInterest.enabled) {
@@ -482,7 +507,11 @@ export class BotServices {
       riskManager,
     );
 
-    // 11.5. Link BTC candles store to TradingOrchestrator for BTC_CORRELATION analyzer
+    // 11.5. Link Pre-calculation Service to TradingOrchestrator (Phase 0.2 Integration)
+    this.tradingOrchestrator.setIndicatorPreCalculationService(this.indicatorPreCalc);
+    this.logger.info('🔗 Pre-calculation service linked to TradingOrchestrator');
+
+    // 11.6. Link BTC candles store to TradingOrchestrator for BTC_CORRELATION analyzer
     if (config.btcConfirmation?.enabled) {
       this.tradingOrchestrator.setBtcCandlesStore(this);
       this.logger.info('🔗 BTC candles store linked to TradingOrchestrator');
@@ -530,6 +559,8 @@ export class BotServices {
       bybitService: this.bybitService,
       timeframeProvider: this.timeframeProvider,
       candleProvider: this.candleProvider,
+      indicatorCache: this.indicatorCache,
+      indicatorPreCalc: this.indicatorPreCalc,
       tradingOrchestrator: this.tradingOrchestrator,
       journal: this.journal,
       sessionStats: this.sessionStats,

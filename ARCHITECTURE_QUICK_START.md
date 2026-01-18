@@ -49,7 +49,8 @@ THIS FILE: QUICK START
 | **0.3 Part 1** | Entry Decisions | ✅ DONE | src/decision-engine/entry-decisions.ts + tests | ✅ BUILD SUCCESS (3a47c01) |
 | **0.3 Part 2** | Exit Event Handler | ✅ DONE | src/exit-handler/ + types + tests | ✅ BUILD SUCCESS (5abe38c) |
 | **0.4** | Action Queue | ✅ DONE | ActionQueueService + 4 handlers | ✅ BUILD SUCCESS (2f81bdc) |
-| **2.5** | IExchange Migration | ✅ DONE | Interface + Adapter + Service Layer | 🎯 **JUST FIXED: 37→0 errors** (4db157b) |
+| **2.5** | IExchange Migration | ✅ DONE | Interface + Adapter + Service Layer | ✅ BUILD SUCCESS (4db157b) |
+| **0.2-Ext** | Cache Calculators | ✅ DONE | 4 Calculators + Factory + 101 Tests | 🎯 **JUST COMPLETED** (Session 7) |
 
 ---
 

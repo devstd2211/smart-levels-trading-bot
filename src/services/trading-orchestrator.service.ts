@@ -52,6 +52,7 @@ import { OpenPositionHandler } from '../action-handlers/open-position.handler';
 import { ClosePercentHandler } from '../action-handlers/close-percent.handler';
 import { UpdateStopLossHandler } from '../action-handlers/update-stop-loss.handler';
 import { ActivateTrailingHandler } from '../action-handlers/activate-trailing.handler';
+import { IndicatorPreCalculationService } from './indicator-precalculation.service';
 
 // ============================================================================
 // TYPES
@@ -84,6 +85,9 @@ export class TradingOrchestrator {
 
   // MTF Snapshot Gate (fixes race condition between HTF bias changes and ENTRY execution)
   private snapshotGate: MTFSnapshotGate | null = null;
+
+  // Pre-calculation Service (Phase 0.2 Integration - optional)
+  private indicatorPreCalc: IndicatorPreCalculationService | null = null;
 
   // DEBUG: Allow testing without real signals
   private testModeEnabled: boolean = false;
@@ -167,6 +171,35 @@ export class TradingOrchestrator {
       handlerCount: this.actionHandlers.length,
       handlers: this.actionHandlers.map(h => h.name),
     });
+  }
+
+  /**
+   * Set the pre-calculation service for indicator caching
+   * Called by BotServices during initialization (Phase 0.2 Integration)
+   */
+  setIndicatorPreCalculationService(preCalc: IndicatorPreCalculationService): void {
+    this.indicatorPreCalc = preCalc;
+    this.logger.debug('🔗 Pre-calculation service wired to TradingOrchestrator');
+  }
+
+  /**
+   * Log cache statistics (for monitoring)
+   * Can be called periodically by BotServices or bot.ts
+   */
+  logCacheStats(): void {
+    if (this.indicatorPreCalc && (this.indicatorPreCalc as any).cache) {
+      const cache = (this.indicatorPreCalc as any).cache;
+      if (cache.getStats) {
+        const stats = cache.getStats();
+        this.logger.info('📊 Indicator Cache Statistics', {
+          hitRate: `${stats.hitRate.toFixed(2)}%`,
+          hits: stats.hits,
+          misses: stats.misses,
+          entries: `${stats.size}/${stats.capacity}`,
+          evictions: stats.evictions,
+        });
+      }
+    }
   }
 
   /**
@@ -307,6 +340,18 @@ export class TradingOrchestrator {
    */
   async onCandleClosed(role: TimeframeRole, candle: Candle): Promise<void> {
     try {
+      // Phase 0.2 Integration: Trigger pre-calculation of indicators on candle close
+      // This ensures indicators are cached before analyzers need them
+      if (this.indicatorPreCalc) {
+        try {
+          await this.indicatorPreCalc.onCandleClosed(role, candle.timestamp);
+        } catch (err) {
+          this.logger.debug('Pre-calculation service error (non-critical)', {
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+
       // PRIMARY (5m) closed → MAIN ENTRY SIGNAL ANALYSIS
       // This is the DECIDING timeframe where analyzers generate entry signals
       if (role === TimeframeRole.PRIMARY) {
