@@ -315,7 +315,12 @@ describe('LadderTpManagerService', () => {
       const success = await service.executePartialClose(level, position);
 
       expect(success).toBe(true);
-      expect(bybitService.closePosition).toHaveBeenCalledWith(PositionSide.LONG, 33); // 100 * 0.33
+      expect(bybitService.closePosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: position.id,
+          percentage: 33,
+        })
+      );
     });
 
     it('should execute partial close for TP2 (33%)', async () => {
@@ -334,7 +339,12 @@ describe('LadderTpManagerService', () => {
       const success = await service.executePartialClose(level, position);
 
       expect(success).toBe(true);
-      expect(bybitService.closePosition).toHaveBeenCalledWith(PositionSide.SHORT, 16.5); // 50 * 0.33
+      expect(bybitService.closePosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: position.id,
+          percentage: 33,
+        })
+      );
     });
 
     it('should skip partial close if quantity too small', async () => {
@@ -386,7 +396,12 @@ describe('LadderTpManagerService', () => {
       const success = await service.moveToBreakeven(position);
 
       expect(success).toBe(true);
-      expect(bybitService.updateStopLoss).toHaveBeenCalledWith(1.0); // Entry price
+      expect(bybitService.updateStopLoss).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: position.id,
+          newPrice: 1.0,
+        })
+      );
     });
 
     it('should move SL to breakeven after TP1 (SHORT)', async () => {
@@ -397,7 +412,12 @@ describe('LadderTpManagerService', () => {
       const success = await service.moveToBreakeven(position);
 
       expect(success).toBe(true);
-      expect(bybitService.updateStopLoss).toHaveBeenCalledWith(2.0); // Entry price
+      expect(bybitService.updateStopLoss).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: position.id,
+          newPrice: 2.0,
+        })
+      );
     });
 
     it('should NOT move to breakeven if disabled in config', async () => {
@@ -444,7 +464,12 @@ describe('LadderTpManagerService', () => {
 
       // Trailing SL: 1.002 * (1 - 0.05/100) = 1.00195
       const expectedSl = 1.002 * 0.9995;
-      expect(bybitService.updateStopLoss).toHaveBeenCalledWith(expectedSl);
+      expect(bybitService.updateStopLoss).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: position.id,
+          newPrice: expectedSl,
+        })
+      );
     });
 
     it('should move trailing SL after TP2 (SHORT)', async () => {
@@ -459,7 +484,12 @@ describe('LadderTpManagerService', () => {
 
       // Trailing SL: 0.998 * (1 + 0.05/100) = 0.99805
       const expectedSl = 0.998 * 1.0005;
-      expect(bybitService.updateStopLoss).toHaveBeenCalledWith(expectedSl);
+      expect(bybitService.updateStopLoss).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: position.id,
+          newPrice: expectedSl,
+        })
+      );
     });
 
     it('should NOT move trailing if new SL worse than current (LONG)', async () => {

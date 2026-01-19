@@ -313,7 +313,12 @@ describe('PositionSyncService', () => {
 
       await service.deepSyncCheck(position);
 
-      expect(mockBybit.closePosition).toHaveBeenCalledWith(PositionSide.LONG, 10);
+      expect(mockBybit.closePosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: position.id,
+          percentage: 100,
+        })
+      );
     });
 
     it('should send alert when closing for missing SL', async () => {
@@ -374,7 +379,12 @@ describe('PositionSyncService', () => {
       await service.deepSyncCheck(position);
 
       // Should attempt to close when SL is missing
-      expect(mockBybit.closePosition).toHaveBeenCalledWith(PositionSide.LONG, 10);
+      expect(mockBybit.closePosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: position.id,
+          percentage: 100,
+        })
+      );
     });
 
     it('should log position age', async () => {

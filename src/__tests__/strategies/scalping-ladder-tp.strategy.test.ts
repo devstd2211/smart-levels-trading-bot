@@ -298,10 +298,20 @@ describe('ScalpingLadderTpStrategy', () => {
       expect(activeLadder!.levels[0].hit).toBe(true);
 
       // Partial close should be executed (33%)
-      expect(bybitService.closePosition).toHaveBeenCalledWith(PositionSide.LONG, 33);
+      expect(bybitService.closePosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: position.id,
+          percentage: 33,
+        })
+      );
 
       // SL should be moved to breakeven (1.0)
-      expect(bybitService.updateStopLoss).toHaveBeenCalledWith(1.0);
+      expect(bybitService.updateStopLoss).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: position.id,
+          newPrice: 1.0,
+        })
+      );
 
       // Position quantity should be reduced
       expect(activeLadder!.position.quantity).toBe(67); // 100 * (1 - 0.33)
@@ -322,8 +332,18 @@ describe('ScalpingLadderTpStrategy', () => {
       const activeLadder = strategy.getActiveLadder();
 
       expect(activeLadder!.tp1Hit).toBe(true);
-      expect(bybitService.closePosition).toHaveBeenCalledWith(PositionSide.SHORT, 33);
-      expect(bybitService.updateStopLoss).toHaveBeenCalledWith(1.0);
+      expect(bybitService.closePosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: position.id,
+          percentage: 33,
+        })
+      );
+      expect(bybitService.updateStopLoss).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: position.id,
+          newPrice: 1.0,
+        })
+      );
     });
 
     it('should NOT trigger TP1 when price not reached', async () => {
@@ -373,7 +393,12 @@ describe('ScalpingLadderTpStrategy', () => {
       expect(activeLadder!.levels[1].hit).toBe(true);
 
       // Partial close should be executed (33% of remaining 67)
-      expect(bybitService.closePosition).toHaveBeenCalledWith(PositionSide.LONG, expect.any(Number));
+      expect(bybitService.closePosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: position.id,
+          percentage: 33,
+        })
+      );
 
       // Position quantity should be reduced again
       // 67 * (1 - 0.33) ≈ 44.89

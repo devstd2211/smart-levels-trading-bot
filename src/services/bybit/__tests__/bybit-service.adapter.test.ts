@@ -77,16 +77,16 @@ describe('BybitServiceAdapter', () => {
   describe('Phase 1: Connection Lifecycle', () => {
     describe('connect()', () => {
       it('should initialize connection successfully', async () => {
-        mockBybitService.connect = jest.fn().mockResolvedValue(undefined);
+        mockBybitService.getServerTime = jest.fn().mockResolvedValue(Date.now());
 
         await adapter.connect();
 
-        expect(mockBybitService.connect).toHaveBeenCalled();
+        expect(mockBybitService.getServerTime).toHaveBeenCalled();
       });
 
       it('should throw error if connection fails', async () => {
         const error = new Error('Connection failed');
-        mockBybitService.connect = jest.fn().mockRejectedValue(error);
+        mockBybitService.getServerTime = jest.fn().mockRejectedValue(error);
 
         await expect(adapter.connect()).rejects.toThrow('Connection failed');
       });
@@ -94,52 +94,52 @@ describe('BybitServiceAdapter', () => {
 
     describe('disconnect()', () => {
       it('should disconnect successfully', async () => {
-        mockBybitService.disconnect = jest.fn().mockResolvedValue(undefined);
-
         await adapter.disconnect();
 
-        expect(mockBybitService.disconnect).toHaveBeenCalled();
+        expect(adapter.isConnected()).toBe(false);
       });
 
-      it('should throw error if disconnect fails', async () => {
-        const error = new Error('Disconnect failed');
-        mockBybitService.disconnect = jest.fn().mockRejectedValue(error);
+      it('should update connection state on disconnect', async () => {
+        // First connect
+        mockBybitService.getServerTime = jest.fn().mockResolvedValue(Date.now());
+        await adapter.connect();
 
-        await expect(adapter.disconnect()).rejects.toThrow('Disconnect failed');
+        // Then disconnect
+        await adapter.disconnect();
+
+        expect(adapter.isConnected()).toBe(false);
       });
     });
 
     describe('isConnected()', () => {
-      it('should return true when connected', () => {
-        mockBybitService.isConnected = jest.fn().mockReturnValue(true);
+      it('should return false initially', () => {
+        const result = adapter.isConnected();
+
+        expect(result).toBe(false);
+      });
+
+      it('should return true when connected', async () => {
+        mockBybitService.getServerTime = jest.fn().mockResolvedValue(Date.now());
+        await adapter.connect();
 
         const result = adapter.isConnected();
 
         expect(result).toBe(true);
-        expect(mockBybitService.isConnected).toHaveBeenCalled();
-      });
-
-      it('should return false when disconnected', () => {
-        mockBybitService.isConnected = jest.fn().mockReturnValue(false);
-
-        const result = adapter.isConnected();
-
-        expect(result).toBe(false);
       });
     });
 
     describe('healthCheck()', () => {
       it('should return true when exchange is healthy', async () => {
-        mockBybitService.getExchangeTime = jest.fn().mockResolvedValue(Date.now());
+        mockBybitService.getServerTime = jest.fn().mockResolvedValue(Date.now());
 
         const result = await adapter.healthCheck();
 
         expect(result).toBe(true);
-        expect(mockBybitService.getExchangeTime).toHaveBeenCalled();
+        expect(mockBybitService.getServerTime).toHaveBeenCalled();
       });
 
       it('should return false when exchange is unhealthy', async () => {
-        mockBybitService.getExchangeTime = jest.fn().mockRejectedValue(new Error('Exchange down'));
+        mockBybitService.getServerTime = jest.fn().mockRejectedValue(new Error('Exchange down'));
 
         const result = await adapter.healthCheck();
 
@@ -188,25 +188,25 @@ describe('BybitServiceAdapter', () => {
 
     describe('getLatestPrice()', () => {
       it('should fetch latest price for symbol', async () => {
-        mockBybitService.getLatestPrice = jest.fn().mockResolvedValue(50000);
+        mockBybitService.getCurrentPrice = jest.fn().mockResolvedValue(50000);
 
-        const result = await adapter.getLatestPrice('BTC/USDT');
+        const result = await adapter.getLatestPrice('APEXUSDT');
 
         expect(result).toBe(50000);
-        expect(mockBybitService.getLatestPrice).toHaveBeenCalled();
+        expect(mockBybitService.getCurrentPrice).toHaveBeenCalled();
       });
 
       it('should throw error when price fetch fails', async () => {
-        mockBybitService.getLatestPrice = jest.fn().mockRejectedValue(new Error('Network error'));
+        mockBybitService.getCurrentPrice = jest.fn().mockRejectedValue(new Error('Network error'));
 
-        await expect(adapter.getLatestPrice('BTC/USDT')).rejects.toThrow('Network error');
+        await expect(adapter.getLatestPrice('APEXUSDT')).rejects.toThrow('Network error');
       });
     });
 
     describe('getExchangeTime()', () => {
       it('should return exchange server time', async () => {
         const now = Date.now();
-        mockBybitService.getExchangeTime = jest.fn().mockResolvedValue(now);
+        mockBybitService.getServerTime = jest.fn().mockResolvedValue(now);
 
         const result = await adapter.getExchangeTime();
 
@@ -214,16 +214,16 @@ describe('BybitServiceAdapter', () => {
       });
 
       it('should throw error when time fetch fails', async () => {
-        mockBybitService.getExchangeTime = jest.fn().mockRejectedValue(new Error('Time sync failed'));
+        mockBybitService.getServerTime = jest.fn().mockRejectedValue(new Error('Time sync failed'));
 
         await expect(adapter.getExchangeTime()).rejects.toThrow('Time sync failed');
       });
     });
 
     describe('getServerTime()', () => {
-      it('should be alias for getExchangeTime()', async () => {
+      it('should return server time', async () => {
         const now = Date.now();
-        mockBybitService.getExchangeTime = jest.fn().mockResolvedValue(now);
+        mockBybitService.getServerTime = jest.fn().mockResolvedValue(now);
 
         const result = await adapter.getServerTime();
 
@@ -232,8 +232,8 @@ describe('BybitServiceAdapter', () => {
     });
 
     describe('getCurrentPrice()', () => {
-      it('should be alias for getLatestPrice()', async () => {
-        mockBybitService.getLatestPrice = jest.fn().mockResolvedValue(50000);
+      it('should return current price', async () => {
+        mockBybitService.getCurrentPrice = jest.fn().mockResolvedValue(50000);
 
         const result = await adapter.getCurrentPrice();
 
@@ -243,17 +243,21 @@ describe('BybitServiceAdapter', () => {
 
     describe('getSymbolPrecision()', () => {
       it('should return precision info for symbol', async () => {
-        const precisionInfo = {
-          pricePrecision: 2,
-          quantityPrecision: 4,
-          minOrderQty: 0.001,
+        const mockLimits = {
+          qtyStep: '0.001',
+          tickSize: '0.01',
+          minOrderQty: '0.001',
+          minOrderValue: '10',
+          maxOrderQty: '10000',
         };
 
-        mockBybitService.getSymbolPrecision = jest.fn().mockResolvedValue(precisionInfo);
+        mockBybitService.getExchangeLimits = jest.fn().mockReturnValue(mockLimits);
 
-        const result = await adapter.getSymbolPrecision('BTC/USDT');
+        const result = await adapter.getSymbolPrecision('APEXUSDT');
 
-        expect(result).toEqual(precisionInfo);
+        expect(result.pricePrecision).toBe(2);
+        expect(result.quantityPrecision).toBe(3);
+        expect(result.minOrderQty).toBe(0.001);
       });
     });
   });
@@ -350,6 +354,30 @@ describe('BybitServiceAdapter', () => {
 
     describe('closePosition()', () => {
       it('should close position fully', async () => {
+        const mockPosition = {
+          id: 'pos_123',
+          symbol: 'APEXUSDT',
+          side: PositionSide.LONG,
+          quantity: 10,
+          entryPrice: 5000,
+          leverage: 5,
+          marginUsed: 10000,
+          openedAt: Date.now(),
+          unrealizedPnL: 100,
+          orderId: 'order_1',
+          reason: 'Signal',
+          status: 'OPEN' as const,
+          stopLoss: {
+            price: 4500,
+            initialPrice: 4500,
+            isBreakeven: false,
+            isTrailing: false,
+            updatedAt: Date.now(),
+          },
+          takeProfits: [],
+        };
+
+        mockBybitService.getPosition = jest.fn().mockResolvedValue(mockPosition);
         mockBybitService.closePosition = jest.fn().mockResolvedValue(undefined);
 
         const params: ClosePositionParams = {
@@ -358,10 +386,37 @@ describe('BybitServiceAdapter', () => {
 
         await adapter.closePosition(params);
 
-        expect(mockBybitService.closePosition).toHaveBeenCalled();
+        expect(mockBybitService.closePosition).toHaveBeenCalledWith(
+          PositionSide.LONG,
+          10
+        );
       });
 
       it('should close position partially when percentage specified', async () => {
+        const mockPosition = {
+          id: 'pos_123',
+          symbol: 'APEXUSDT',
+          side: PositionSide.LONG,
+          quantity: 10,
+          entryPrice: 5000,
+          leverage: 5,
+          marginUsed: 10000,
+          openedAt: Date.now(),
+          unrealizedPnL: 100,
+          orderId: 'order_1',
+          reason: 'Signal',
+          status: 'OPEN' as const,
+          stopLoss: {
+            price: 4500,
+            initialPrice: 4500,
+            isBreakeven: false,
+            isTrailing: false,
+            updatedAt: Date.now(),
+          },
+          takeProfits: [],
+        };
+
+        mockBybitService.getPosition = jest.fn().mockResolvedValue(mockPosition);
         mockBybitService.closePosition = jest.fn().mockResolvedValue(undefined);
 
         const params: ClosePositionParams = {
@@ -371,22 +426,49 @@ describe('BybitServiceAdapter', () => {
 
         await adapter.closePosition(params);
 
-        expect(mockBybitService.closePosition).toHaveBeenCalled();
+        expect(mockBybitService.closePosition).toHaveBeenCalledWith(
+          PositionSide.LONG,
+          5
+        );
       });
 
-      it('should throw error when close fails', async () => {
-        mockBybitService.closePosition = jest.fn().mockRejectedValue(new Error('Position not found'));
+      it('should throw error when position not found', async () => {
+        mockBybitService.getPosition = jest.fn().mockResolvedValue(null);
 
         const params: ClosePositionParams = {
           positionId: 'invalid_id',
         };
 
-        await expect(adapter.closePosition(params)).rejects.toThrow('Position not found');
+        await expect(adapter.closePosition(params)).rejects.toThrow('Position invalid_id not found');
       });
     });
 
     describe('updateStopLoss()', () => {
       it('should update stop loss price', async () => {
+        const mockPosition = {
+          id: 'pos_123',
+          symbol: 'APEXUSDT',
+          side: PositionSide.LONG,
+          quantity: 10,
+          entryPrice: 5000,
+          leverage: 5,
+          marginUsed: 10000,
+          openedAt: Date.now(),
+          unrealizedPnL: 100,
+          orderId: 'order_1',
+          reason: 'Signal',
+          status: 'OPEN' as const,
+          stopLoss: {
+            price: 4500,
+            initialPrice: 4500,
+            isBreakeven: false,
+            isTrailing: false,
+            updatedAt: Date.now(),
+          },
+          takeProfits: [],
+        };
+
+        mockBybitService.getPosition = jest.fn().mockResolvedValue(mockPosition);
         mockBybitService.updateStopLoss = jest.fn().mockResolvedValue(undefined);
 
         const params: UpdateStopLossParams = {
@@ -396,24 +478,48 @@ describe('BybitServiceAdapter', () => {
 
         await adapter.updateStopLoss(params);
 
-        expect(mockBybitService.updateStopLoss).toHaveBeenCalled();
+        expect(mockBybitService.updateStopLoss).toHaveBeenCalledWith(9000);
       });
 
-      it('should throw error when update fails', async () => {
-        mockBybitService.updateStopLoss = jest.fn().mockRejectedValue(new Error('Invalid price'));
+      it('should throw error when position not found', async () => {
+        mockBybitService.getPosition = jest.fn().mockResolvedValue(null);
 
         const params: UpdateStopLossParams = {
           positionId: 'pos_123',
           newPrice: 50000,
         };
 
-        await expect(adapter.updateStopLoss(params)).rejects.toThrow('Invalid price');
+        await expect(adapter.updateStopLoss(params)).rejects.toThrow('Position pos_123 not found');
       });
     });
 
     describe('activateTrailing()', () => {
       it('should activate trailing stop', async () => {
-        mockBybitService.activateTrailing = jest.fn().mockResolvedValue(undefined);
+        const mockPosition = {
+          id: 'pos_123',
+          symbol: 'APEXUSDT',
+          side: PositionSide.LONG,
+          quantity: 10,
+          entryPrice: 5000,
+          leverage: 5,
+          marginUsed: 10000,
+          openedAt: Date.now(),
+          unrealizedPnL: 100,
+          orderId: 'order_1',
+          reason: 'Signal',
+          status: 'OPEN' as const,
+          stopLoss: {
+            price: 4500,
+            initialPrice: 4500,
+            isBreakeven: false,
+            isTrailing: false,
+            updatedAt: Date.now(),
+          },
+          takeProfits: [],
+        };
+
+        mockBybitService.getPosition = jest.fn().mockResolvedValue(mockPosition);
+        mockBybitService.setTrailingStop = jest.fn().mockResolvedValue(undefined);
 
         const params: ActivateTrailingParams = {
           positionId: 'pos_123',
@@ -422,58 +528,62 @@ describe('BybitServiceAdapter', () => {
 
         await adapter.activateTrailing(params);
 
-        expect(mockBybitService.activateTrailing).toHaveBeenCalled();
+        expect(mockBybitService.setTrailingStop).toHaveBeenCalledWith(
+          expect.objectContaining({
+            side: PositionSide.LONG,
+            trailingPercent: 2,
+          })
+        );
       });
 
-      it('should throw error when activation fails', async () => {
-        mockBybitService.activateTrailing = jest.fn().mockRejectedValue(new Error('Trailing not supported'));
+      it('should throw error when position not found', async () => {
+        mockBybitService.getPosition = jest.fn().mockResolvedValue(null);
 
         const params: ActivateTrailingParams = {
           positionId: 'pos_123',
           trailingPercent: 2,
         };
 
-        await expect(adapter.activateTrailing(params)).rejects.toThrow('Trailing not supported');
+        await expect(adapter.activateTrailing(params)).rejects.toThrow('Position pos_123 not found');
       });
     });
 
     describe('getOpenPositions()', () => {
       it('should return array of open positions', async () => {
-        const mockPositions = [
-          {
-            id: 'pos_1',
-            symbol: 'APEXUSDT',
-            side: PositionSide.LONG,
-            quantity: 10,
-            entryPrice: 5000,
-            leverage: 5,
-            marginUsed: 10000,
-            openedAt: Date.now(),
-            unrealizedPnL: 100,
-            orderId: 'order_1',
-            reason: 'Signal',
-            status: 'OPEN' as const,
-            stopLoss: {
-              price: 4500,
-              initialPrice: 4500,
-              isBreakeven: false,
-              isTrailing: false,
-              updatedAt: Date.now(),
-            },
-            takeProfits: [],
+        const mockPosition = {
+          id: 'pos_1',
+          symbol: 'APEXUSDT',
+          side: PositionSide.LONG,
+          quantity: 10,
+          entryPrice: 5000,
+          leverage: 5,
+          marginUsed: 10000,
+          openedAt: Date.now(),
+          unrealizedPnL: 100,
+          orderId: 'order_1',
+          reason: 'Signal',
+          status: 'OPEN' as const,
+          stopLoss: {
+            price: 4500,
+            initialPrice: 4500,
+            isBreakeven: false,
+            isTrailing: false,
+            updatedAt: Date.now(),
           },
-        ];
+          takeProfits: [],
+        };
 
-        mockBybitService.getOpenPositions = jest.fn().mockResolvedValue(mockPositions);
+        mockBybitService.getPosition = jest.fn().mockResolvedValue(mockPosition);
 
         const result = await adapter.getOpenPositions();
 
-        expect(result).toEqual(mockPositions);
-        expect(mockBybitService.getOpenPositions).toHaveBeenCalled();
+        expect(result).toHaveLength(1);
+        expect(result[0].id).toBe('pos_1');
+        expect(mockBybitService.getPosition).toHaveBeenCalled();
       });
 
       it('should return empty array when no positions open', async () => {
-        mockBybitService.getOpenPositions = jest.fn().mockResolvedValue([]);
+        mockBybitService.getPosition = jest.fn().mockResolvedValue(null);
 
         const result = await adapter.getOpenPositions();
 
@@ -524,7 +634,30 @@ describe('BybitServiceAdapter', () => {
 
     describe('hasPosition()', () => {
       it('should return true when position exists for symbol', async () => {
-        mockBybitService.hasPosition = jest.fn().mockResolvedValue(true);
+        const mockPosition = {
+          id: 'pos_1',
+          symbol: 'APEXUSDT',
+          side: PositionSide.LONG,
+          quantity: 10,
+          entryPrice: 5000,
+          leverage: 5,
+          marginUsed: 10000,
+          openedAt: Date.now(),
+          unrealizedPnL: 100,
+          orderId: 'order_1',
+          reason: 'Signal',
+          status: 'OPEN' as const,
+          stopLoss: {
+            price: 4500,
+            initialPrice: 4500,
+            isBreakeven: false,
+            isTrailing: false,
+            updatedAt: Date.now(),
+          },
+          takeProfits: [],
+        };
+
+        mockBybitService.getPosition = jest.fn().mockResolvedValue(mockPosition);
 
         const result = await adapter.hasPosition('APEXUSDT');
 
@@ -532,9 +665,9 @@ describe('BybitServiceAdapter', () => {
       });
 
       it('should return false when no position exists for symbol', async () => {
-        mockBybitService.hasPosition = jest.fn().mockResolvedValue(false);
+        mockBybitService.getPosition = jest.fn().mockResolvedValue(null);
 
-        const result = await adapter.hasPosition('BTC/USDT');
+        const result = await adapter.hasPosition('APEXUSDT');
 
         expect(result).toBe(false);
       });
@@ -548,13 +681,7 @@ describe('BybitServiceAdapter', () => {
   describe('Phase 2C: Order Management', () => {
     describe('createConditionalOrder()', () => {
       it('should create conditional order', async () => {
-        mockBybitService.createConditionalOrder = jest.fn().mockResolvedValue({
-          orderId: 'cond_order_1',
-          symbol: 'APEXUSDT',
-          side: 'Buy',
-          quantity: 10,
-          timestamp: Date.now(),
-        });
+        mockBybitService.placeStopLoss = jest.fn().mockResolvedValue('cond_order_1');
 
         const result = await adapter.createConditionalOrder({
           symbol: 'APEXUSDT',
@@ -566,41 +693,68 @@ describe('BybitServiceAdapter', () => {
 
         expect(result).toBeDefined();
         expect(result.orderId).toBe('cond_order_1');
+        expect(result.symbol).toBe('APEXUSDT');
+        expect(mockBybitService.placeStopLoss).toHaveBeenCalledWith(
+          expect.objectContaining({
+            side: PositionSide.LONG,
+            quantity: 10,
+            stopPrice: 5500,
+          })
+        );
       });
     });
 
     describe('cancelOrder()', () => {
       it('should cancel order by ID', async () => {
-        mockBybitService.cancelOrder = jest.fn().mockResolvedValue(undefined);
+        mockBybitService.cancelStopLoss = jest.fn().mockResolvedValue(undefined);
 
         await adapter.cancelOrder('order_123');
 
-        expect(mockBybitService.cancelOrder).toHaveBeenCalledWith('order_123');
+        expect(mockBybitService.cancelStopLoss).toHaveBeenCalledWith('order_123');
+      });
+
+      it('should try cancel take profit if stop loss cancel fails', async () => {
+        mockBybitService.cancelStopLoss = jest.fn().mockRejectedValue(new Error('Not found'));
+        mockBybitService.cancelTakeProfit = jest.fn().mockResolvedValue(undefined);
+
+        await adapter.cancelOrder('order_456');
+
+        expect(mockBybitService.cancelStopLoss).toHaveBeenCalledWith('order_456');
+        expect(mockBybitService.cancelTakeProfit).toHaveBeenCalledWith('order_456');
       });
     });
 
     describe('getOrderStatus()', () => {
-      it('should return order status', async () => {
-        mockBybitService.getOrderStatus = jest.fn().mockResolvedValue({
-          orderId: 'order_123',
-          status: 'FILLED',
-          filledQuantity: 10,
-          averagePrice: 5000,
-        });
+      it('should return PENDING when order in active orders', async () => {
+        mockBybitService.getActiveOrders = jest.fn().mockResolvedValue([
+          {
+            orderId: 'order_123',
+            status: 'PENDING',
+          },
+        ]);
 
         const result = await adapter.getOrderStatus('order_123');
 
-        expect(result.status).toBe('FILLED');
+        expect(result.status).toBe('PENDING');
+        expect(result.orderId).toBe('order_123');
+      });
+
+      it('should return CANCELLED when order not in active orders', async () => {
+        mockBybitService.getActiveOrders = jest.fn().mockResolvedValue([]);
+
+        const result = await adapter.getOrderStatus('order_123');
+
+        expect(result.status).toBe('CANCELLED');
       });
     });
 
     describe('cancelAllOrders()', () => {
       it('should cancel all orders for symbol', async () => {
-        mockBybitService.cancelAllOrders = jest.fn().mockResolvedValue(undefined);
+        mockBybitService.cancelAllConditionalOrders = jest.fn().mockResolvedValue(undefined);
 
         await adapter.cancelAllOrders('APEXUSDT');
 
-        expect(mockBybitService.cancelAllOrders).toHaveBeenCalled();
+        expect(mockBybitService.cancelAllConditionalOrders).toHaveBeenCalled();
       });
     });
 
@@ -622,27 +776,55 @@ describe('BybitServiceAdapter', () => {
   describe('Phase 2D: Account Management', () => {
     describe('getBalance()', () => {
       it('should return account balance', async () => {
-        mockBybitService.getBalance = jest.fn().mockResolvedValue({
-          walletBalance: 100000,
-          availableBalance: 50000,
-          totalMarginUsed: 50000,
-          totalUnrealizedPnL: 1000,
-        });
+        mockBybitService.getBalance = jest.fn().mockResolvedValue(100000);
 
         const result = await adapter.getBalance();
 
         expect(result.walletBalance).toBe(100000);
-        expect(result.availableBalance).toBe(50000);
+        expect(result.availableBalance).toBe(100000);
+        expect(result.totalMarginUsed).toBe(0);
+        expect(result.totalUnrealizedPnL).toBe(0);
       });
     });
 
     describe('getLeverage()', () => {
-      it('should return current leverage', async () => {
-        mockBybitService.getLeverage = jest.fn().mockResolvedValue(5);
+      it('should return current leverage from position', async () => {
+        const mockPosition = {
+          id: 'pos_1',
+          symbol: 'APEXUSDT',
+          side: PositionSide.LONG,
+          quantity: 10,
+          entryPrice: 5000,
+          leverage: 5,
+          marginUsed: 10000,
+          openedAt: Date.now(),
+          unrealizedPnL: 100,
+          orderId: 'order_1',
+          reason: 'Signal',
+          status: 'OPEN' as const,
+          stopLoss: {
+            price: 4500,
+            initialPrice: 4500,
+            isBreakeven: false,
+            isTrailing: false,
+            updatedAt: Date.now(),
+          },
+          takeProfits: [],
+        };
+
+        mockBybitService.getPosition = jest.fn().mockResolvedValue(mockPosition);
 
         const result = await adapter.getLeverage('APEXUSDT');
 
         expect(result).toBe(5);
+      });
+
+      it('should return 1 when no position exists', async () => {
+        mockBybitService.getPosition = jest.fn().mockResolvedValue(null);
+
+        const result = await adapter.getLeverage('APEXUSDT');
+
+        expect(result).toBe(1);
       });
     });
 

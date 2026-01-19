@@ -224,7 +224,7 @@ describe('PositionExitingService', () => {
 
       expect(mockBybit.setTrailingStop).toHaveBeenCalledWith(
         expect.objectContaining({
-          side: PositionSide.LONG,
+          side: 'Buy',
           activationPrice: 120,
           trailingPercent: 2,
         }),
@@ -267,7 +267,12 @@ describe('PositionExitingService', () => {
 
       await service.onTakeProfitHit(position, 1, 110);
 
-      expect(mockBybit.updateStopLoss).toHaveBeenCalledWith(100.1);
+      expect(mockBybit.updateStopLoss).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: expect.any(String),
+          newPrice: expect.closeTo(100.1, 2),
+        }),
+      );
       expect(position.stopLoss.isBreakeven).toBe(true);
     });
 
@@ -312,7 +317,12 @@ describe('PositionExitingService', () => {
 
       await service.onTakeProfitHit(position, 1, 90);
 
-      expect(mockBybit.updateStopLoss).toHaveBeenCalledWith(99.9);
+      expect(mockBybit.updateStopLoss).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: expect.any(String),
+          newPrice: expect.closeTo(99.9, 2),
+        }),
+      );
       expect(position.stopLoss.isBreakeven).toBe(true);
     });
   });
@@ -359,7 +369,7 @@ describe('PositionExitingService', () => {
       await service.onTakeProfitHit(position, 2, 120);
 
       expect(mockBybit.setTrailingStop).toHaveBeenCalledWith({
-        side: PositionSide.LONG,
+        side: 'Buy',
         activationPrice: 120,
         trailingPercent: 2,
       });
@@ -393,7 +403,7 @@ describe('PositionExitingService', () => {
 
       expect(position.stopLoss.isTrailing).toBe(true);
       expect(mockBybit.setTrailingStop).toHaveBeenCalledWith({
-        side: PositionSide.SHORT,
+        side: 'Sell',
         activationPrice: 80,
         trailingPercent: 2,
       });
@@ -780,7 +790,12 @@ describe('PositionExitingService', () => {
       await service.updateBBTrailingStop(position, candles);
 
       // BB lower band should be around 100, so SL should update to be higher
-      expect(mockBybit.updateStopLoss).toHaveBeenCalledWith(expect.closeTo(100, 0));
+      expect(mockBybit.updateStopLoss).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: expect.any(String),
+          newPrice: expect.closeTo(100, 0),
+        }),
+      );
       expect(position.stopLoss.price).toBeGreaterThan(85);
     });
 

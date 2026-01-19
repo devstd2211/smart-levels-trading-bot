@@ -374,7 +374,7 @@ describe('MTFSnapshotGate - Functional Tests', () => {
 
       // If HTF stays BEARISH, entry should be blocked (conservative)
       const resultBearish = gate.validateSnapshot(TrendBias.BEARISH);
-      expect(resultBearish.valid).toBe(true); // LONG + BEARISH is incompatible
+      expect(resultBearish.valid).toBe(false); // LONG + BEARISH is incompatible
     });
 
     it('should handle inverted head-and-shoulders (bottoming pattern)', () => {
@@ -562,10 +562,7 @@ describe('MTFSnapshotGate - Functional Tests', () => {
       } as any, signal, candle);
 
       expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('[MTF-SNAPSHOT] Created snapshot'),
-        expect.objectContaining({
-          htfBias: TrendBias.BULLISH,
-        })
+        expect.stringContaining('[MTF-SNAPSHOT] Created snapshot')
       );
     });
 
@@ -604,8 +601,7 @@ describe('MTFSnapshotGate - Functional Tests', () => {
       // Invalid validation
       gate.validateSnapshot(TrendBias.BEARISH);
       expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('[MTF-SNAPSHOT] Bias mismatch'),
-        expect.any(Object)
+        expect.stringContaining('[MTF-SNAPSHOT] Bias mismatch')
       );
     });
   });

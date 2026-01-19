@@ -204,7 +204,12 @@ describe('PositionExitingService', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockBybit.closePosition).toHaveBeenCalledWith(PositionSide.LONG, 5); // 50% of 10
+      expect(mockBybit.closePosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: 'APEXUSDT_Buy',
+          percentage: 50,
+        })
+      );
     });
 
     it('should route CLOSE_ALL action to closeFullPosition', async () => {
@@ -220,7 +225,12 @@ describe('PositionExitingService', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockBybit.closePosition).toHaveBeenCalledWith(PositionSide.LONG, 10);
+      expect(mockBybit.closePosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: 'APEXUSDT_Buy',
+          percentage: 100,
+        })
+      );
       expect(position.status).toBe('CLOSED');
     });
 
@@ -237,7 +247,12 @@ describe('PositionExitingService', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockBybit.updateStopLoss).toHaveBeenCalledWith(101);
+      expect(mockBybit.updateStopLoss).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: 'APEXUSDT_Buy',
+          newPrice: 101,
+        })
+      );
       expect(position.stopLoss.price).toBe(101);
     });
 
@@ -318,7 +333,12 @@ describe('PositionExitingService', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockBybit.closePosition).toHaveBeenCalledWith(PositionSide.LONG, 5);
+      expect(mockBybit.closePosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: 'APEXUSDT_Buy',
+          percentage: 50,
+        })
+      );
       expect(position.quantity).toBe(5); // 50% of 10
     });
 
@@ -333,7 +353,12 @@ describe('PositionExitingService', () => {
         ExitType.TAKE_PROFIT_1,
       );
 
-      expect(mockBybit.closePosition).toHaveBeenCalledWith(PositionSide.LONG, 2.5);
+      expect(mockBybit.closePosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: 'APEXUSDT_Buy',
+          percentage: 25,
+        })
+      );
       expect(position.quantity).toBe(7.5);
     });
 
@@ -418,7 +443,12 @@ describe('PositionExitingService', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockBybit.closePosition).toHaveBeenCalledWith(PositionSide.LONG, 10);
+      expect(mockBybit.closePosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: 'APEXUSDT_Buy',
+          percentage: 100,
+        })
+      );
       expect(position.status).toBe('CLOSED');
     });
 
@@ -604,7 +634,12 @@ describe('PositionExitingService', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockBybit.updateStopLoss).toHaveBeenCalledWith(101);
+      expect(mockBybit.updateStopLoss).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: 'APEXUSDT_Buy',
+          newPrice: 101,
+        })
+      );
       expect(position.stopLoss.price).toBe(101);
     });
 
@@ -623,7 +658,12 @@ describe('PositionExitingService', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockBybit.updateStopLoss).toHaveBeenCalledWith(99);
+      expect(mockBybit.updateStopLoss).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: 'APEXUSDT_Buy',
+          newPrice: 99,
+        })
+      );
       expect(position.stopLoss.price).toBe(99);
     });
 
@@ -953,7 +993,12 @@ describe('PositionExitingService', () => {
       );
 
       expect(result).toBe(true);
-      expect(mockBybit.closePosition).toHaveBeenCalledWith(PositionSide.SHORT, 10);
+      expect(mockBybit.closePosition).toHaveBeenCalledWith(
+        expect.objectContaining({
+          positionId: 'APEXUSDT_Buy',
+          percentage: 100,
+        })
+      );
     });
 
     it('should handle very small position sizes', async () => {

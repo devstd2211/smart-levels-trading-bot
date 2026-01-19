@@ -151,7 +151,14 @@ describe('StrategyLoaderService', () => {
           lastModified: '2026-01-09T00:00:00Z',
           tags: [],
         },
-        analyzers: [],
+        analyzers: [
+          {
+            name: 'EMA_ANALYZER_NEW',
+            enabled: true,
+            weight: 0.5,
+            priority: 1,
+          },
+        ],
       };
 
       const filePath = join(tempDir, 'no-name.strategy.json');
@@ -173,7 +180,14 @@ describe('StrategyLoaderService', () => {
           lastModified: '2026-01-09T00:00:00Z',
           tags: 'test',
         },
-        analyzers: [],
+        analyzers: [
+          {
+            name: 'EMA_ANALYZER_NEW',
+            enabled: true,
+            weight: 0.5,
+            priority: 1,
+          },
+        ],
       };
 
       const filePath = join(tempDir, 'bad-tags.strategy.json');
@@ -201,7 +215,14 @@ describe('StrategyLoaderService', () => {
             period: 'test',
           },
         },
-        analyzers: [],
+        analyzers: [
+          {
+            name: 'EMA_ANALYZER_NEW',
+            enabled: true,
+            weight: 0.5,
+            priority: 1,
+          },
+        ],
       };
 
       const filePath = join(tempDir, 'bad-backtest.strategy.json');
