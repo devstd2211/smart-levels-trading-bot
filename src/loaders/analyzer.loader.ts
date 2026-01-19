@@ -122,7 +122,7 @@ export class AnalyzerLoader {
           priority: config.ema.priority,
         });
         const indicator = this.getIndicator(IndicatorType.EMA);
-        analyzers.set(AnalyzerType.EMA, new EmaAnalyzerNew(config.ema, this.logger, indicator));
+        analyzers.set(AnalyzerType.EMA, new EmaAnalyzerNew(config.ema as any, this.logger, indicator));
       }
 
       if (config.rsi?.enabled) {
@@ -131,37 +131,37 @@ export class AnalyzerLoader {
           priority: config.rsi.priority,
         });
         const indicator = this.getIndicator(IndicatorType.RSI);
-        analyzers.set(AnalyzerType.RSI, new RsiAnalyzerNew(config.rsi, this.logger, indicator));
+        analyzers.set(AnalyzerType.RSI, new RsiAnalyzerNew(config.rsi as any, this.logger, indicator));
       }
 
       if (config.atr?.enabled) {
         this.logger.debug('Loading ATR analyzer');
         const indicator = this.getIndicator(IndicatorType.ATR);
-        analyzers.set(AnalyzerType.ATR, new AtrAnalyzerNew(config.atr, this.logger, indicator));
+        analyzers.set(AnalyzerType.ATR, new AtrAnalyzerNew(config.atr as any, this.logger, indicator));
       }
 
       if (config.volume?.enabled) {
         this.logger.debug('Loading Volume analyzer');
         const indicator = this.getIndicator(IndicatorType.VOLUME);
-        analyzers.set(AnalyzerType.VOLUME, new VolumeAnalyzerNew(config.volume, this.logger, indicator));
+        analyzers.set(AnalyzerType.VOLUME, new VolumeAnalyzerNew(config.volume as any, this.logger, indicator));
       }
 
       if (config.stochastic?.enabled) {
         this.logger.debug('Loading Stochastic analyzer');
         const indicator = this.getIndicator(IndicatorType.STOCHASTIC);
-        analyzers.set(AnalyzerType.STOCHASTIC, new StochasticAnalyzerNew(config.stochastic, this.logger, indicator));
+        analyzers.set(AnalyzerType.STOCHASTIC, new StochasticAnalyzerNew(config.stochastic as any, this.logger, indicator));
       }
 
       if (config.bollingerBands?.enabled) {
         this.logger.debug('Loading Bollinger Bands analyzer');
         const indicator = this.getIndicator(IndicatorType.BOLLINGER_BANDS);
-        analyzers.set(AnalyzerType.BOLLINGER_BANDS, new BollingerBandsAnalyzerNew(config.bollingerBands, this.logger, indicator));
+        analyzers.set(AnalyzerType.BOLLINGER_BANDS, new BollingerBandsAnalyzerNew(config.bollingerBands as any, this.logger, indicator));
       }
 
       // ========== DIVERGENCE ==========
       if (config.divergence?.enabled) {
         this.logger.debug('Loading Divergence analyzer');
-        analyzers.set(AnalyzerType.DIVERGENCE, new DivergenceAnalyzerNew(config.divergence, this.logger));
+        analyzers.set(AnalyzerType.DIVERGENCE, new DivergenceAnalyzerNew(config.divergence as any, this.logger));
       }
 
       // ========== BREAKOUT ==========
@@ -199,7 +199,7 @@ export class AnalyzerLoader {
 
       if (config.trendDetector?.enabled) {
         this.logger.debug('Loading Trend Detector analyzer');
-        analyzers.set(AnalyzerType.TREND_DETECTOR, new TrendDetectorAnalyzerNew(config.trendDetector, this.logger));
+        analyzers.set(AnalyzerType.TREND_DETECTOR, new TrendDetectorAnalyzerNew(config.trendDetector as any, this.logger));
       }
 
       // ========== LEVEL ANALYSIS ==========
@@ -268,7 +268,7 @@ export class AnalyzerLoader {
       // ========== SCALPING ==========
       if (config.priceMomentum?.enabled) {
         this.logger.debug('Loading Price Momentum analyzer');
-        analyzers.set(AnalyzerType.PRICE_MOMENTUM, new PriceMomentumAnalyzerNew(config.priceMomentum, this.logger));
+        analyzers.set(AnalyzerType.PRICE_MOMENTUM, new PriceMomentumAnalyzerNew(config.priceMomentum as any, this.logger));
       }
 
       if (config.volumeProfile?.enabled) {

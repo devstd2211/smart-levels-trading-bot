@@ -207,13 +207,6 @@ export class VolatilitySpikeAnalyzerNew implements IAnalyzer {
   }
 
   /**
-   * Get analyzer type
-   */
-  getType(): string {
-    return AnalyzerType.VOLATILITY_SPIKE;
-  }
-
-  /**
    * Check if analyzer is enabled
    */
   isEnabled(): boolean {
