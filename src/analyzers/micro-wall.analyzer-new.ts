@@ -2,11 +2,16 @@ import type { Candle } from '../types/core';
 import type { AnalyzerSignal } from '../types/strategy';
 import type { BreakoutAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
-export class MicroWallAnalyzerNew {
+const MIN_CANDLES_FOR_MICRO_WALL = 20;
+
+export class MicroWallAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
+  private maxConfidence: number = 0.95;
   private lastSignal: AnalyzerSignal | null = null;
   private initialized: boolean = false;
 
@@ -22,7 +27,7 @@ export class MicroWallAnalyzerNew {
   analyze(candles: Candle[]): AnalyzerSignal {
     if (!this.enabled) throw new Error('[MICRO_WALL] Analyzer is disabled');
     if (!Array.isArray(candles)) throw new Error('[MICRO_WALL] Invalid candles input');
-    if (candles.length < 20) throw new Error('[MICRO_WALL] Not enough candles');
+    if (candles.length < MIN_CANDLES_FOR_MICRO_WALL) throw new Error('[MICRO_WALL] Not enough candles');
     for (let i = 0; i < candles.length; i++) {
       if (!candles[i] || typeof candles[i].volume !== 'number') throw new Error('[MICRO_WALL] Invalid candle');
     }
@@ -48,6 +53,48 @@ export class MicroWallAnalyzerNew {
       if (currentPrice < wallPrice) return { type: 'BUY', strength: Math.min(1, (wallPrice - currentPrice) / wallPrice) };
     }
     return { type: 'NONE', strength: 0 };
+  }
+
+  /**
+   * Get analyzer type
+   */
+  getType(): string {
+    return AnalyzerType.MICRO_WALL;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_MICRO_WALL;
+  }
+
+  /**
+   * Get minimum candles required
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_MICRO_WALL;
+  }
+
+  /**
+   * Get analyzer weight
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence
+   */
+  getMaxConfidence(): number {
+    return this.maxConfidence;
   }
 
   getLastSignal(): AnalyzerSignal | null { return this.lastSignal; }

@@ -2,11 +2,16 @@ import type { Candle } from '../types/core';
 import type { AnalyzerSignal } from '../types/strategy';
 import type { BreakoutAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
-export class OrderBlockAnalyzerNew {
+const MIN_CANDLES_FOR_ORDER_BLOCK = 25;
+
+export class OrderBlockAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
+  private maxConfidence: number = 0.95;
   private lastSignal: AnalyzerSignal | null = null;
   private initialized: boolean = false;
 
@@ -22,7 +27,7 @@ export class OrderBlockAnalyzerNew {
   analyze(candles: Candle[]): AnalyzerSignal {
     if (!this.enabled) throw new Error('[ORDER_BLOCK] Analyzer is disabled');
     if (!Array.isArray(candles)) throw new Error('[ORDER_BLOCK] Invalid candles input');
-    if (candles.length < 25) throw new Error('[ORDER_BLOCK] Not enough candles');
+    if (candles.length < MIN_CANDLES_FOR_ORDER_BLOCK) throw new Error('[ORDER_BLOCK] Not enough candles');
 
     for (let i = 0; i < candles.length; i++) {
       if (!candles[i] || typeof candles[i].close !== 'number') {
@@ -243,6 +248,48 @@ export class OrderBlockAnalyzerNew {
       distance: bestBlock.distance,
       isRelevant,
     };
+  }
+
+  /**
+   * Get analyzer type
+   */
+  getType(): string {
+    return AnalyzerType.ORDER_BLOCK;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_ORDER_BLOCK;
+  }
+
+  /**
+   * Get minimum candles required
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_ORDER_BLOCK;
+  }
+
+  /**
+   * Get analyzer weight
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence
+   */
+  getMaxConfidence(): number {
+    return this.maxConfidence;
   }
 
   getLastSignal(): AnalyzerSignal | null { return this.lastSignal; }

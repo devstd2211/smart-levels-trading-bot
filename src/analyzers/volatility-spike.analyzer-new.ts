@@ -20,6 +20,8 @@ import type { SignalDirection } from '../types/enums';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import { ATRIndicatorNew } from '../indicators/atr.indicator-new';
 import type { LoggerService } from '../services/logger.service';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -36,7 +38,7 @@ const MAX_ATR_ESTIMATE = 100; // Upper bound for ATR scaling
 // VOLATILITY SPIKE ANALYZER - NEW VERSION
 // ============================================================================
 
-export class VolatilitySpikeAnalyzerNew {
+export class VolatilitySpikeAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
@@ -181,6 +183,62 @@ export class VolatilitySpikeAnalyzerNew {
 
     // Clamp to range [MIN_CONFIDENCE, maxConfidence]
     return Math.max(MIN_CONFIDENCE, Math.min(this.maxConfidence, confidence));
+  }
+
+  /**
+   * Get analyzer type
+   */
+  getType(): string {
+    return AnalyzerType.VOLATILITY_SPIKE;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_VOLATILITY;
+  }
+
+  /**
+   * Get minimum candles required
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_VOLATILITY;
+  }
+
+  /**
+   * Get analyzer type
+   */
+  getType(): string {
+    return AnalyzerType.VOLATILITY_SPIKE;
+  }
+
+  /**
+   * Check if analyzer is enabled
+   */
+  isEnabled(): boolean {
+    return this.enabled;
+  }
+
+  /**
+   * Get analyzer weight
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence
+   */
+  getMaxConfidence(): number {
+    return this.maxConfidence;
   }
 
   /**

@@ -2,8 +2,13 @@ import type { Candle } from '../types/core';
 import type { AnalyzerSignal } from '../types/strategy';
 import type { BreakoutAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
-export class DeltaAnalyzerNew {
+const MIN_CANDLES_FOR_DELTA = 15;
+const MAX_CONFIDENCE = 0.95;
+
+export class DeltaAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
@@ -56,9 +61,18 @@ export class DeltaAnalyzerNew {
     return { value: (buyPressure - sellPressure) / total };
   }
 
+  // ===== INTERFACE IMPLEMENTATION (IAnalyzer) =====
+  getType(): string { return AnalyzerType.DELTA; }
+  isReady(candles: Candle[]): boolean { return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_DELTA; }
+  getMinCandlesRequired(): number { return MIN_CANDLES_FOR_DELTA; }
+  isEnabled(): boolean { return this.enabled; }
+  getWeight(): number { return this.weight; }
+  getPriority(): number { return this.priority; }
+  getMaxConfidence(): number { return MAX_CONFIDENCE; }
+
+  // ===== EXISTING METHODS =====
   getLastSignal(): AnalyzerSignal | null { return this.lastSignal; }
   getState() { return { enabled: this.enabled, initialized: this.initialized, lastSignal: this.lastSignal, config: { weight: this.weight, priority: this.priority } }; }
   reset(): void { this.lastSignal = null; this.initialized = false; }
-  isEnabled(): boolean { return this.enabled; }
   getConfig() { return { enabled: this.enabled, weight: this.weight, priority: this.priority }; }
 }

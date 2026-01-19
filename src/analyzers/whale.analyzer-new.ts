@@ -2,11 +2,16 @@ import type { Candle } from '../types/core';
 import type { AnalyzerSignal } from '../types/strategy';
 import type { BreakoutAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
-export class WhaleAnalyzerNew {
+const MIN_CANDLES_FOR_WHALE = 25;
+
+export class WhaleAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
+  private maxConfidence: number = 0.95;
   private lastSignal: AnalyzerSignal | null = null;
   private initialized: boolean = false;
 
@@ -22,7 +27,7 @@ export class WhaleAnalyzerNew {
   analyze(candles: Candle[]): AnalyzerSignal {
     if (!this.enabled) throw new Error('[WHALE] Analyzer is disabled');
     if (!Array.isArray(candles)) throw new Error('[WHALE] Invalid candles input');
-    if (candles.length < 25) throw new Error('[WHALE] Not enough candles');
+    if (candles.length < MIN_CANDLES_FOR_WHALE) throw new Error('[WHALE] Not enough candles');
     for (let i = 0; i < candles.length; i++) {
       if (!candles[i] || typeof candles[i].volume !== 'number') throw new Error('[WHALE] Invalid candle');
     }
@@ -49,6 +54,48 @@ export class WhaleAnalyzerNew {
       else return { type: 'BEARISH', strength: Math.min(1, (maxVol - avgVol) / avgVol / 5) };
     }
     return { type: 'NONE', strength: 0 };
+  }
+
+  /**
+   * Get analyzer type
+   */
+  getType(): string {
+    return AnalyzerType.WHALE;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_WHALE;
+  }
+
+  /**
+   * Get minimum candles required
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_WHALE;
+  }
+
+  /**
+   * Get analyzer weight
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence
+   */
+  getMaxConfidence(): number {
+    return this.maxConfidence;
   }
 
   getLastSignal(): AnalyzerSignal | null { return this.lastSignal; }

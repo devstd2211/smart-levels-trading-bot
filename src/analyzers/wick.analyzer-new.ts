@@ -17,6 +17,8 @@ import type { SignalDirection } from '../types/enums';
 import type { WickAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import type { LoggerService } from '../services/logger.service';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -31,10 +33,11 @@ const MIN_BODY_TO_WICK_RATIO = 0.3; // Wick should be at least 3x body
 // WICK ANALYZER - NEW VERSION
 // ============================================================================
 
-export class WickAnalyzerNew {
+export class WickAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
+  private maxConfidence: number = MAX_CONFIDENCE;
 
   private lastSignal: AnalyzerSignal | null = null;
   private initialized: boolean = false;
@@ -249,6 +252,48 @@ export class WickAnalyzerNew {
    */
   isEnabled(): boolean {
     return this.enabled;
+  }
+
+  /**
+   * Get analyzer type
+   */
+  getType(): string {
+    return AnalyzerType.WICK;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_WICK;
+  }
+
+  /**
+   * Get minimum candles required
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_WICK;
+  }
+
+  /**
+   * Get analyzer weight
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence
+   */
+  getMaxConfidence(): number {
+    return this.maxConfidence;
   }
 
   /**

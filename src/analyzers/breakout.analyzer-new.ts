@@ -17,6 +17,8 @@ import type { SignalDirection } from '../types/enums';
 import type { BreakoutAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import type { LoggerService } from '../services/logger.service';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -32,10 +34,11 @@ const VOLATILITY_THRESHOLD = 1.5; // ATR multiple for breakout confirmation
 // BREAKOUT ANALYZER - NEW VERSION
 // ============================================================================
 
-export class BreakoutAnalyzerNew {
+export class BreakoutAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
+  private maxConfidence: number = MAX_CONFIDENCE;
 
   private lastSignal: AnalyzerSignal | null = null;
   private lastHigh: number = 0;
@@ -316,6 +319,48 @@ export class BreakoutAnalyzerNew {
    */
   isEnabled(): boolean {
     return this.enabled;
+  }
+
+  /**
+   * Get analyzer type
+   */
+  getType(): string {
+    return AnalyzerType.BREAKOUT;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_BREAKOUT;
+  }
+
+  /**
+   * Get minimum candles required
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_BREAKOUT;
+  }
+
+  /**
+   * Get analyzer weight
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence
+   */
+  getMaxConfidence(): number {
+    return this.maxConfidence;
   }
 
   /**

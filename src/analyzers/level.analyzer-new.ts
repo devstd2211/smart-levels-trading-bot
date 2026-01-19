@@ -16,8 +16,10 @@ import type { LevelAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection } from '../types/enums';
 import type { LoggerService } from '../services/logger.service';
 import { SwingPointDetectorService } from '../services/swing-point-detector.service';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
-const MIN_CANDLES = 30;
+const MIN_CANDLES_FOR_LEVEL = 30;
 const MIN_CONFIDENCE = 0.15;
 const MAX_CONFIDENCE = 0.95;
 
@@ -30,10 +32,11 @@ interface Level {
   isRecent: boolean; // Within last 15 candles
 }
 
-export class LevelAnalyzerNew {
+export class LevelAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
+  private maxConfidence: number = MAX_CONFIDENCE;
   private lastSignal: AnalyzerSignal | null = null;
   private initialized: boolean = false;
 
@@ -60,7 +63,7 @@ export class LevelAnalyzerNew {
   analyze(candles: Candle[]): AnalyzerSignal {
     if (!this.enabled) throw new Error('[LEVEL] Analyzer is disabled');
     if (!Array.isArray(candles)) throw new Error('[LEVEL] Invalid candles input');
-    if (candles.length < MIN_CANDLES) throw new Error(`[LEVEL] Not enough candles`);
+    if (candles.length < MIN_CANDLES_FOR_LEVEL) throw new Error(`[LEVEL] Not enough candles`);
     for (let i = 0; i < candles.length; i++) {
       if (!candles[i] || typeof candles[i].close !== 'number')
         throw new Error(`[LEVEL] Invalid candle`);
@@ -161,7 +164,7 @@ export class LevelAnalyzerNew {
       confidence = MIN_CONFIDENCE + (supportLevels.length + resistanceLevels.length) * 0.05;
       // Provide detailed reason for HOLD
       if (supportLevels.length === 0 && resistanceLevels.length === 0) {
-        reason = `HOLD: No levels detected (min ${MIN_CANDLES} candles needed)`;
+        reason = `HOLD: No levels detected (min ${MIN_CANDLES_FOR_LEVEL} candles needed)`;
       } else if (!nearSupport && !nearResistance) {
         reason = `HOLD: Price not near support/resistance (threshold=${Math.round(proximityThreshold * 100) / 100})`;
       } else if (nearSupport && trend === 'down') {
@@ -398,6 +401,48 @@ export class LevelAnalyzerNew {
     const high = Math.max(...candles.map((c) => c.high));
     const low = Math.min(...candles.map((c) => c.low));
     return high - low;
+  }
+
+  /**
+   * Get analyzer type
+   */
+  getType(): string {
+    return AnalyzerType.LEVEL;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_LEVEL;
+  }
+
+  /**
+   * Get minimum candles required
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_LEVEL;
+  }
+
+  /**
+   * Get analyzer weight
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence
+   */
+  getMaxConfidence(): number {
+    return this.maxConfidence;
   }
 
   getLastSignal(): AnalyzerSignal | null {

@@ -2,11 +2,16 @@ import type { Candle } from '../types/core';
 import type { AnalyzerSignal } from '../types/strategy';
 import type { BreakoutAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
-export class LiquidityZoneAnalyzerNew {
+const MIN_CANDLES_FOR_LIQUIDITY_ZONE = 25;
+
+export class LiquidityZoneAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
+  private maxConfidence: number = 0.95;
   private lastSignal: AnalyzerSignal | null = null;
   private initialized: boolean = false;
 
@@ -22,7 +27,7 @@ export class LiquidityZoneAnalyzerNew {
   analyze(candles: Candle[]): AnalyzerSignal {
     if (!this.enabled) throw new Error('[LIQUIDITY_ZONE] Analyzer is disabled');
     if (!Array.isArray(candles)) throw new Error('[LIQUIDITY_ZONE] Invalid candles input');
-    if (candles.length < 25) throw new Error('[LIQUIDITY_ZONE] Not enough candles');
+    if (candles.length < MIN_CANDLES_FOR_LIQUIDITY_ZONE) throw new Error('[LIQUIDITY_ZONE] Not enough candles');
 
     for (let i = 0; i < candles.length; i++) {
       if (!candles[i] || typeof candles[i].volume !== 'number') {
@@ -172,6 +177,48 @@ export class LiquidityZoneAnalyzerNew {
       highStrength,
       lowStrength,
     };
+  }
+
+  /**
+   * Get analyzer type
+   */
+  getType(): string {
+    return AnalyzerType.LIQUIDITY_ZONE;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_LIQUIDITY_ZONE;
+  }
+
+  /**
+   * Get minimum candles required
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_LIQUIDITY_ZONE;
+  }
+
+  /**
+   * Get analyzer weight
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence
+   */
+  getMaxConfidence(): number {
+    return this.maxConfidence;
   }
 
   getLastSignal(): AnalyzerSignal | null { return this.lastSignal; }

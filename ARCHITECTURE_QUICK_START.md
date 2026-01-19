@@ -50,7 +50,8 @@ THIS FILE: QUICK START
 | **0.3 Part 2** | Exit Event Handler | ✅ DONE | src/exit-handler/ + types + tests | ✅ BUILD SUCCESS (5abe38c) |
 | **0.4** | Action Queue | ✅ DONE | ActionQueueService + 4 handlers | ✅ BUILD SUCCESS (2f81bdc) |
 | **2.5** | IExchange Migration | ✅ DONE | Interface + Adapter + Service Layer | ✅ BUILD SUCCESS (4db157b) |
-| **0.2-Ext** | Cache Calculators | ✅ DONE | 4 Calculators + Factory + 101 Tests | 🎯 **JUST COMPLETED** (Session 7) |
+| **0.2-Ext** | Cache Calculators | ✅ DONE | 4 Calculators + Factory + 101 Tests | 🎯 **COMPLETED** (Session 7) |
+| **3** | Advanced Analyzers | 🚀 INFRASTRUCTURE | IAnalyzer + Enum + Registry + Loader | 🎯 **IN PROGRESS** (Session 8) |
 
 ---
 
@@ -359,6 +360,42 @@ export class EmaIndicator implements IIndicator {
 ```
 
 Currently using `as any` casts - Phase 1 will fix this.
+
+---
+
+## 🎯 Phase 3: Advanced Analyzers Refactoring (🚀 NEW - Session 8)
+
+### Status: ✅ INFRASTRUCTURE COMPLETE, REFACTORING IN PROGRESS
+
+**What Was Just Created (Session 8 - Infrastructure):**
+
+✅ **IAnalyzer Interface** (`src/types/analyzer.interface.ts`)
+- Universal contract for all 29 analyzers
+- Methods: `analyze()`, `getType()`, `isReady()`, `getMinCandlesRequired()`, `isEnabled()`, `getWeight()`, `getPriority()`, `getMaxConfidence()`
+
+✅ **AnalyzerType Enum** (`src/types/analyzer-type.enum.ts`)
+- Type-safe enum for all 29 analyzer types (NO magic strings!)
+- Organized by category: Basic (6), Advanced (23)
+- Helper functions: `getAllAnalyzerTypes()`, `getAnalyzersByCategory()`
+
+✅ **AnalyzerLoader Service** (`src/loaders/analyzer.loader.ts`)
+- Config-driven analyzer loading (mirrors IndicatorLoader pattern)
+- Loads all 29 analyzer types from config
+- Returns: `Map<AnalyzerType, IAnalyzer>`
+
+✅ **AnalyzerRegistry Service Enhancement** (`src/services/analyzer-registry.service.ts`)
+- Already exists with sophisticated lazy-loading
+- Now ready to work with IAnalyzer interface
+
+**Build Status After Infrastructure:** ✅ TypeScript compilation succeeds (ready for analyzer refactoring)
+
+**Next Steps:**
+1. **Phase 3.1** - Refactor 6 basic indicator analyzers to implement IAnalyzer (30 min)
+2. **Phase 3.2** - Refactor 23 advanced analyzers to implement IAnalyzer (2-3 hours)
+3. **Phase 3.3** - Create comprehensive test suite (1-2 hours)
+4. **Phase 3.4** - Integration tests (1 hour)
+
+**See:** [PHASE_3_PLAN.md](./PHASE_3_PLAN.md) for complete refactoring checklist
 
 ---
 
@@ -681,7 +718,7 @@ Phase 0.3 is COMPLETE. Next phases:
 
 ---
 
-## ✅ Current Status (Session 6 - UPDATED)
+## ✅ Current Status (Session 8 - UPDATED)
 
 ### Completed Phases ✅
 
@@ -693,13 +730,16 @@ Phase 0.3 is COMPLETE. Next phases:
 - [x] Phase 0.3 Part 2: Exit event handler (config-driven, event-based)
 - [x] Phase 0.4: Action Queue Service (CORE + Type Safety ✅ COMPLETE)
 - [x] **Phase 1: Implement IIndicator in all 6 indicators** (per CLAUDE.md)
-- [x] **Phase 2.5: Complete IExchange Interface Migration** (🎯 JUST COMPLETED - 37 errors → 0)
+- [x] **Phase 2.5: Complete IExchange Interface Migration** (37 errors → 0)
+- [x] **Phase 0.2 Extended: Cache Calculators** (101 tests, 4 calculators + Factory)
+- [x] **Phase 3 Infrastructure: IAnalyzer + Enum + Registry + Loader** (🎯 JUST COMPLETED - Session 8)
 
 ### Build Status ✨
 
-- ✅ TypeScript: **0 errors** (DOWN from 37!)
-- ✅ Tests: **2723/2775 passing** (improved from 2641)
-- ✅ Git: **Last commit:** `4db157b` (Phase 2.5 Fix: Complete IExchange Interface Migration)
+- ✅ TypeScript: **0 errors** (after Phase 3 infrastructure)
+- ✅ Tests: **2723/2775 passing** (+ Phase 3 infrastructure ready)
+- ✅ Git: **Last commit:** `8a73b05` (Phase 0.2 Extended Complete)
+- 🚀 **Phase 3 Ready:** IAnalyzer interface created, AnalyzerType enum created, AnalyzerLoader ready
 
 ### Phase 2.5: IExchange Interface Migration - ✅ COMPLETE
 

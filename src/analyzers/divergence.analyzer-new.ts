@@ -23,6 +23,8 @@ import type { DivergenceAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import { RSIIndicatorNew } from '../indicators/rsi.indicator-new';
 import type { LoggerService } from '../services/logger.service';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
 // ============================================================================
 // CONSTANTS
@@ -39,7 +41,7 @@ const SWING_LOOKBACK = 10; // Look back N candles to find swing points
 // DIVERGENCE ANALYZER - NEW VERSION
 // ============================================================================
 
-export class DivergenceAnalyzerNew {
+export class DivergenceAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
@@ -490,6 +492,48 @@ export class DivergenceAnalyzerNew {
    */
   isEnabled(): boolean {
     return this.enabled;
+  }
+
+  /**
+   * Get analyzer type
+   */
+  getType(): string {
+    return AnalyzerType.DIVERGENCE;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_DIVERGENCE;
+  }
+
+  /**
+   * Get minimum candles required
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_DIVERGENCE;
+  }
+
+  /**
+   * Get analyzer weight
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence
+   */
+  getMaxConfidence(): number {
+    return this.maxConfidence;
   }
 
   /**

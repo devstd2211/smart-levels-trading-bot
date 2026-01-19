@@ -14,15 +14,18 @@ import type { SignalDirection } from '../types/enums';
 import type { ChochBosAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
 import type { LoggerService } from '../services/logger.service';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
-const MIN_CANDLES = 30;
+const MIN_CANDLES_FOR_CHOCH_BOS = 30;
 const MIN_CONFIDENCE = 0.1;
 const MAX_CONFIDENCE = 0.95;
 
-export class ChochBosAnalyzerNew {
+export class ChochBosAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
+  private maxConfidence: number = MAX_CONFIDENCE;
   private lastSignal: AnalyzerSignal | null = null;
   private initialized: boolean = false;
 
@@ -42,7 +45,7 @@ export class ChochBosAnalyzerNew {
   analyze(candles: Candle[]): AnalyzerSignal {
     if (!this.enabled) throw new Error('[CHOCH_BOS] Analyzer is disabled');
     if (!Array.isArray(candles)) throw new Error('[CHOCH_BOS] Invalid candles input (must be array)');
-    if (candles.length < MIN_CANDLES) throw new Error(`[CHOCH_BOS] Not enough candles. Need ${MIN_CANDLES}, got ${candles.length}`);
+    if (candles.length < MIN_CANDLES_FOR_CHOCH_BOS) throw new Error(`[CHOCH_BOS] Not enough candles. Need ${MIN_CANDLES_FOR_CHOCH_BOS}, got ${candles.length}`);
 
     for (let i = 0; i < candles.length; i++) {
       if (!candles[i] || typeof candles[i].high !== 'number' || typeof candles[i].low !== 'number')
@@ -87,6 +90,48 @@ export class ChochBosAnalyzerNew {
     }
 
     return { type: 'NONE', strength: 0 };
+  }
+
+  /**
+   * Get analyzer type
+   */
+  getType(): string {
+    return AnalyzerType.CHOCH_BOS;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_CHOCH_BOS;
+  }
+
+  /**
+   * Get minimum candles required
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_CHOCH_BOS;
+  }
+
+  /**
+   * Get analyzer weight
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence
+   */
+  getMaxConfidence(): number {
+    return this.maxConfidence;
   }
 
   getLastSignal(): AnalyzerSignal | null { return this.lastSignal; }

@@ -2,11 +2,16 @@ import type { Candle } from '../types/core';
 import type { AnalyzerSignal } from '../types/strategy';
 import type { BreakoutAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
-export class OrderFlowAnalyzerNew {
+const MIN_CANDLES_FOR_ORDER_FLOW = 15;
+
+export class OrderFlowAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
+  private maxConfidence: number = 0.95;
   private lastSignal: AnalyzerSignal | null = null;
   private initialized: boolean = false;
 
@@ -22,7 +27,7 @@ export class OrderFlowAnalyzerNew {
   analyze(candles: Candle[]): AnalyzerSignal {
     if (!this.enabled) throw new Error('[ORDER_FLOW] Analyzer is disabled');
     if (!Array.isArray(candles)) throw new Error('[ORDER_FLOW] Invalid candles input');
-    if (candles.length < 15) throw new Error('[ORDER_FLOW] Not enough candles');
+    if (candles.length < MIN_CANDLES_FOR_ORDER_FLOW) throw new Error('[ORDER_FLOW] Not enough candles');
     for (let i = 0; i < candles.length; i++) {
       if (!candles[i] || typeof candles[i].volume !== 'number') throw new Error('[ORDER_FLOW] Invalid candle');
     }
@@ -52,6 +57,48 @@ export class OrderFlowAnalyzerNew {
     if (bullishVol > bearishVol) return { type: 'BULLISH', strength: bullishVol / total };
     if (bearishVol > bullishVol) return { type: 'BEARISH', strength: bearishVol / total };
     return { type: 'NONE', strength: 0 };
+  }
+
+  /**
+   * Get analyzer type
+   */
+  getType(): string {
+    return AnalyzerType.ORDER_FLOW;
+  }
+
+  /**
+   * Check if analyzer has enough data
+   */
+  isReady(candles: Candle[]): boolean {
+    return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_ORDER_FLOW;
+  }
+
+  /**
+   * Get minimum candles required
+   */
+  getMinCandlesRequired(): number {
+    return MIN_CANDLES_FOR_ORDER_FLOW;
+  }
+
+  /**
+   * Get analyzer weight
+   */
+  getWeight(): number {
+    return this.weight;
+  }
+
+  /**
+   * Get analyzer priority
+   */
+  getPriority(): number {
+    return this.priority;
+  }
+
+  /**
+   * Get maximum confidence
+   */
+  getMaxConfidence(): number {
+    return this.maxConfidence;
   }
 
   getLastSignal(): AnalyzerSignal | null { return this.lastSignal; }

@@ -2,11 +2,16 @@ import type { Candle } from '../types/core';
 import type { AnalyzerSignal } from '../types/strategy';
 import type { BreakoutAnalyzerConfigNew } from '../types/config-new.types';
 import { SignalDirection as SignalDirectionEnum } from '../types/enums';
+import { IAnalyzer } from '../types/analyzer.interface';
+import { AnalyzerType } from '../types/analyzer-type.enum';
 
-export class TickDeltaAnalyzerNew {
+const MIN_CANDLES_FOR_TICK_DELTA = 15;
+
+export class TickDeltaAnalyzerNew implements IAnalyzer {
   private readonly enabled: boolean;
   private readonly weight: number;
   private readonly priority: number;
+  private maxConfidence: number = 0.95;
   private lastSignal: AnalyzerSignal | null = null;
   private initialized: boolean = false;
 
@@ -22,7 +27,7 @@ export class TickDeltaAnalyzerNew {
   analyze(candles: Candle[]): AnalyzerSignal {
     if (!this.enabled) throw new Error('[TICK_DELTA] Analyzer is disabled');
     if (!Array.isArray(candles)) throw new Error('[TICK_DELTA] Invalid candles input');
-    if (candles.length < 15) throw new Error('[TICK_DELTA] Not enough candles');
+    if (candles.length < MIN_CANDLES_FOR_TICK_DELTA) throw new Error('[TICK_DELTA] Not enough candles');
     for (let i = 0; i < candles.length; i++) {
       if (!candles[i] || typeof candles[i].close !== 'number') throw new Error('[TICK_DELTA] Invalid candle');
     }
@@ -49,9 +54,18 @@ export class TickDeltaAnalyzerNew {
     return { value: normalized, positive: delta > 0, negative: delta < 0 };
   }
 
+  // ===== INTERFACE IMPLEMENTATION (IAnalyzer) =====
+  getType(): string { return AnalyzerType.TICK_DELTA; }
+  isReady(candles: Candle[]): boolean { return candles && Array.isArray(candles) && candles.length >= MIN_CANDLES_FOR_TICK_DELTA; }
+  getMinCandlesRequired(): number { return MIN_CANDLES_FOR_TICK_DELTA; }
+  getWeight(): number { return this.weight; }
+  getPriority(): number { return this.priority; }
+  getMaxConfidence(): number { return this.maxConfidence; }
+  isEnabled(): boolean { return this.enabled; }
+
+  // ===== EXISTING METHODS =====
   getLastSignal(): AnalyzerSignal | null { return this.lastSignal; }
   getState() { return { enabled: this.enabled, initialized: this.initialized, lastSignal: this.lastSignal, config: { weight: this.weight, priority: this.priority } }; }
   reset(): void { this.lastSignal = null; this.initialized = false; }
-  isEnabled(): boolean { return this.enabled; }
   getConfig() { return { enabled: this.enabled, weight: this.weight, priority: this.priority }; }
 }
