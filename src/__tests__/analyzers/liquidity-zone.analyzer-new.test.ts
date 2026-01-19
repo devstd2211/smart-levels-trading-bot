@@ -59,7 +59,25 @@ describe('LiquidityZoneAnalyzerNew - Input Validation Tests', () => {
 describe('LiquidityZoneAnalyzerNew - Signal Generation Tests', () => {
   test('should generate signal', () => {
     const analyzer = new LiquidityZoneAnalyzerNew(createConfig());
-    const candles = createCandles(Array.from({ length: 50 }, (_, i) => 100 + i * 0.5));
+    // Create realistic candles with clear HIGH ZONE (support/resistance level with volume)
+    // Strategy: Create a tight band of high prices (110-111) with consistent volume
+    // Then lower prices to create contrast
+    const closes = [
+      ...Array.from({ length: 20 }, (_, i) => 100 + i * 0.4), // Build up
+      ...Array.from({ length: 5 }, () => 107.8), // HIGH ZONE: multiple candles at same high level
+      ...Array.from({ length: 5 }, () => 107.9), // HIGH ZONE: very close high level
+      ...Array.from({ length: 5 }, (_, i) => 107 - i * 0.2), // Start pullback
+    ];
+
+    const candles = closes.map((close, i) => ({
+      timestamp: Date.now() + i * 60000,
+      open: close - 0.2,
+      high: close + 0.8, // Tight wicks around the close
+      low: close - 0.8,
+      close,
+      volume: 5000 + (i >= 20 && i < 30 ? 2000 : 0), // HIGH volume at zone
+    }));
+
     const signal = analyzer.analyze(candles);
     expect(signal).toBeDefined();
     expect(signal.source).toBe('LIQUIDITY_ZONE_ANALYZER');
