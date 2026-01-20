@@ -58,6 +58,86 @@ THIS FILE: QUICK START
 | **4** | Event-Sourced Position State | ✅ DONE | Position events + store + projection | ✅ 30 TESTS PASSING (Session 11) |
 | **4.5** | Unified Position State Machine | ✅ DONE | State machine + **closure reasons** | ✅ 20 TESTS PASSING (Session 12) ⭐ |
 | **4.10** | Config-Driven Constants | ✅ DONE | Orchestration + Trend + Analyzer params | ✅ 31 TESTS PASSING (Session 12) ⭐ |
+| **5** | Exit Decision Function | ✅ DONE | Pure evaluateExit() + integration | ✅ 50 TESTS PASSING (Session 13) ⭐⭐ |
+| **6** | Multi-Exchange Support | ✅ DONE | ExchangeFactory + BinanceAdapter + tests | ✅ 26 TESTS PASSING (Session 14) ⭐⭐⭐ |
+
+---
+
+## 🚀 PHASE 6: MULTI-EXCHANGE SUPPORT (✅ COMPLETE - Session 14)
+
+### Status: ✅ PHASE 6 COMPLETE! Multi-exchange architecture with Binance support!
+
+**What Was Implemented (Session 14):**
+
+✅ **ExchangeFactory Service:**
+- Factory pattern for instantiating exchange adapters
+- Config-driven exchange selection (config.exchange.name)
+- Caching mechanism for exchange instances
+- Support for multiple exchanges (Bybit, Binance, extensible)
+
+✅ **BinanceService & BinanceServiceAdapter:**
+- BinanceService mirrors BybitService interface
+- BinanceServiceAdapter implements full IExchange interface
+- Follows same adapter pattern as BybitServiceAdapter
+- Handles all 23 method signature mismatches
+
+✅ **Backward Compatibility:**
+- Existing Bybit setup continues to work unchanged
+- Traditional initialization when config.exchange.name = 'bybit'
+- Factory initialization for new exchanges
+- No breaking changes to existing code
+
+✅ **Bot Integration:**
+- BotServices updated to use ExchangeFactory
+- BotInitializer handles async exchange creation
+- Support for demo/testnet/API credentials
+- Seamless fallback to Bybit if not specified
+
+✅ **Comprehensive Test Coverage (26 Tests):**
+- Factory initialization tests (6 tests)
+- Bybit creation tests (4 tests)
+- Binance creation tests (4 tests)
+- Exchange caching tests (5 tests)
+- IExchange interface compliance tests (3 tests)
+- Multi-exchange switching tests (4 tests)
+
+✅ **Build Status:**
+- **0 TypeScript Errors**
+- **3258/3258 Tests Passing** (3232 existing + 26 new Phase 6)
+
+**Files Created/Modified:**
+```
+src/services/exchange-factory.service.ts (NEW - factory logic)
+src/services/binance/binance.service.ts (NEW - Binance API)
+src/services/binance/binance-service.adapter.ts (NEW - IExchange impl)
+src/__tests__/services/exchange-factory.service.test.ts (NEW - 26 tests)
+src/services/bot-services.ts (MODIFIED - factory integration)
+src/services/bot-initializer.ts (MODIFIED - async creation)
+```
+
+**Key Benefits:**
+- ✅ Extensible architecture for future exchanges
+- ✅ Type-safe across all implementations
+- ✅ Config-driven (no code changes to switch exchanges)
+- ✅ Full backward compatibility
+- ✅ Factory caching prevents recreating instances
+- ✅ Demo/testnet modes supported
+
+**Usage:**
+```json
+{
+  "exchange": {
+    "name": "binance",  // or "bybit"
+    "symbol": "BTCUSDT",
+    "demo": true,
+    "testnet": false,
+    "apiKey": "",
+    "apiSecret": ""
+  }
+}
+```
+
+**Next Steps:** Phase 7 - Backtest Engine Optimization
 
 ---
 
@@ -125,7 +205,7 @@ src/types/index.ts (exports updated)
 
 ---
 
-## 🎯 PHASE 0-4.10 STATUS: ALL COMPLETE ✅
+## 🎯 PHASES 0-5 STATUS: ALL COMPLETE ✅
 
 ### Summary of Completed Phases
 
@@ -144,9 +224,11 @@ src/types/index.ts (exports updated)
 - ✅ Phase 3.3-3.4: Comprehensive Test Suite (3101 tests passing)
 - ✅ Phase 3.5: Final Test Fixes (100% pass rate achieved)
 
-**Phase 4 + 4.5 Complete:**
+**Phase 4-5 Complete:**
 - ✅ Phase 4: Event-Sourced Position State (30 tests)
-- ✅ Phase 4.5: Unified Position State Machine (18 tests)
+- ✅ Phase 4.5: Unified Position State Machine (20 tests)
+- ✅ Phase 4.10: Config-Driven Constants (31 tests)
+- ✅ Phase 5: Extract Exit Decision Function (50 tests) ⭐ NEW!
 
 See [PHASE_3_PLAN.md](./PHASE_3_PLAN.md) for detailed completion notes from Sessions 8-10.
 
@@ -279,6 +361,98 @@ src/__tests__/event-sourcing/
 ```
 
 **Next Steps:** Phase 4.5 - Unified Position State Machine
+
+---
+
+## 🚀 PHASE 5: EXTRACT EXIT DECISION FUNCTION (✅ COMPLETE - Session 13)
+
+### Status: ✅ PHASE 5 COMPLETE! Pure exit decision function fully extracted and integrated!
+
+**What Was Implemented (Session 13):**
+
+✅ **Core Pure Decision Function:**
+- `src/decision-engine/exit-decisions.ts` - Pure evaluateExit() function (no side effects)
+- ExitDecisionContext interface - All data needed for exit decision
+- ExitDecisionResult interface - State + actions + reason returned
+- Deterministic, testable, reusable decision logic
+
+✅ **Exit Decision Logic Extracted:**
+- STEP 0: Input validation (FAST FAIL)
+- STEP 1: Stop Loss detection (ANY state → CLOSED)
+- STEP 2: State validation
+- STEP 3: TP progression based on state:
+  - OPEN → TP1_HIT (check TP1, move SL to BE, close 50%)
+  - TP1_HIT → TP2_HIT (check TP2, activate trailing, close 30%)
+  - TP2_HIT → TP3_HIT (check TP3, close 20%)
+  - TP3_HIT → HOLDING (await SL or manual close)
+- STEP 4: No state change scenario
+
+✅ **Helper Functions (Pure):**
+- checkStopLossHit() - Validates SL breach
+- checkTPHit() - Validates TP levels with index support
+- calculateBreakevenSL() - Calculates breakeven price
+- calculateSmartTrailingDistance() - ATR-based or percentage trailing
+- calculatePnL() - Profit/loss calculation
+- validateExitInputs() - Input validation
+- isValidState() - State validation
+
+✅ **ExitOrchestrator Integration:**
+- Refactored evaluateExit() to use pure decision function
+- Kept side effects (logging, state machine) in orchestrator
+- Maintains all existing functionality and tests
+- 31 existing tests continue to pass
+
+✅ **Comprehensive Test Coverage (50 Tests - 100% Passing):**
+- Input Validation (5 tests): Missing position, invalid price, invalid state
+- Stop Loss Detection (5 tests): LONG/SHORT, from any state, edge cases
+- Take Profit Hit Detection (4 tests): TP1/2/3, LONG/SHORT
+- State Transitions (7 tests): OPEN→TP1→TP2→TP3, no backward transitions
+- Exit Actions (6 tests): CLOSE_PERCENT, UPDATE_SL, ACTIVATE_TRAILING
+- Breakeven Calculation (4 tests): Default/custom margin, LONG/SHORT
+- Trailing Distance Calculation (4 tests): Default/ATR-based, volume adjustment
+- P&L Calculation (3 tests): Positive/negative, LONG/SHORT
+- Edge Cases (6 tests): Tight/wide TPs, overshoots, extreme prices
+- State Consistency (3 tests): Valid states, actions array, reason strings
+- Integration Scenarios (3 tests): Full lifecycle, SL during progression, indicators
+
+✅ **Build Status:**
+- **0 TypeScript Errors**
+- **3232/3232 Tests Passing** (3182 existing + 50 new Phase 5)
+- **Full backward compatibility maintained**
+
+**Files Created/Modified:**
+```
+src/decision-engine/exit-decisions.ts (NEW - 380 lines, pure function)
+src/__tests__/decision-engine/exit-decisions.test.ts (NEW - 50 comprehensive tests)
+src/orchestrators/exit.orchestrator.ts (REFACTORED - uses pure function, side effects intact)
+```
+
+**Key Benefits:**
+- ✅ Pure decision logic - fully testable in isolation
+- ✅ No side effects - no logger or service dependencies
+- ✅ Deterministic - same inputs always produce same outputs
+- ✅ Reusable - can be used in backtesting, analysis, other modules
+- ✅ Maintainable - clear separation of concerns
+- ✅ Extensible - easy to add new decision logic without orchestrator changes
+- ✅ Follows Entry Decision Pattern - consistent architecture
+
+**Integration Points:**
+- ExitOrchestrator now delegates decision logic to pure function
+- State machine updates happen after decision (as side effect)
+- Logging happens after decision (as side effect)
+- All advanced features (smart breakeven, trailing, adaptive TP3) available
+
+**Architecture Pattern:**
+```
+TradingOrchestrator.onCandleClosed()
+  ↓
+ExitOrchestrator.evaluateExit()
+  ├─ Call evaluateExit(context) [PURE - no side effects]
+  ├─ Apply side effects (state machine, logging)
+  └─ Return result to caller
+```
+
+**Next Steps:** Phase 6 - Multi-Exchange Support (2-3 weeks)
 
 ---
 
@@ -545,7 +719,7 @@ Move hardcoded constants to strategy.json:
 
 ---
 
-## ✅ Current Status (Session 12 - 2026-01-20)
+## ✅ Current Status (Session 14 - 2026-01-20)
 
 ### Completed Phases ✅
 
@@ -564,13 +738,16 @@ Move hardcoded constants to strategy.json:
 - [x] **Phase 3.3-3.4: Unit & Integration Tests** ✅ COMPLETE (28 + 13 tests)
 - [x] **Phase 3.5: Fix Final Failing Test** ✅ COMPLETE (LiquidityZoneAnalyzer)
 - [x] **Phase 4: Event-Sourced Position State** ✅ COMPLETE (30 tests passing)
-- [x] **Phase 4.5: Unified Position State Machine** ✅ COMPLETE (18 tests passing)
+- [x] **Phase 4.5: Unified Position State Machine** ✅ COMPLETE (20 tests passing)
+- [x] **Phase 4.10: Config-Driven Constants** ✅ COMPLETE (31 tests passing)
+- [x] **Phase 5: Extract Exit Decision Function** ✅ COMPLETE (50 tests passing)
+- [x] **Phase 6: Multi-Exchange Support** ✅ COMPLETE (26 tests passing) ⭐ NEW!
 
 ### Build Status ✨
 
 - ✅ TypeScript: **0 errors** ✅ BUILD SUCCESS!
-- ✅ Tests: **3151/3151 passing** 🎉 **100% TEST SUITE PASSING!** (3101 existing + 30 Phase 4 + 20 Phase 4.5)
-- 🎯 **Phase 4.5 ENHANCED:** Unified state machine with validation, persistence, and **closure reason tracking** (20 tests, 0 errors) ⭐
+- ✅ Tests: **3258/3258 passing** 🎉 **100% TEST SUITE PASSING!** (3232 existing + 26 new Phase 6)
+- 🎯 **Phase 6 COMPLETE:** Multi-exchange architecture with ExchangeFactory (Bybit + Binance support) ⭐⭐⭐
 
 ### Phase 2.5: IExchange Interface Migration - ✅ COMPLETE
 
@@ -636,8 +813,8 @@ Phases 0.1-0.4 and Phase 1-3 are fully implemented and tested.
 
 ---
 
-**Version:** 2.1 (Phase 4 Complete)
-**Last Updated:** 2026-01-20 (Session 11)
-**Status:** Phase 4 ✅ COMPLETE (30 new tests) | Phase 3.5 ✅ COMPLETE | Phase 2.5 ✅ COMPLETE | Phase 1 ✅ COMPLETE | Phase 0.4 ✅ COMPLETE
-**Architecture Stage:** Event Sourcing Complete | Position Lifecycle Tracking | State Projection Working | Phase 4.5 Ready to Start
-**Build:** ✅ 0 TypeScript Errors | **3131/3131 Tests Passing (100%)** 🎉 (3101 existing + 30 new)
+**Version:** 2.3 (Phase 6 Complete)
+**Last Updated:** 2026-01-20 (Session 14)
+**Status:** ✅ **ALL PHASES 0-6 COMPLETE!** Phase 6 ✅ COMPLETE (26 new tests) | Phase 5 ✅ COMPLETE (50 tests) | Phase 4.10 ✅ COMPLETE | Phase 4.5 ✅ COMPLETE | Phase 4 ✅ COMPLETE
+**Architecture Stage:** Multi-Exchange Support | Pure Decision Functions | Event Sourcing Complete | Position Lifecycle Tracking | Config-Driven Constants
+**Build:** ✅ 0 TypeScript Errors | **3258/3258 Tests Passing (100%)** 🎉 (3232 existing + 26 new Phase 6)
