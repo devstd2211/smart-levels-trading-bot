@@ -43,6 +43,7 @@ import {
   LoggerService,
   PositionSide,
 } from '../types';
+import { evaluateExit, ExitDecisionContext, ExitDecisionResult } from '../decision-engine/exit-decisions';
 import { PositionStateMachineService } from '../services/position-state-machine.service';
 
 // ============================================================================
@@ -111,6 +112,9 @@ export class ExitOrchestrator {
    * PRIMARY METHOD: Evaluate position state and determine exit actions
    * ATOMIC decision point for ALL exit logic
    *
+   * PHASE 5: Uses pure evaluateExit() function for decision logic
+   * Keeps side effects (state machine, logging) in orchestrator
+   *
    * @param position - Current position to evaluate
    * @param currentPrice - Current market price
    * @param indicators - Optional indicators (EMA, volume, ATR)
@@ -128,76 +132,59 @@ export class ExitOrchestrator {
   ): Promise<ExitOrchestratorResult> {
     try {
       // =====================================================================
-      // PHASE 4 RULE: Validate inputs (FAST FAIL)
-      // =====================================================================
-      if (!position) {
-        throw new Error('[ExitOrchestrator] REQUIRED: position must be provided');
-      }
-
-      if (currentPrice <= 0) {
-        throw new Error(`[ExitOrchestrator] REQUIRED: currentPrice must be > 0. Got: ${currentPrice}`);
-      }
-
-      // =====================================================================
-      // STEP 1: Check if Stop Loss hit (ANY state → CLOSED)
-      // =====================================================================
-      if (this.checkStopLossHit(position, currentPrice)) {
-        this.logger.warn('❌ Stop Loss HIT - closing position', {
-          symbol: position.symbol,
-          side: position.side,
-          entryPrice: position.entryPrice.toFixed(8),
-          currentPrice: currentPrice.toFixed(8),
-          stopLoss: position.stopLoss.price.toFixed(8),
-        });
-
-        // PHASE 4.5: Update state machine with SL closure details
-        const slPnL = position.side === PositionSide.LONG
-          ? ((currentPrice - position.entryPrice) / position.entryPrice) * 100
-          : ((position.entryPrice - currentPrice) / position.entryPrice) * 100;
-
-        this.stateMachine.closePosition(position.symbol, position.id, 'Stop Loss triggered', {
-          closureReason: 'SL_HIT',
-          closurePrice: currentPrice,
-          closurePnL: slPnL,
-        });
-
-        return {
-          newState: PositionState.CLOSED,
-          actions: [{ action: ExitAction.CLOSE_ALL }],
-          stateTransition: `${this.getCurrentState(position.symbol)} → CLOSED (SL HIT)`,
-        };
-      }
-
-      // =====================================================================
-      // STEP 2: Get current position state
+      // PHASE 5: Use pure decision function
       // =====================================================================
       const currentState = this.getCurrentState(position.symbol);
 
+      const decisionContext: ExitDecisionContext = {
+        position,
+        currentPrice,
+        currentState,
+        indicators: {
+          atrPercent: indicators?.atrPercent,
+          currentVolume: indicators?.currentVolume,
+          avgVolume: indicators?.avgVolume,
+          ema20: indicators?.ema20,
+        },
+        config: {
+          beMarginPercent: EXIT_ORCHESTRATOR_PRE_BE_PROFIT_LOCK,
+          minSLDistancePercent: EXIT_ORCHESTRATOR_MIN_SL_DISTANCE_PERCENT,
+          trailingDistancePercent: EXIT_ORCHESTRATOR_TRAIL_DISTANCE_ATR,
+        },
+      };
+
+      // Call pure decision function (no side effects)
+      const decisionResult = evaluateExit(decisionContext);
+
       // =====================================================================
-      // STEP 3: Check TP progression based on current state
+      // APPLY SIDE EFFECTS (Orchestrator responsibility)
       // =====================================================================
-      if (currentState === PositionState.OPEN) {
-        // Check TP1
-        if (this.checkTPHit(position, currentPrice, 0)) {
+
+      // Update internal state tracking
+      this.positionStates.set(position.symbol, decisionResult.state);
+
+      // Handle state machine integration (PHASE 4.5)
+      if (decisionResult.state !== currentState) {
+        // State transition occurred
+        const pnL = decisionResult.metadata?.profitPercent ?? 0;
+
+        this.logger.info(`📊 Exit State Transition: ${decisionResult.state}`, {
+          symbol: position.symbol,
+          transition: decisionResult.stateTransition,
+          trigger: decisionResult.metadata?.closureReason || decisionResult.state,
+          profit: pnL.toFixed(2) + '%',
+          profitPercent: pnL.toFixed(2) + '%',
+          timestamp: Date.now(),
+        });
+
+        // Handle special cases for logging
+        if (decisionResult.state === PositionState.TP1_HIT) {
           this.logger.info('✅ TP1 HIT - moving SL to breakeven', {
             symbol: position.symbol,
             tp1Price: position.takeProfits[0]?.price.toFixed(8),
+            newSL: decisionResult.actions[1]?.newStopLoss?.toFixed(8),
           });
-
-          // Use Smart Breakeven Pre-BE Mode for sophisticated profit locking
-          const preBEStatus = this.preBEModes.get(position.symbol);
-          const beSL = preBEStatus && preBEStatus.candlesWaited >= EXIT_ORCHESTRATOR_PRE_BE_MAX_CANDLES
-            ? this.evaluateSmartBreakeven(position.symbol, position, currentPrice)
-            : { shouldMoveToBreakeven: true, newSL: this.calculateBreakevenSL(position) };
-          const newSL = beSL.newSL;
-
-          this.positionStates.set(position.symbol, PositionState.TP1_HIT);
           this.activatePreBEMode(position.symbol);
-
-          // PHASE 4.5: Update state machine for TP1_HIT transition
-          const tp1Profit = position.side === PositionSide.LONG
-            ? ((currentPrice - position.entryPrice) / position.entryPrice) * 100
-            : ((position.entryPrice - currentPrice) / position.entryPrice) * 100;
 
           this.stateMachine.transitionState({
             symbol: position.symbol,
@@ -212,57 +199,17 @@ export class ExitOrchestrator {
               },
             },
           });
-
-          // Detailed state transition telemetry
-          this.logger.info('📊 Exit State Transition: TP1_HIT', {
-            symbol: position.symbol,
-            transition: 'OPEN → TP1_HIT',
-            trigger: 'TP1_REACHED',
-            tp1Price: position.takeProfits[0]?.price.toFixed(8),
-            currentPrice: currentPrice.toFixed(8),
-            newSL: newSL.toFixed(8),
-            positionClosed: '50%',
-            remainingSize: (position.quantity * 0.5).toFixed(4),
-            profit: tp1Profit.toFixed(2) + '%',
-            timestamp: Date.now(),
-          });
-
-          return {
-            newState: PositionState.TP1_HIT,
-            actions: [
-              { action: ExitAction.CLOSE_PERCENT, percent: 50 }, // Close 50% of position
-              { action: ExitAction.UPDATE_SL, newStopLoss: newSL },
-            ],
-            stateTransition: `OPEN → TP1_HIT`,
-          };
-        }
-      } else if (currentState === PositionState.TP1_HIT) {
-        // Check TP2
-        if (this.checkTPHit(position, currentPrice, 1)) {
+        } else if (decisionResult.state === PositionState.TP2_HIT) {
           this.logger.info('✅ TP2 HIT - activating trailing stop', {
             symbol: position.symbol,
             tp2Price: position.takeProfits[1]?.price.toFixed(8),
+            trailingDistance: decisionResult.actions[1]?.trailingDistance?.toFixed(8),
           });
-
-          // Use SmartTrailingV2 for ATR + volume-aware trailing
-          const trailingDistance = this.calculateSmartTrailingV2(
-            position.symbol,
-            position,
-            currentPrice,
-            { atrPercent: indicators?.atrPercent, currentVolume: indicators?.currentVolume, avgVolume: indicators?.avgVolume },
-          );
-
-          this.positionStates.set(position.symbol, PositionState.TP2_HIT);
-          this.preBEModes.delete(position.symbol); // Clear pre-BE mode
-
-          // PHASE 4.5: Update state machine for TP2_HIT transition with trailing mode
-          const tp2Profit = position.side === PositionSide.LONG
-            ? ((currentPrice - position.entryPrice) / position.entryPrice) * 100
-            : ((position.entryPrice - currentPrice) / position.entryPrice) * 100;
+          this.preBEModes.delete(position.symbol);
 
           const trailingPrice = position.side === PositionSide.LONG
-            ? currentPrice - trailingDistance
-            : currentPrice + trailingDistance;
+            ? currentPrice - (decisionResult.actions[1]?.trailingDistance ?? 0)
+            : currentPrice + (decisionResult.actions[1]?.trailingDistance ?? 0);
 
           this.stateMachine.transitionState({
             symbol: position.symbol,
@@ -277,47 +224,11 @@ export class ExitOrchestrator {
               },
             },
           });
-
-          // Detailed state transition telemetry
-          this.logger.info('📊 Exit State Transition: TP2_HIT', {
-            symbol: position.symbol,
-            transition: 'TP1_HIT → TP2_HIT',
-            trigger: 'TP2_REACHED',
-            tp2Price: position.takeProfits[1]?.price.toFixed(8),
-            currentPrice: currentPrice.toFixed(8),
-            trailingDistance: trailingDistance.toFixed(8),
-            positionClosed: '30%',
-            remainingSize: (position.quantity * 0.2).toFixed(4),
-            profit: tp2Profit.toFixed(2) + '%',
-            timestamp: Date.now(),
-          });
-
-          return {
-            newState: PositionState.TP2_HIT,
-            actions: [
-              { action: ExitAction.CLOSE_PERCENT, percent: 30 }, // Close 30%
-              { action: ExitAction.ACTIVATE_TRAILING, trailingDistance },
-            ],
-            stateTransition: `TP1_HIT → TP2_HIT`,
-          };
-        }
-      } else if (currentState === PositionState.TP2_HIT) {
-        // Check TP3
-        if (this.checkTPHit(position, currentPrice, 2)) {
+        } else if (decisionResult.state === PositionState.TP3_HIT) {
           this.logger.info('✅ TP3 HIT - closing remaining position', {
             symbol: position.symbol,
             tp3Price: position.takeProfits[2]?.price.toFixed(8),
           });
-
-          // Note: BB Trailing would require candles data passed from TradingOrchestrator
-          // For now, standard trailing is sufficient for final leg
-
-          this.positionStates.set(position.symbol, PositionState.TP3_HIT);
-
-          // PHASE 4.5: Update state machine for TP3_HIT transition
-          const tp3Profit = position.side === PositionSide.LONG
-            ? ((currentPrice - position.entryPrice) / position.entryPrice) * 100
-            : ((position.entryPrice - currentPrice) / position.entryPrice) * 100;
 
           this.stateMachine.transitionState({
             symbol: position.symbol,
@@ -325,47 +236,30 @@ export class ExitOrchestrator {
             targetState: PositionState.TP3_HIT,
             reason: 'TP3 hit at ' + currentPrice.toFixed(8),
           });
+        } else if (decisionResult.state === PositionState.CLOSED) {
+          // Map closure reason to valid enum value
+          const closureReason = (decisionResult.metadata?.closureReason as 'SL_HIT' | 'TP1_HIT' | 'TP2_HIT' | 'TP3_HIT' | 'TRAILING_STOP' | 'MANUAL' | 'OTHER') || 'OTHER';
 
-          // Detailed state transition telemetry
-          this.logger.info('📊 Exit State Transition: TP3_HIT', {
+          this.logger.warn('❌ Position Closed', {
             symbol: position.symbol,
-            transition: 'TP2_HIT → TP3_HIT',
-            trigger: 'TP3_REACHED',
-            tp3Price: position.takeProfits[2]?.price.toFixed(8),
-            currentPrice: currentPrice.toFixed(8),
-            positionClosed: '20%',
-            remainingSize: (position.quantity * 0).toFixed(4),
-            totalProfit: tp3Profit.toFixed(2) + '%',
-            timestamp: Date.now(),
+            reason: closureReason,
+            closurePrice: currentPrice.toFixed(8),
+            profitPercent: pnL.toFixed(2) + '%',
           });
 
-          return {
-            newState: PositionState.TP3_HIT,
-            actions: [{ action: ExitAction.CLOSE_PERCENT, percent: 20 }], // Close last 20%
-            stateTransition: `TP2_HIT → TP3_HIT`,
-          };
+          this.stateMachine.closePosition(position.symbol, position.id, decisionResult.reason, {
+            closureReason,
+            closurePrice: currentPrice,
+            closurePnL: pnL,
+          });
         }
-      } else if (currentState === PositionState.TP3_HIT) {
-        // All TPs hit, just wait for SL or manual close
-        this.logger.debug('All TPs hit - waiting for SL or manual close', {
-          symbol: position.symbol,
-          remainingSize: position.quantity,
-        });
-
-        return {
-          newState: PositionState.TP3_HIT,
-          actions: [],
-          stateTransition: `TP3_HIT → HOLDING (awaiting SL)`,
-        };
       }
 
-      // =====================================================================
-      // STEP 4: No state change, position holding
-      // =====================================================================
+      // Return result with converted actions
       return {
-        newState: currentState,
-        actions: [],
-        stateTransition: `${currentState} → NO CHANGE`,
+        newState: decisionResult.state,
+        actions: decisionResult.actions,
+        stateTransition: decisionResult.stateTransition,
       };
     } catch (error) {
       this.logger.error('ExitOrchestrator evaluation failed', {
