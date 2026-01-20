@@ -57,10 +57,75 @@ THIS FILE: QUICK START
 | **3.5** | Final Test Fixes | ✅ DONE | Fix LiquidityZoneAnalyzer test | 🎉 **3101/3101 PASSING (Session 10)** |
 | **4** | Event-Sourced Position State | ✅ DONE | Position events + store + projection | ✅ 30 TESTS PASSING (Session 11) |
 | **4.5** | Unified Position State Machine | ✅ DONE | State machine + **closure reasons** | ✅ 20 TESTS PASSING (Session 12) ⭐ |
+| **4.10** | Config-Driven Constants | ✅ DONE | Orchestration + Trend + Analyzer params | ✅ 31 TESTS PASSING (Session 12) ⭐ |
 
 ---
 
-## 🎯 PHASE 0-4.5 STATUS: ALL COMPLETE ✅
+## 🚀 PHASE 4.10: CONFIG-DRIVEN CONSTANTS (✅ COMPLETE - Session 12)
+
+### Status: ✅ PHASE 4.10 COMPLETE! Orchestration config infrastructure fully implemented!
+
+**What Was Implemented (Session 12):**
+
+✅ **Core Configuration Schemas:**
+- OrchestrationConfig with entry and exit parameters
+- TrendAnalysisConfig for trend analyzer customization
+- AnalyzerParametersConfig for per-analyzer tuning (ATR, Bollinger Bands, Breakout, OrderBlock, Wick)
+
+✅ **Config Type System:**
+- EntryOrchestrationConfig: minConfidenceThreshold, signalConflictThreshold, flatMarketConfidenceThreshold
+- ExitOrchestrationConfig: breakeven and trailing stop parameters
+- Individual analyzer parameter types with validation
+
+✅ **Service Refactoring:**
+- EntryOrchestrator updated to accept and use orchestrationConfig
+- Changed from static methods to instance-level configuration
+- Backward compatible with existing code
+
+✅ **Strategy Configuration:**
+- Updated level-trading.strategy.json with complete orchestration section
+- All parameters have sensible defaults
+- Ready for tuning without code changes
+
+✅ **Config Helper Utilities:**
+- analyzer-config.utils.ts for extracting parameters
+- Fallback to defaults if parameters not in config
+- Type-safe parameter extraction
+
+✅ **Comprehensive Test Coverage (31 Tests - 100% Passing):**
+- EntryOrchestrationConfig tests (4 tests): parameter validation, custom thresholds
+- ExitOrchestrationConfig tests (3 tests): parameter validation, distance enforcement
+- TrendAnalysisConfig tests (4 tests): strength thresholds, validation
+- AnalyzerParametersConfig tests (12 tests): All 5 analyzer types with validation
+- Config Defaults tests (4 tests): Sensible defaults validation
+- Config Compatibility tests (2 tests): Backward compatibility, partial overrides
+
+✅ **Build Status:**
+- **0 TypeScript Errors**
+- **3182/3182 Tests Passing** (3151 existing + 31 new Phase 4.10 tests)
+
+**Files Created/Modified:**
+```
+src/types/config.types.ts (expanded with new interfaces)
+src/orchestrators/entry.orchestrator.ts (refactored for config)
+src/utils/analyzer-config.utils.ts (NEW - config extraction utilities)
+src/__tests__/config/orchestration-config.test.ts (NEW - 31 comprehensive tests)
+strategies/json/level-trading.strategy.json (updated with orchestration section)
+src/types/index.ts (exports updated)
+```
+
+**Key Benefits:**
+- ✅ Parameter tuning without code changes
+- ✅ Per-strategy configuration of decision thresholds
+- ✅ Backtest-friendly parameter optimization
+- ✅ Type-safe configuration access
+- ✅ Full backward compatibility with existing configs
+
+**Next Steps:** Phase 5 - Extract Exit Decision Function (2026-01-21+)
+
+---
+
+## 🎯 PHASE 0-4.10 STATUS: ALL COMPLETE ✅
 
 ### Summary of Completed Phases
 

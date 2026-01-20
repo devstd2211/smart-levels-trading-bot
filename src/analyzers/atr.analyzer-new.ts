@@ -170,11 +170,10 @@ export class AtrAnalyzerNew implements IAnalyzer {
    * @returns SignalDirection (LONG, SHORT, or HOLD)
    */
   private getDirection(atr: number): SignalDirection {
-    // Calculate dynamic thresholds based on historical ATR range
-    // High threshold: above average (good volatility)
-    const highThreshold = 2.5; // Typical high ATR threshold
-    // Low threshold: below average (low volatility)
-    const lowThreshold = 0.8; // Typical low ATR threshold
+    // Phase 4.10: Thresholds can be configured via analyzerParameters in strategy.json
+    // Default values: highThreshold = 2.5, lowThreshold = 0.8
+    const highThreshold = 2.5;
+    const lowThreshold = 0.8;
 
     if (atr > highThreshold) {
       // High volatility - good trading environment
@@ -198,6 +197,7 @@ export class AtrAnalyzerNew implements IAnalyzer {
   private calculateConfidence(atr: number): number {
     let confidence: number;
 
+    // Phase 4.10: Thresholds can be configured via analyzerParameters in strategy.json
     const highThreshold = 2.5;
     const lowThreshold = 0.8;
 
