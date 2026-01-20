@@ -13,6 +13,9 @@ export interface BotConfig {
   analyzers: AnalyzersConfig;
   filters: FiltersConfig;
   confidence: ConfidenceConfig;
+  orchestration: OrchestrationConfig;
+  trendAnalysis: TrendAnalysisConfig;
+  analyzerParameters: AnalyzerParametersConfig;
   strategies: StrategiesConfig;
   services: ServicesConfig;
   monitoring: MonitoringConfig;
@@ -271,6 +274,91 @@ export interface VolatilityRegimeConfig {
 export interface DisabledFiltersConfig {
   _comment: string;
   [key: string]: any;
+}
+
+// ============================================================================
+// ORCHESTRATION (Phase 4.10 - Config-Driven Constants)
+// ============================================================================
+
+export interface OrchestrationConfig {
+  entry: EntryOrchestrationConfig;
+  exit: ExitOrchestrationConfig;
+}
+
+export interface EntryOrchestrationConfig {
+  minConfidenceThreshold: number; // Default: 60
+  signalConflictThreshold: number; // Default: 0.4 (40%)
+  flatMarketConfidenceThreshold: number; // Default: 70
+  minCandlesRequired: number; // Default: 20
+  minEntryConfidenceCandlesRequired: number; // Default: 5
+  maxPrimaryCandles: number; // Default: 100
+}
+
+export interface ExitOrchestrationConfig {
+  breakeven: {
+    marginPercent: number; // Default: 0.1
+  };
+  trailingStop: {
+    minDistancePercent: number; // Default: 0.1
+    maxDistancePercent: number; // Default: 5.0
+    atrMultiplier: number; // Default: 1.0
+  };
+}
+
+// ============================================================================
+// TREND ANALYSIS (Phase 4.10 - Trend Analyzer Constants)
+// ============================================================================
+
+export interface TrendAnalysisConfig {
+  minCandlesRequired: number; // Default: 20
+  strongTrendStrength: number; // Default: 0.8
+  flatTrendStrength: number; // Default: 0.3
+  unclearTrendStrength: number; // Default: 0.0
+  zigzagMinDepth: number; // Default: 5
+  recentSwingMaxAge: number; // Default: 20
+}
+
+// ============================================================================
+// ANALYZER PARAMETERS (Phase 4.10 - Individual Analyzer Config)
+// ============================================================================
+
+export interface AnalyzerParametersConfig {
+  atr?: AtrAnalyzerParams;
+  bollingerBands?: BollingerBandsAnalyzerParams;
+  breakout?: BreakoutAnalyzerParams;
+  orderBlock?: OrderBlockAnalyzerParams;
+  wick?: WickAnalyzerParams;
+}
+
+export interface AtrAnalyzerParams {
+  highThreshold: number; // Default: 2.5
+  lowThreshold: number; // Default: 0.8
+}
+
+export interface BollingerBandsAnalyzerParams {
+  minCandlesRequired: number; // Default: 25
+  oversoldThreshold: number; // Default: 20
+  overboughtThreshold: number; // Default: 80
+  neutralRange: {
+    lower: number; // Default: 40
+    upper: number; // Default: 60
+  };
+  squeezeThreshold: number; // Default: 5 (%)
+}
+
+export interface BreakoutAnalyzerParams {
+  minCandlesRequired: number; // Default: 30
+  resistanceLookback: number; // Default: 20
+  volatilityThreshold: number; // Default: 1.5
+}
+
+export interface OrderBlockAnalyzerParams {
+  maxDistanceThreshold: number; // Default: 0.05
+  maxRejectionCount: number; // Default: 5
+}
+
+export interface WickAnalyzerParams {
+  minBodyToWickRatio: number; // Default: 0.3
 }
 
 // ============================================================================

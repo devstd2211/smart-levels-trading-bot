@@ -113,5 +113,61 @@
       "offsetPercent": 0.4
     }
   },
+  "orchestration": {
+    "entry": {
+      "minConfidenceThreshold": 60,
+      "signalConflictThreshold": 0.4,
+      "flatMarketConfidenceThreshold": 70,
+      "minCandlesRequired": 20,
+      "minEntryConfidenceCandlesRequired": 5,
+      "maxPrimaryCandles": 100
+    },
+    "exit": {
+      "breakeven": {
+        "marginPercent": 0.1
+      },
+      "trailingStop": {
+        "minDistancePercent": 0.1,
+        "maxDistancePercent": 5.0,
+        "atrMultiplier": 1.0
+      }
+    }
+  },
+  "trendAnalysis": {
+    "minCandlesRequired": 20,
+    "strongTrendStrength": 0.8,
+    "flatTrendStrength": 0.3,
+    "unclearTrendStrength": 0.0,
+    "zigzagMinDepth": 5,
+    "recentSwingMaxAge": 20
+  },
+  "analyzerParameters": {
+    "atr": {
+      "highThreshold": 2.5,
+      "lowThreshold": 0.8
+    },
+    "bollingerBands": {
+      "minCandlesRequired": 25,
+      "oversoldThreshold": 20,
+      "overboughtThreshold": 80,
+      "neutralRange": {
+        "lower": 40,
+        "upper": 60
+      },
+      "squeezeThreshold": 5
+    },
+    "breakout": {
+      "minCandlesRequired": 30,
+      "resistanceLookback": 20,
+      "volatilityThreshold": 1.5
+    },
+    "orderBlock": {
+      "maxDistanceThreshold": 0.05,
+      "maxRejectionCount": 5
+    },
+    "wick": {
+      "minBodyToWickRatio": 0.3
+    }
+  },
   "notes": "Best used in 4-hour and higher timeframes with clear structural levels. Requires at least 3 touches for level confirmation."
 }

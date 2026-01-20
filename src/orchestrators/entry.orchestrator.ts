@@ -35,51 +35,69 @@ import {
   FlatMarketResult,
   RiskManager,
 } from '../types';
+import type { EntryOrchestrationConfig } from '../types/config.types';
 import { evaluateEntry as evaluateEntryPure, EntryDecisionContext } from '../decision-engine/entry-decisions';
 import { FilterOrchestrator } from './filter.orchestrator';
 
 // ============================================================================
-// CONSTANTS (PHASE 4: NO FALLBACKS RULE)
+// DEFAULT CONFIGURATION (Phase 4.10: Config-Driven Constants)
 // ============================================================================
 
-// Minimum confidence threshold to consider a signal valid
-// DEFAULT: 60 (strict), can be overridden by strategy config
-let ENTRY_ORCHESTRATOR_MIN_CONFIDENCE = 60;
-
-// If multiple signals, prefer this many top signals for ranking
-const ENTRY_ORCHESTRATOR_TOP_SIGNALS = 3;
-
-// Confidence boost for multi-strategy agreement
-const ENTRY_ORCHESTRATOR_CONFIDENCE_BOOST_FOR_AGREEMENT = 10;
-
-// PHASE 1.3: Flat market blocking threshold
-const FLAT_MARKET_CONFIDENCE_THRESHOLD = 70; // Block entries if flat confidence >= 70%
+const DEFAULT_ENTRY_ORCHESTRATION: EntryOrchestrationConfig = {
+  minConfidenceThreshold: 60,
+  signalConflictThreshold: 0.4,
+  flatMarketConfidenceThreshold: 70,
+  minCandlesRequired: 20,
+  minEntryConfidenceCandlesRequired: 5,
+  maxPrimaryCandles: 100,
+};
 
 // ============================================================================
 // ENTRY ORCHESTRATOR
 // ============================================================================
 
 export class EntryOrchestrator {
+  private orchestrationConfig: EntryOrchestrationConfig;
+
   constructor(
     private riskManager: RiskManager,
     private logger: LoggerService,
     private filterOrchestrator?: FilterOrchestrator,
+    orchestrationConfig?: EntryOrchestrationConfig,
   ) {
-    this.logger.info('🎯 EntryOrchestrator initialized (PHASE 4)', {
-      minConfidenceThreshold: ENTRY_ORCHESTRATOR_MIN_CONFIDENCE,
+    // Phase 4.10: Use provided config or fall back to defaults
+    this.orchestrationConfig = orchestrationConfig || DEFAULT_ENTRY_ORCHESTRATION;
+
+    this.logger.info('🎯 EntryOrchestrator initialized (PHASE 4.10 - Config-Driven)', {
+      minConfidenceThreshold: this.orchestrationConfig.minConfidenceThreshold,
+      signalConflictThreshold: this.orchestrationConfig.signalConflictThreshold,
+      flatMarketConfidenceThreshold: this.orchestrationConfig.flatMarketConfidenceThreshold,
     });
   }
 
   /**
+   * Set orchestration configuration (for backtesting/tuning)
+   * Phase 4.10: Instance-level config instead of static
+   */
+  setOrchestrationConfig(config: EntryOrchestrationConfig): void {
+    this.orchestrationConfig = config;
+  }
+
+  getOrchestrationConfig(): EntryOrchestrationConfig {
+    return this.orchestrationConfig;
+  }
+
+  /**
+   * DEPRECATED: Use setOrchestrationConfig() instead
    * Set minimum confidence threshold (for backtesting/tuning)
    * Default is 60%, can be lowered to 30-40% for more signal participation
    */
-  static setMinConfidenceThreshold(threshold: number): void {
-    ENTRY_ORCHESTRATOR_MIN_CONFIDENCE = threshold;
+  setMinConfidenceThreshold(threshold: number): void {
+    this.orchestrationConfig.minConfidenceThreshold = threshold;
   }
 
-  static getMinConfidenceThreshold(): number {
-    return ENTRY_ORCHESTRATOR_MIN_CONFIDENCE;
+  getMinConfidenceThreshold(): number {
+    return this.orchestrationConfig.minConfidenceThreshold;
   }
 
   /**
@@ -118,9 +136,9 @@ export class EntryOrchestrator {
         openPositions,
         globalTrendBias,
         flatMarketAnalysis,
-        minConfidenceThreshold: ENTRY_ORCHESTRATOR_MIN_CONFIDENCE,
-        signalConflictThreshold: 0.4, // 40% conflict threshold
-        flatMarketConfidenceThreshold: FLAT_MARKET_CONFIDENCE_THRESHOLD,
+        minConfidenceThreshold: this.orchestrationConfig.minConfidenceThreshold,
+        signalConflictThreshold: this.orchestrationConfig.signalConflictThreshold,
+        flatMarketConfidenceThreshold: this.orchestrationConfig.flatMarketConfidenceThreshold,
       };
 
       const pureDecision = evaluateEntryPure(decisionContext);

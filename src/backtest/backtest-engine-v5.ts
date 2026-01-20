@@ -146,9 +146,10 @@ export class BacktestEngineV5 {
     this.exitOrchestrator = new ExitOrchestrator(this.logger);
 
     // Configure entry threshold from strategy if specified (allows tuning without modifying code)
+    // Phase 4.10: Use instance method instead of static
     const entryThreshold = (this.strategyConfig as any).entryThreshold;
     if (entryThreshold !== undefined && typeof entryThreshold === 'number') {
-      EntryOrchestrator.setMinConfidenceThreshold(entryThreshold);
+      this.entryOrchestrator.setMinConfidenceThreshold(entryThreshold);
       this.logger.info('🎛️ Entry confidence threshold configured', {
         threshold: entryThreshold,
       });
@@ -164,7 +165,7 @@ export class BacktestEngineV5 {
       strategyName: this.strategyConfig.metadata.name,
       symbol: config.symbol,
       initialBalance: config.initialBalance,
-      entryThreshold: EntryOrchestrator.getMinConfidenceThreshold(),
+      entryThreshold: this.entryOrchestrator.getMinConfidenceThreshold(),
     });
   }
 
