@@ -117,6 +117,13 @@ export class SqliteOptimizedDataProvider implements IDataProvider {
   }
 
   /**
+   * Get data source name for logging
+   */
+  getSourceName(): string {
+    return `SQLite Optimized (${this.dbPath})`;
+  }
+
+  /**
    * Close database connection
    */
   async close(): Promise<void> {

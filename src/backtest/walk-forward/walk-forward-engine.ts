@@ -10,7 +10,6 @@
  */
 
 import { BacktestEngineV5, BacktestConfig, BacktestResult } from '../backtest-engine-v5';
-import { ParameterOptimizer } from './walk-forward-types';
 import { LoggerService } from '../../services/logger.service';
 import { Candle } from '../../types';
 
@@ -39,8 +38,8 @@ export interface WalkForwardWindowResult {
     totalTrades: number;
   };
   optimalParams: { [key: string]: any };
-  overftingDetected: boolean;
-  overftingScore: number; // 0-1: 0=no overfitting, 1=severe
+  overfittingDetected: boolean;
+  overfittingScore: number; // 0-1: 0=no overfitting, 1=severe
 }
 
 export interface WalkForwardConfig {
@@ -58,11 +57,9 @@ export interface WalkForwardConfig {
  */
 export class WalkForwardEngine {
   private logger: LoggerService;
-  private optimizer: ParameterOptimizer;
 
   constructor(logger?: LoggerService) {
     this.logger = logger || new LoggerService();
-    this.optimizer = new ParameterOptimizer(logger);
   }
 
   /**
@@ -167,7 +164,7 @@ export class WalkForwardEngine {
       },
       optimalParams: {},
       overfittingDetected: false,
-      overftingScore: 0.2,
+      overfittingScore: 0.2,
     };
 
     // Detect overfitting
@@ -218,7 +215,7 @@ export class WalkForwardEngine {
    */
   private summarizeResults(results: WalkForwardWindowResult[], config: WalkForwardConfig): void {
     const overfittedWindows = results.filter(r => r.overfittingDetected).length;
-    const avgOverftingScore = results.reduce((sum, r) => sum + r.overftingScore, 0) / results.length;
+    const avgOverftingScore = results.reduce((sum, r) => sum + r.overfittingScore, 0) / results.length;
 
     this.logger.info('📈 Walk-Forward Analysis Summary', {
       totalWindows: results.length,
@@ -231,11 +228,4 @@ export class WalkForwardEngine {
       this.logger.warn('⚠️ High overfitting detected - parameters may not generalize well');
     }
   }
-}
-
-/**
- * Placeholder type - real implementation would integrate with ParameterOptimizer
- */
-export interface ParameterOptimizer {
-  optimize(grid: any, config: any, opts: any): Promise<any>;
 }

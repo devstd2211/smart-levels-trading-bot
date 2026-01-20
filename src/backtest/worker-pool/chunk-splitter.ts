@@ -54,7 +54,7 @@ export class ChunkSplitter {
 
   constructor(
     private chunkSize: number = 1000, // Default: ~3.5 days of 5m candles
-    private lookbackCandles: number = LOOKBACK_CANDLES
+    private lookbackCandles: number = 60
   ) {
     if (chunkSize < 100) {
       throw new Error('Chunk size must be at least 100 candles');
