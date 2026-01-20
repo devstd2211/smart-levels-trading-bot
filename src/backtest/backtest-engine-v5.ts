@@ -23,6 +23,7 @@ import { RiskManager } from '../services/risk-manager.service';
 import { IDataProvider, TimeframeData } from './data-providers/base.provider';
 import { JsonDataProvider } from './data-providers/json.provider';
 import { SqliteDataProvider } from './data-providers/sqlite.provider';
+import { SqliteOptimizedDataProvider } from './data-providers/sqlite-optimized.provider';  // Phase 7.1
 import { Candle, Signal, Position } from '../types';
 import { SignalDirection, EntryDecision } from '../types/enums';
 import { StrategyConfig } from '../types/strategy-config.types';
@@ -38,6 +39,15 @@ interface TrendAnalysisBacktest {
 // TYPES
 // ============================================================================
 
+// Phase 7.1: Optimization flags for backtest performance
+export interface BacktestOptimizationConfig {
+  useSqliteOptimized?: boolean;      // Enable SQLite indexing (Phase 7.1)
+  useIndicatorCache?: boolean;       // Enable indicator cache integration (Phase 7.2)
+  useWorkerPool?: boolean;           // Enable parallel processing (Phase 7.3)
+  workers?: number;                  // Number of worker threads (default: CPU count - 1)
+  chunkSize?: number;                // Candles per chunk (default: 1000)
+}
+
 export interface BacktestConfig {
   strategyFile: string;
   symbol: string;
@@ -48,6 +58,7 @@ export interface BacktestConfig {
   initialBalance: number;
   maxOpenPositions: number;
   outputDir?: string;
+  optimization?: BacktestOptimizationConfig;  // Phase 7: Performance optimizations (opt-in)
 }
 
 export interface BacktestTrade {
@@ -155,10 +166,15 @@ export class BacktestEngineV5 {
       });
     }
 
-    // Initialize data provider
-    this.dataProvider = this.config.dataProvider === 'json'
-      ? new JsonDataProvider()
-      : new SqliteDataProvider();
+    // Initialize data provider (Phase 7.1: with optimization support)
+    if (this.config.dataProvider === 'json') {
+      this.dataProvider = new JsonDataProvider();
+    } else if (this.config.optimization?.useSqliteOptimized) {
+      this.dataProvider = new SqliteOptimizedDataProvider();
+      this.logger.info('🚀 Using optimized SQLite provider (Phase 7.1)');
+    } else {
+      this.dataProvider = new SqliteDataProvider();
+    }
 
     this.logger.info('🎯 BacktestEngineV5 initialized', {
       strategyFile: config.strategyFile,
