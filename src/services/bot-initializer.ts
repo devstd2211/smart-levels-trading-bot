@@ -262,11 +262,23 @@ export class BotInitializer {
    * Private: Initialize Bybit service
    */
   private async initializeBybit(): Promise<void> {
-    this.logger.info('Initializing Bybit service...');
-    if (this.services.bybitService.initialize) {
+    const exchangeName = (this.config.exchange as any)?.name || 'bybit';
+    this.logger.info(`Initializing ${exchangeName} service...`);
+
+    // If using factory-created exchange (non-Bybit), create it asynchronously
+    const exchangeFactory = (this.services as any).exchangeFactory;
+    if (exchangeFactory && exchangeName !== 'bybit') {
+      this.logger.info(`Creating ${exchangeName} exchange via factory...`);
+      const exchange = await exchangeFactory.createExchange();
+      (this.services as any).bybitService = exchange;
+      this.logger.info(`✅ ${exchangeName} exchange created and initialized`);
+    } else if (this.services.bybitService.initialize) {
+      // Traditional Bybit initialization
       await this.services.bybitService.initialize();
+      this.logger.debug('✅ Bybit service initialized');
+    } else {
+      this.logger.debug('✅ Exchange service initialized');
     }
-    this.logger.debug('✅ Bybit service initialized');
   }
 
   /**

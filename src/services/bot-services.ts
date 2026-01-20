@@ -26,6 +26,7 @@ import {
   PositionExitingService,
 } from './index';
 import { BybitServiceAdapter } from './bybit/bybit-service.adapter';
+import { ExchangeFactory } from './exchange-factory.service';
 import { IndicatorCacheService } from './indicator-cache.service';
 import { IndicatorPreCalculationService } from './indicator-precalculation.service';
 import { CalculatorFactory } from '../factories/calculator.factory';
@@ -229,9 +230,40 @@ export class BotServices {
       config.system.timeSyncMaxFailures,
     );
 
-    // 3. Initialize exchange service with adapter wrapper
-    const rawBybitService = new BybitService(config.exchange, this.logger);
-    this.bybitService = new BybitServiceAdapter(rawBybitService, this.logger);
+    // 3. Initialize exchange service using factory pattern
+    // Supports multiple exchanges (Bybit, Binance, etc.) via config.exchange.name
+    // Note: Factory will create the appropriate adapter based on config.exchange.name
+    const exchangeFactory = new ExchangeFactory(this.logger, {
+      name: (config.exchange.name || 'bybit') as 'bybit' | 'binance',
+      symbol: config.exchange.symbol,
+      demo: config.exchange.demo,
+      testnet: config.exchange.testnet,
+      apiKey: config.exchange.apiKey,
+      apiSecret: config.exchange.apiSecret,
+    });
+
+    // For backward compatibility: if config.name is 'bybit' or not specified,
+    // initialize traditional Bybit service. Otherwise, use factory.
+    if (!config.exchange.name || config.exchange.name === 'bybit') {
+      // Traditional Bybit initialization (backward compatible)
+      const rawBybitService = new BybitService(config.exchange, this.logger);
+      this.bybitService = new BybitServiceAdapter(rawBybitService, this.logger);
+    } else {
+      // Use factory for other exchanges (Binance, etc.)
+      // This will be initialized properly in bot-initializer
+      // For now, return a stub that will be replaced after async initialization
+      this.bybitService = exchangeFactory.getExchange() || ({
+        name: 'Unknown',
+        isConnected: () => false,
+        healthCheck: async () => false,
+        connect: async () => {},
+        disconnect: async () => {},
+        initialize: async () => {},
+      } as any);
+    }
+
+    // Store factory for async initialization in BotInitializer
+    (this as any).exchangeFactory = exchangeFactory;
 
     // TimeService now accepts IExchange interface
     this.timeService.setBybitService(this.bybitService);
