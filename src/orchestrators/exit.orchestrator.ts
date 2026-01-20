@@ -43,6 +43,7 @@ import {
   LoggerService,
   PositionSide,
 } from '../types';
+import { PositionStateMachineService } from '../services/position-state-machine.service';
 
 // ============================================================================
 // CONSTANTS (PHASE 4: EXPLICIT CONSTANTS - NO MAGIC NUMBERS)
@@ -91,11 +92,18 @@ export class ExitOrchestrator {
   private trailingModes: Map<string, { isTrailing: boolean; currentTrailingPrice: number; lastUpdatePrice: number }> = new Map();
   private bbTrailingModes: Map<string, { bbLower: number; bbUpper: number; activatedAt: number }> = new Map();
 
-  constructor(private logger: LoggerService) {
-    this.logger.info('🎯 ExitOrchestrator initialized (PHASE 4 Week 3)', {
+  // PHASE 4.5: Unified Position State Machine (persisted state + closure reasons)
+  private stateMachine: PositionStateMachineService;
+
+  constructor(private logger: LoggerService, stateMachine?: PositionStateMachineService) {
+    // Use injected state machine or create new one
+    this.stateMachine = stateMachine || new PositionStateMachineService(logger);
+
+    this.logger.info('🎯 ExitOrchestrator initialized (PHASE 4.5 INTEGRATION)', {
       role: 'Single position exit state machine',
       statesAvailable: 'OPEN, TP1_HIT, TP2_HIT, TP3_HIT, CLOSED',
       actionsAvailable: 'CLOSE_PERCENT, UPDATE_SL, ACTIVATE_TRAILING, MOVE_SL_TO_BREAKEVEN, CLOSE_ALL',
+      stateMachineIntegrated: 'YES (Phase 4.5)',
     });
   }
 
@@ -142,6 +150,17 @@ export class ExitOrchestrator {
           stopLoss: position.stopLoss.price.toFixed(8),
         });
 
+        // PHASE 4.5: Update state machine with SL closure details
+        const slPnL = position.side === PositionSide.LONG
+          ? ((currentPrice - position.entryPrice) / position.entryPrice) * 100
+          : ((position.entryPrice - currentPrice) / position.entryPrice) * 100;
+
+        this.stateMachine.closePosition(position.symbol, position.id, 'Stop Loss triggered', {
+          closureReason: 'SL_HIT',
+          closurePrice: currentPrice,
+          closurePnL: slPnL,
+        });
+
         return {
           newState: PositionState.CLOSED,
           actions: [{ action: ExitAction.CLOSE_ALL }],
@@ -175,6 +194,25 @@ export class ExitOrchestrator {
           this.positionStates.set(position.symbol, PositionState.TP1_HIT);
           this.activatePreBEMode(position.symbol);
 
+          // PHASE 4.5: Update state machine for TP1_HIT transition
+          const tp1Profit = position.side === PositionSide.LONG
+            ? ((currentPrice - position.entryPrice) / position.entryPrice) * 100
+            : ((position.entryPrice - currentPrice) / position.entryPrice) * 100;
+
+          this.stateMachine.transitionState({
+            symbol: position.symbol,
+            positionId: position.id,
+            targetState: PositionState.TP1_HIT,
+            reason: 'TP1 hit at ' + currentPrice.toFixed(8),
+            metadata: {
+              preBEMode: {
+                activatedAt: Date.now(),
+                candlesWaited: 0,
+                candleCount: EXIT_ORCHESTRATOR_PRE_BE_MAX_CANDLES,
+              },
+            },
+          });
+
           // Detailed state transition telemetry
           this.logger.info('📊 Exit State Transition: TP1_HIT', {
             symbol: position.symbol,
@@ -185,7 +223,7 @@ export class ExitOrchestrator {
             newSL: newSL.toFixed(8),
             positionClosed: '50%',
             remainingSize: (position.quantity * 0.5).toFixed(4),
-            profit: (((currentPrice - position.entryPrice) / position.entryPrice) * 100).toFixed(2) + '%',
+            profit: tp1Profit.toFixed(2) + '%',
             timestamp: Date.now(),
           });
 
@@ -217,6 +255,29 @@ export class ExitOrchestrator {
           this.positionStates.set(position.symbol, PositionState.TP2_HIT);
           this.preBEModes.delete(position.symbol); // Clear pre-BE mode
 
+          // PHASE 4.5: Update state machine for TP2_HIT transition with trailing mode
+          const tp2Profit = position.side === PositionSide.LONG
+            ? ((currentPrice - position.entryPrice) / position.entryPrice) * 100
+            : ((position.entryPrice - currentPrice) / position.entryPrice) * 100;
+
+          const trailingPrice = position.side === PositionSide.LONG
+            ? currentPrice - trailingDistance
+            : currentPrice + trailingDistance;
+
+          this.stateMachine.transitionState({
+            symbol: position.symbol,
+            positionId: position.id,
+            targetState: PositionState.TP2_HIT,
+            reason: 'TP2 hit at ' + currentPrice.toFixed(8),
+            metadata: {
+              trailingMode: {
+                isTrailing: true,
+                currentTrailingPrice: trailingPrice,
+                lastUpdatePrice: currentPrice,
+              },
+            },
+          });
+
           // Detailed state transition telemetry
           this.logger.info('📊 Exit State Transition: TP2_HIT', {
             symbol: position.symbol,
@@ -227,7 +288,7 @@ export class ExitOrchestrator {
             trailingDistance: trailingDistance.toFixed(8),
             positionClosed: '30%',
             remainingSize: (position.quantity * 0.2).toFixed(4),
-            profit: (((currentPrice - position.entryPrice) / position.entryPrice) * 100).toFixed(2) + '%',
+            profit: tp2Profit.toFixed(2) + '%',
             timestamp: Date.now(),
           });
 
@@ -253,6 +314,18 @@ export class ExitOrchestrator {
 
           this.positionStates.set(position.symbol, PositionState.TP3_HIT);
 
+          // PHASE 4.5: Update state machine for TP3_HIT transition
+          const tp3Profit = position.side === PositionSide.LONG
+            ? ((currentPrice - position.entryPrice) / position.entryPrice) * 100
+            : ((position.entryPrice - currentPrice) / position.entryPrice) * 100;
+
+          this.stateMachine.transitionState({
+            symbol: position.symbol,
+            positionId: position.id,
+            targetState: PositionState.TP3_HIT,
+            reason: 'TP3 hit at ' + currentPrice.toFixed(8),
+          });
+
           // Detailed state transition telemetry
           this.logger.info('📊 Exit State Transition: TP3_HIT', {
             symbol: position.symbol,
@@ -262,7 +335,7 @@ export class ExitOrchestrator {
             currentPrice: currentPrice.toFixed(8),
             positionClosed: '20%',
             remainingSize: (position.quantity * 0).toFixed(4),
-            totalProfit: (((currentPrice - position.entryPrice) / position.entryPrice) * 100).toFixed(2) + '%',
+            totalProfit: tp3Profit.toFixed(2) + '%',
             timestamp: Date.now(),
           });
 
@@ -602,12 +675,18 @@ export class ExitOrchestrator {
    * Cleans up internal tracking
    * @public
    */
-  resetPositionState(symbol: string): void {
+  resetPositionState(symbol: string, positionId?: string): void {
     this.positionStates.delete(symbol);
     this.preBEModes.delete(symbol);
     this.trailingModes.delete(symbol);
     this.bbTrailingModes.delete(symbol);
-    this.logger.debug('Position state reset', { symbol });
+
+    // PHASE 4.5: Clear state machine state when position reset
+    if (positionId) {
+      this.stateMachine.clearState(symbol, positionId);
+    }
+
+    this.logger.debug('Position state reset', { symbol, positionId });
   }
 
   /**
