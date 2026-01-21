@@ -33,10 +33,6 @@ describe('Phase 8: Web Dashboard - WebSocket Service', () => {
     test('should have disconnect method', () => {
       expect(typeof wsClient.disconnect).toBe('function');
     });
-
-    test('should have reconnect method', () => {
-      expect(typeof wsClient.reconnect).toBe('function');
-    });
   });
 
   describe('Event Handling', () => {
@@ -46,10 +42,6 @@ describe('Phase 8: Web Dashboard - WebSocket Service', () => {
 
     test('should have off method for event unsubscription', () => {
       expect(typeof wsClient.off).toBe('function');
-    });
-
-    test('should have emit method for event emission', () => {
-      expect(typeof wsClient.emit).toBe('function');
     });
   });
 

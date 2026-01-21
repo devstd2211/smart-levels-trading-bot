@@ -102,6 +102,21 @@ export class ApiClient {
   }
 
   /**
+   * Make DELETE request
+   */
+  async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      return this.handleResponse(response);
+    } catch (error) {
+      return this.handleError(error);
+    }
+  }
+
+  /**
    * Handle response
    */
   private async handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
