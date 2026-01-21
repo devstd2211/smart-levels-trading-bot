@@ -102,14 +102,17 @@ export class WalkForwardEngine {
    */
   private splitIntoWindows(candles: Candle[], config: WalkForwardConfig): WalkForwardWindow[] {
     const windows: WalkForwardWindow[] = [];
+    if (candles.length === 0) return windows;
+
     const inSampleMs = config.inSampleDays * 24 * 60 * 60 * 1000;
     const outOfSampleMs = config.outOfSampleDays * 24 * 60 * 60 * 1000;
     const windowSize = inSampleMs + outOfSampleMs;
 
     let windowId = 0;
+    let inSampleStart = candles[0].timestamp;
 
-    for (let i = 0; i < candles.length - inSampleMs - outOfSampleMs; i += outOfSampleMs) {
-      const inSampleStart = candles[i].timestamp;
+    // Iterate through time windows until we run out of data
+    while (inSampleStart + windowSize <= candles[candles.length - 1].timestamp) {
       const inSampleEnd = inSampleStart + inSampleMs;
       const outOfSampleEnd = inSampleEnd + outOfSampleMs;
 
@@ -132,6 +135,9 @@ export class WalkForwardEngine {
           outOfSampleCandles,
         });
       }
+
+      // Move to next window (rolling forward by outOfSampleMs)
+      inSampleStart += outOfSampleMs;
     }
 
     return windows;

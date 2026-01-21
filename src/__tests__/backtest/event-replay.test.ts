@@ -182,12 +182,27 @@ describe('Phase 7.6: Event Stream Replay', () => {
           pnlPercent: 5,
           duration: 1000,
         },
+        {
+          entryTime: 5000,
+          entryPrice: 100,
+          entrySignal: 'TEST',
+          direction: 'LONG',
+          size: 100,
+          stopLoss: 95,
+          takeProfits: [{ level: 1, price: 105, size: 100 }],
+          exitTime: 6000,
+          exitPrice: 98,
+          exitReason: 'SL',
+          pnl: -1000,
+          pnlPercent: -10,
+          duration: 1000,
+        },
       ];
 
       const result = await engine.replayTrades(trades, 10000);
       const metrics = result.metrics;
 
-      expect(metrics.profitFactor).toBe(1.5); // 1500 / 1000
+      expect(metrics.profitFactor).toBe(1.5); // (1000 + 500) / 1000 = 1.5
     });
 
     it('should calculate total P&L correctly', async () => {

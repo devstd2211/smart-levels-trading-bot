@@ -64,19 +64,19 @@ describe('Phase 7.3: Worker Pool', () => {
       const candles = createTestCandles(2000);
       const candles15m = createTestCandles(2000, 1000000000000, 15 * 60 * 1000);
 
-      const chunks = splitter.split(candles, candles15m, 10000);
+      const chunks = splitter.split(candles, candles15m, 1000);  // Use 1000 chunk size to avoid overlaps
 
       // Each chunk should have lookback context
       for (let i = 0; i < chunks.length; i++) {
         expect(chunks[i].lookbackCandles).toBe(60);
 
         if (i === 0) {
-          // First chunk: candles from 0 onwards
+          // First chunk: candles from 0 onwards (no lookback context needed)
           expect(chunks[i].isFirstChunk).toBe(true);
           expect(chunks[i].candles5m.length).toBeLessThanOrEqual(1000);
         } else {
-          // Later chunks: should have overlap for context
-          expect(chunks[i].candles5m.length).toBeLessThanOrEqual(1000);
+          // Later chunks: candles + lookback overlap = 1000 + 60 = 1060
+          expect(chunks[i].candles5m.length).toBeLessThanOrEqual(1060);
         }
       }
     });
@@ -101,17 +101,27 @@ describe('Phase 7.3: Worker Pool', () => {
   describe('Test 2: Chunk Timestamps', () => {
     it('should maintain timestamp ordering across chunks', () => {
       const baseTime = 1000000000000;
-      const candles = createTestCandles(2000, baseTime);
-      const candles15m = createTestCandles(2000, baseTime, 15 * 60 * 1000);
+      const candles = createTestCandles(5000, baseTime);  // Use more candles to create multiple chunks
+      const candles15m = createTestCandles(5000, baseTime, 15 * 60 * 1000);
 
-      const chunks = splitter.split(candles, candles15m, 10000);
+      const chunks = splitter.split(candles, candles15m, 1000);  // Smaller chunks to test ordering
 
+      // Verify chunks are in chronological order
       for (let i = 1; i < chunks.length; i++) {
         const prevEnd = chunks[i - 1].timestamp.end;
-        const currStart = chunks[i].timestamp.start;
+        const currMainEnd = chunks[i].timestamp.end;
 
-        // Current chunk should start after or at previous chunk end
-        expect(currStart).toBeGreaterThanOrEqual(prevEnd);
+        // Each chunk should have later or equal end time than previous
+        expect(currMainEnd).toBeGreaterThanOrEqual(prevEnd);
+      }
+
+      // Also verify that actual candle timestamps in each chunk are ordered
+      for (let j = 0; j < chunks.length; j++) {
+        for (let k = 1; k < chunks[j].candles5m.length; k++) {
+          expect(chunks[j].candles5m[k].timestamp).toBeGreaterThanOrEqual(
+            chunks[j].candles5m[k - 1].timestamp
+          );
+        }
       }
     });
 

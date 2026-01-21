@@ -95,6 +95,10 @@ export class WebServer {
     this.fileWatcher = new FileWatcherService(journalPath, sessionsPath);
     const analyticsRoutes = createAnalyticsRoutes(this.fileWatcher);
 
+    // Serve web-client static files
+    const webClientPath = path.resolve(process.cwd(), 'web-client', 'dist');
+    this.app.use(express.static(webClientPath));
+
     this.app.use('/api/bot', botRoutes);
     this.app.use('/api/data', dataRoutes);
     this.app.use('/api/config', configRoutes);
@@ -271,6 +275,17 @@ export class WebServer {
         </body>
         </html>
       `);
+    });
+
+    // SPA catch-all route: serve index.html for all non-API routes (must be after all API routes)
+    this.app.get('*', (req, res) => {
+      const indexPath = path.join(webClientPath, 'index.html');
+      res.sendFile(indexPath, (err) => {
+        if (err) {
+          // If index.html doesn't exist, return 404
+          res.status(404).json({ error: 'Not found' });
+        }
+      });
     });
 
     // Global error handler (must be last middleware)
