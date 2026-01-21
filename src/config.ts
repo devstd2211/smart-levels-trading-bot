@@ -85,9 +85,18 @@ export function getConfig(): Config {
         strategy: (config as any).meta.strategy,
         indicatorsAfterMerge: Object.keys(config.indicators || {}),
       });
+
+      // DEBUG: Log enabled/disabled status of each indicator
+      console.log('🔍 DEBUG: Indicator enabled status after merge:');
+      Object.entries(config.indicators || {}).forEach(([key, val]) => {
+        const enabled = (val as any)?.enabled !== false;
+        console.log(`  ${key}: ${enabled ? '✅ ENABLED' : '❌ DISABLED'}`);
+      });
     } else {
       console.warn('⚠️  Strategy file not found:', strategyPath);
     }
+  } else {
+    console.warn('⚠️  No strategy configured in config.meta - using all config.json indicators');
   }
 
   // Set defaults for dataSubscriptions (if not present in config)

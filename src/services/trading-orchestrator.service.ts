@@ -298,6 +298,13 @@ export class TradingOrchestrator {
         configKeys: Object.keys(indicatorsConfig),
       });
 
+      // DEBUG: Log enabled status for each indicator
+      const enabledStatus: Record<string, boolean> = {};
+      Object.entries(indicatorsConfig).forEach(([key, val]) => {
+        enabledStatus[key] = (val as any)?.enabled === true;
+      });
+      this.logger.debug('🔍 Indicator enabled status in TradingOrchestrator:', enabledStatus);
+
       const indicators = await this.indicatorLoader.loadIndicators(indicatorsConfig);
 
       // Pass loaded indicators to AnalyzerRegistry so analyzers can receive them
