@@ -2,6 +2,8 @@
  * Configuration Types - New Simplified Structure
  */
 
+import type { LiveTradingConfig } from './live-trading.types';
+
 export interface BotConfig {
   version: number;
   meta: ConfigMeta;
@@ -19,6 +21,7 @@ export interface BotConfig {
   strategies: StrategiesConfig;
   services: ServicesConfig;
   monitoring: MonitoringConfig;
+  liveTrading?: LiveTradingConfig; // Phase 9: Live Trading Engine (optional)
 }
 
 // ============================================================================
