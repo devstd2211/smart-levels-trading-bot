@@ -186,6 +186,7 @@ export interface Position {
   reason: string; // Why position was opened
   confidence?: number; // Signal confidence
   strategy?: string; // Strategy name
+  strategyId?: string; // [Phase 10.2] Multi-strategy support - which strategy owns this position
   protectionVerifiedOnce?: boolean; // Protection verified once - no need to check repeatedly
   status: 'OPEN' | 'CLOSED'; // Position status - used for idempotent close operations
 }

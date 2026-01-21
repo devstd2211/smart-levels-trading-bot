@@ -21,6 +21,8 @@ import type {
   SystemStats,
   StrategyStats,
 } from '../../types/multi-strategy-types';
+import { TimeframeRole, Candle, LoggerService } from '../../types';
+import { BotEventBus } from './../../services/event-bus';
 import { StrategyRegistryService } from './strategy-registry.service';
 import { StrategyFactoryService } from './strategy-factory.service';
 import { StrategyStateManagerService } from './strategy-state-manager.service';
@@ -28,11 +30,14 @@ import { StrategyStateManagerService } from './strategy-state-manager.service';
 export class StrategyOrchestratorService {
   private activeContext: IsolatedStrategyContext | null = null;
   private contextMap = new Map<string, IsolatedStrategyContext>();
+  private tradingOrchestratorCache = new Map<string, any>(); // Cache TradingOrchestrator instances per strategy
 
   constructor(
     private registry: StrategyRegistryService,
     private factory: StrategyFactoryService,
     private stateManager: StrategyStateManagerService,
+    private logger: LoggerService,
+    private eventBus: BotEventBus,
   ) {}
 
   /**
@@ -274,20 +279,94 @@ export class StrategyOrchestratorService {
   /**
    * Handle candle for active strategy
    *
-   * Routes candle data only to active strategy.
+   * Routes candle data only to active strategy's TradingOrchestrator.
+   * [Phase 10.2] Implements multi-strategy candle routing
+   *
+   * @param role Timeframe role (PRIMARY, ENTRY, TREND, CONTEXT)
+   * @param candle OHLCV candle data
    */
-  async onCandleClosed(candle: any): Promise<void> {
+  async onCandleClosed(role: TimeframeRole, candle: Candle): Promise<void> {
     if (!this.activeContext) {
-      return; // No active strategy
+      this.logger.debug('[Phase 10.2] No active strategy - skipping candle');
+      return;
     }
 
-    this.activeContext.lastCandleTime = new Date();
+    try {
+      this.activeContext.lastCandleTime = new Date(candle.timestamp);
 
-    // Route to active strategy's decision engine
-    // Actual implementation would call TradingOrchestrator with active context
-    console.log(
-      `[StrategyOrchestrator] Routing candle to ${this.activeContext.strategyId}`,
-    );
+      // Get or create TradingOrchestrator instance for this strategy
+      const orchestrator = this.getOrCreateStrategyOrchestrator(this.activeContext);
+      if (!orchestrator) {
+        this.logger.warn('[Phase 10.2] Failed to get orchestrator for active strategy', {
+          strategyId: this.activeContext.strategyId,
+        });
+        return;
+      }
+
+      // Route candle to active strategy's orchestrator only
+      // Other strategies remain dormant and do not receive candle events
+      await orchestrator.onCandleClosed(role, candle);
+
+      // Emit event for monitoring
+      this.eventBus.publishSync({
+        type: 'candleRoutedToStrategy',
+        timestamp: Date.now(),
+        data: {
+          strategyId: this.activeContext.strategyId,
+          role,
+          timestamp: candle.timestamp,
+        },
+        strategyId: this.activeContext.strategyId, // [Phase 10.2] Tag event with strategy
+      });
+    } catch (error) {
+      this.logger.error('[Phase 10.2] Error routing candle to active strategy', {
+        strategyId: this.activeContext?.strategyId,
+        error: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+      });
+    }
+  }
+
+  /**
+   * Get or create TradingOrchestrator instance for a strategy
+   *
+   * [Phase 10.2] Caches instances to maintain state across candles
+   *
+   * @param context Strategy context with isolated configuration
+   * @returns TradingOrchestrator instance or null if creation fails
+   */
+  private getOrCreateStrategyOrchestrator(context: IsolatedStrategyContext): any | null {
+    // Check cache first
+    if (this.tradingOrchestratorCache.has(context.strategyId)) {
+      return this.tradingOrchestratorCache.get(context.strategyId);
+    }
+
+    try {
+      // Would create TradingOrchestrator with strategy-specific config here
+      // For now, placeholder that will be fully implemented in Phase 10.3
+      // TODO: Implement full orchestrator creation with:
+      // - Strategy-specific config
+      // - Pre-initialized analyzers
+      // - Per-strategy position manager
+      // - Per-strategy action queue
+      // - Per-strategy decision gates
+
+      // Store in cache
+      // this.tradingOrchestratorCache.set(context.strategyId, orchestrator);
+      // return orchestrator;
+
+      this.logger.warn('[Phase 10.2] TradingOrchestrator creation not yet implemented', {
+        strategyId: context.strategyId,
+        plannedInPhase: '10.3',
+      });
+      return null;
+    } catch (error) {
+      this.logger.error('[Phase 10.2] Failed to create TradingOrchestrator', {
+        strategyId: context.strategyId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
   }
 
   /**

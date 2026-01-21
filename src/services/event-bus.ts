@@ -19,6 +19,7 @@ export interface BotEvent {
   type: string;
   timestamp: number;
   data: any;
+  strategyId?: string; // [Phase 10.2] Optional: which strategy does this event belong to?
 }
 
 /**

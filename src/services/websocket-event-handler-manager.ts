@@ -155,8 +155,15 @@ export class WebSocketEventHandlerManager {
             });
           }
 
-          // Delegate to Trading Orchestrator (handles ENTRY + PRIMARY logic)
-          await tradingOrchestrator.onCandleClosed(role, candle);
+          // [Phase 10.2] Route to StrategyOrchestrator if multi-strategy mode is enabled
+          // Otherwise use TradingOrchestrator for single-strategy mode
+          if (this.services.strategyOrchestrator) {
+            // Multi-strategy mode: route only to active strategy
+            await this.services.strategyOrchestrator.onCandleClosed(role, candle);
+          } else {
+            // Single-strategy mode: use legacy flow
+            await tradingOrchestrator.onCandleClosed(role, candle);
+          }
         } catch (error) {
           this.logger.error('Error handling candle close event', {
             role,

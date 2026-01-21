@@ -53,6 +53,10 @@ import { WallTrackerService } from './wall-tracker.service';
 import { ConsoleDashboardService } from './console-dashboard.service';
 import { INTEGER_MULTIPLIERS } from '../constants';
 import { RealityCheckService } from './reality-check.service';
+import { StrategyOrchestratorService } from './multi-strategy/strategy-orchestrator.service';
+import { StrategyRegistryService } from './multi-strategy/strategy-registry.service';
+import { StrategyFactoryService } from './multi-strategy/strategy-factory.service';
+import { StrategyStateManagerService } from './multi-strategy/strategy-state-manager.service';
 
 /**
  * Container for all bot services
@@ -78,6 +82,7 @@ export class BotServices {
 
   // Analysis & Orchestration
   readonly tradingOrchestrator: TradingOrchestrator;
+  readonly strategyOrchestrator?: StrategyOrchestratorService; // [Phase 10.2] Optional multi-strategy support
 
   // Tracking & Journal
   readonly journal: TradingJournalService;
@@ -551,6 +556,41 @@ export class BotServices {
       this.logger.info('🔗 BTC candles store linked to TradingOrchestrator');
     }
 
+    // 11.7 [Phase 10.2] Initialize StrategyOrchestratorService if multi-strategy mode enabled
+    // NOTE: Full initialization deferred to Phase 10.3 after TradingOrchestrator instance allocation
+    // For now, initialize registry only to support candle routing framework
+    const multiStrategyMode = (config as any).multiStrategy?.enabled || false;
+    if (multiStrategyMode) {
+      try {
+        // Initialize registry with default configuration
+        const strategyRegistry = new StrategyRegistryService();
+
+        // TODO Phase 10.3: Initialize factory + state manager
+        // Requires: StrategyLoaderService, ConfigMergerService instances
+        // const strategyFactory = new StrategyFactoryService({...}, loader, merger);
+        // const strategyStateManager = new StrategyStateManagerService(stateDir);
+
+        // For Phase 10.2, create stub that will be fully initialized later
+        this.strategyOrchestrator = new StrategyOrchestratorService(
+          strategyRegistry,
+          null as any, // TODO Phase 10.3: Proper factory
+          null as any, // TODO Phase 10.3: Proper state manager
+          this.logger,
+          this.eventBus,
+        );
+
+        this.logger.info('⏳ StrategyOrchestratorService partial init (Phase 10.2)', {
+          mode: 'multi-strategy-framework',
+          note: 'Full factory integration deferred to Phase 10.3',
+        });
+      } catch (error) {
+        this.logger.warn('⚠️  Failed to initialize StrategyOrchestratorService', {
+          error: error instanceof Error ? error.message : String(error),
+          fallbackMode: 'single-strategy',
+        });
+      }
+    }
+
     // 12. Initialize event handlers (uses all above services)
     this.positionEventHandler = new PositionEventHandler(
       this.positionManager,
@@ -596,6 +636,7 @@ export class BotServices {
       indicatorCache: this.indicatorCache,
       indicatorPreCalc: this.indicatorPreCalc,
       tradingOrchestrator: this.tradingOrchestrator,
+      strategyOrchestrator: this.strategyOrchestrator, // [Phase 10.2] Optional
       journal: this.journal,
       sessionStats: this.sessionStats,
       positionManager: this.positionManager,

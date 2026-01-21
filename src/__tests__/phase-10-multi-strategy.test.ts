@@ -478,7 +478,9 @@ describe('StrategyOrchestratorService', () => {
       getContext: jest.fn(),
     };
     stateManager = new StrategyStateManagerService();
-    orchestrator = new StrategyOrchestratorService(registry, factory, stateManager);
+    const mockLogger = { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() } as any;
+    const mockEventBus = { subscribe: jest.fn(), publish: jest.fn(), publishSync: jest.fn() } as any;
+    orchestrator = new StrategyOrchestratorService(registry, factory, stateManager, mockLogger, mockEventBus);
   });
 
   // Strategy Loading Tests (5 tests)
@@ -656,7 +658,9 @@ describe('Phase 10 Integration Tests', () => {
       listContexts: jest.fn(() => []),
     } as any;
     const stateManager = new StrategyStateManagerService();
-    const orchestrator = new StrategyOrchestratorService(registry, factory, stateManager);
+    const mockLogger = { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() } as any;
+    const mockEventBus = { subscribe: jest.fn(), publish: jest.fn(), publishSync: jest.fn() } as any;
+    const orchestrator = new StrategyOrchestratorService(registry, factory, stateManager, mockLogger, mockEventBus);
 
     expect(orchestrator).toBeDefined();
     expect(registry.getStats().totalStrategies).toBe(0);
@@ -816,7 +820,9 @@ describe('Phase 10 Integration Tests', () => {
       listContexts: jest.fn(() => []),
     } as any;
     const stateManager = new StrategyStateManagerService();
-    const orchestrator = new StrategyOrchestratorService(registry, factory, stateManager);
+    const mockLogger = { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() } as any;
+    const mockEventBus = { subscribe: jest.fn(), publish: jest.fn(), publishSync: jest.fn() } as any;
+    const orchestrator = new StrategyOrchestratorService(registry, factory, stateManager, mockLogger, mockEventBus);
 
     registry.registerStrategy('strategy-1', {
       id: 'strategy-1',
