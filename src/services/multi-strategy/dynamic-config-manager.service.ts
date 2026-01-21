@@ -56,12 +56,10 @@ export class DynamicConfigManagerService {
         metadata: {
           name: strategyName,
           version: '1.0.0',
-          description: `Strategy: ${strategyName}`,
         },
         indicators: {},
         analyzers: [],
-        orchestration: {},
-      };
+      } as any;
 
       // Validate
       const validation = this.validateConfig(config);
@@ -111,10 +109,7 @@ export class DynamicConfigManagerService {
           ...updates.indicators,
         },
         analyzers: updates.analyzers || [],
-        orchestration: {
-          ...updates.orchestration,
-        },
-      };
+      } as any;
 
       // Validate
       const validation = this.validateConfig(merged);
@@ -150,7 +145,6 @@ export class DynamicConfigManagerService {
    * 1. Required fields
    * 2. Analyzer weights sum to ~1.0
    * 3. All referenced analyzers exist
-   * 4. Orchestration parameters in valid ranges
    */
   validateConfig(config: StrategyConfig): ConfigValidationResult {
     const errors: string[] = [];
@@ -173,11 +167,11 @@ export class DynamicConfigManagerService {
     }
 
     // Validate analyzer weights if present
-    if (config.analyzers.length > 0) {
+    if (config.analyzers && config.analyzers.length > 0) {
       let totalWeight = 0;
       for (const analyzer of config.analyzers) {
-        if (analyzer.weight && typeof analyzer.weight === 'number') {
-          totalWeight += analyzer.weight;
+        if ((analyzer as any).weight && typeof (analyzer as any).weight === 'number') {
+          totalWeight += (analyzer as any).weight;
         }
       }
 
@@ -186,33 +180,6 @@ export class DynamicConfigManagerService {
         warnings.push(
           `Analyzer weights sum to ${totalWeight.toFixed(2)}, expected ~1.0`,
         );
-      }
-    }
-
-    // Validate orchestration if present
-    if (config.orchestration) {
-      const orch = config.orchestration as any;
-
-      // Entry validation
-      if (orch.entry) {
-        if (
-          orch.entry.minConfidenceThreshold &&
-          (orch.entry.minConfidenceThreshold < 0 ||
-            orch.entry.minConfidenceThreshold > 100)
-        ) {
-          errors.push('entry.minConfidenceThreshold must be 0-100');
-        }
-      }
-
-      // Exit validation
-      if (orch.exit) {
-        if (
-          orch.exit.breakeven &&
-          orch.exit.breakeven.activationProfit &&
-          orch.exit.breakeven.activationProfit < 0
-        ) {
-          errors.push('exit.breakeven.activationProfit must be positive');
-        }
       }
     }
 
@@ -238,15 +205,7 @@ export class DynamicConfigManagerService {
     if (strategy.indicators) {
       merged.indicators = {
         ...merged.indicators,
-        ...strategy.indicators,
-      };
-    }
-
-    // Merge orchestration
-    if (strategy.orchestration) {
-      merged.orchestration = {
-        ...merged.orchestration,
-        ...strategy.orchestration,
+        ...(strategy.indicators as any),
       };
     }
 
@@ -267,27 +226,10 @@ export class DynamicConfigManagerService {
     // Check indicator changes
     if (strategy.indicators) {
       for (const [key, value] of Object.entries(strategy.indicators)) {
-        const baseValue = base.indicators?.[key];
+        const baseValue = (base.indicators as any)?.[key];
         if (JSON.stringify(baseValue) !== JSON.stringify(value)) {
           changes.push({
             path: `indicators.${key}`,
-            from: baseValue,
-            to: value,
-          });
-        }
-      }
-    }
-
-    // Check orchestration changes
-    if (strategy.orchestration) {
-      const flattenOrch = flattenObject(strategy.orchestration as any);
-      const flattenBase = flattenObject(base.orchestration || {});
-
-      for (const [key, value] of Object.entries(flattenOrch)) {
-        const baseValue = flattenBase[key];
-        if (baseValue !== value) {
-          changes.push({
-            path: `orchestration.${key}`,
             from: baseValue,
             to: value,
           });

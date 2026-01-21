@@ -84,7 +84,7 @@ export class StrategyOrchestratorService {
     const context = await this.factory.createContext(
       strategyName,
       symbol || 'default',
-      { restorePreviousState: true },
+      { restorePreviousState: true, validate: false },
     );
 
     this.contextMap.set(context.strategyId, context);

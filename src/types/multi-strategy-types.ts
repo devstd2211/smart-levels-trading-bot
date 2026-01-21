@@ -7,9 +7,6 @@
 
 import type { ConfigNew } from './config-new.types';
 import type { StrategyConfig } from './strategy-config.types';
-import type { Position } from './position.types';
-import type { TradeEntry } from './trade-entry.types';
-import type { PerformanceMetrics } from './performance-metrics.types';
 import type { IAnalyzer } from './analyzer.interface';
 import type { IExchange } from '../interfaces/IExchange';
 
@@ -50,13 +47,19 @@ export interface StrategyStateSnapshot {
   strategyName: string;
 
   /** All open positions */
-  positions: Position[];
+  positions: any[];
 
   /** Trade history/journal */
-  journal: TradeEntry[];
+  journal: any[];
 
   /** Performance metrics at snapshot time */
-  metrics: PerformanceMetrics;
+  metrics: {
+    totalPnL: number;
+    winRate: number;
+    profitFactor: number;
+    maxDrawdown: number;
+    sharpeRatio: number;
+  };
 
   /** Timestamp of snapshot */
   timestamp: Date;
