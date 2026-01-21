@@ -12,7 +12,12 @@ import { Config } from './types';
 dotenv.config();
 
 /**
- * Load configuration from config.json
+ * Load configuration from config.json and merge with strategy.json
+ *
+ * Priority (highest to lowest):
+ * 1. strategy.json (if exists) - overrides config.json
+ * 2. config.json - base configuration
+ * 3. Environment variables - override both
  */
 export function getConfig(): Config {
   const configPath = path.join(__dirname, '..', 'config.json');
@@ -28,6 +33,62 @@ export function getConfig(): Config {
 
   console.log('🔍 DEBUG: Config loaded. scalpingLadderTp exists:', !!config.scalpingLadderTp, 'enabled:', config.scalpingLadderTp?.enabled);
   console.log('🔍 DEBUG: entryConfig.divergenceDetector:', JSON.stringify(config.entryConfig?.divergenceDetector || 'MISSING'));
+
+  // PHASE 8.5: Load and merge strategy.json if specified in config
+  // Strategy config takes precedence over base config.json
+  if ((config as any).meta?.strategy || (config as any).meta?.strategyFile) {
+    const strategyFileName = (config as any).meta.strategyFile ||
+      `strategies/json/${(config as any).meta.strategy}.strategy.json`;
+    const strategyPath = path.join(__dirname, '..', strategyFileName);
+
+    if (fs.existsSync(strategyPath)) {
+      console.log('🔍 DEBUG: Loading strategy from:', strategyPath);
+      const strategyFile = fs.readFileSync(strategyPath, 'utf-8');
+      const strategyConfig = JSON.parse(strategyFile) as any;
+
+      // Merge strategy into base config (strategy takes precedence)
+      // This ensures strategy.json overrides config.json for:
+      // - indicators (critical! only load indicators used by strategy)
+      // - analyzers
+      // - risk management
+      // - filters
+      if (strategyConfig.indicators) {
+        console.log('✅ Strategy defines indicators - overriding config.json');
+        config.indicators = {
+          ...config.indicators,
+          ...strategyConfig.indicators,
+        };
+      }
+
+      if (strategyConfig.analyzers) {
+        console.log('✅ Strategy defines analyzers - using strategy config');
+        (config as any).analyzers = strategyConfig.analyzers;
+      }
+
+      if (strategyConfig.riskManagement) {
+        console.log('✅ Strategy defines risk management - merging with config');
+        config.riskManagement = {
+          ...config.riskManagement,
+          ...strategyConfig.riskManagement,
+        };
+      }
+
+      if (strategyConfig.filters) {
+        console.log('✅ Strategy defines filters - merging with config');
+        (config as any).filters = {
+          ...(config as any).filters,
+          ...strategyConfig.filters,
+        };
+      }
+
+      console.log('✅ Strategy merged into config', {
+        strategy: (config as any).meta.strategy,
+        indicatorsAfterMerge: Object.keys(config.indicators || {}),
+      });
+    } else {
+      console.warn('⚠️  Strategy file not found:', strategyPath);
+    }
+  }
 
   // Set defaults for dataSubscriptions (if not present in config)
   if (!config.dataSubscriptions) {

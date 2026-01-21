@@ -65,12 +65,14 @@
   ],
   "indicators": {
     "ema": {
+      "enabled": true,
       "fastPeriod": 9,
       "slowPeriod": 19,
       "baseConfidence": 0.8,
       "strengthMultiplier": 1.5
     },
     "rsi": {
+      "enabled": true,
       "period": 14,
       "oversold": 30,
       "overbought": 70,
@@ -85,13 +87,27 @@
       "maxConfidence": 0.9
     },
     "atr": {
+      "enabled": true,
       "period": 14,
       "minimumATR": 0.005,
       "maximumATR": 2.0
     },
     "volume": {
+      "enabled": true,
       "period": 20,
       "volumeMultiplier": 1.5
+    },
+    "stochastic": {
+      "enabled": false,
+      "kPeriod": 14,
+      "dPeriod": 3,
+      "oversold": 20,
+      "overbought": 80
+    },
+    "bollingerBands": {
+      "enabled": false,
+      "period": 20,
+      "stdDev": 2.0
     }
   },
   "entryThreshold": 30,

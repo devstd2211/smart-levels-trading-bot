@@ -201,7 +201,100 @@ npm --prefix web-client run build    # Build web-client only
 npm --prefix web-client run test     # Run web-client tests
 ```
 
-**Next Steps:** Phase 9 - Live Trading Engine (3-4 weeks)
+**Next Steps:** Phase 9 - Live Trading Engine (2-3 weeks)
+
+---
+
+## 🎯 PHASE 8.5: CRITICAL ARCHITECTURE FIXES (✅ COMPLETE - Session 16)
+
+### Status: ✅ FIXED! Two critical issues resolved!
+
+**What Was Fixed (Session 16):**
+
+✅ **Issue #1: PositionExitingService Not Initialized**
+- Problem: Exit handlers weren't registered, positions couldn't close
+- Fix: Pass `PositionExitingService` to `TradingOrchestrator` constructor
+- Impact: Exit handlers now work properly, positions close via ActionQueue
+
+✅ **Issue #2: Indicator Configuration Mismatch**
+- Problem: `config.json` loaded ALL 6 indicators even if strategy used only 4
+- Fix: Implement strategy→config merging (strategy overrides base config)
+- Impact: Only indicators used by strategy are loaded (cleaner, faster backtests)
+
+**Files Modified:**
+```
+src/services/bot-services.ts          (Pass PositionExitingService to TradingOrchestrator)
+src/config.ts                         (Add strategy.json merging logic)
+strategies/json/simple-levels.strategy.json (Explicit indicator config)
+config.json                           (Disable unused indicators)
+.claude/skills/log-analyzer.sh        (NEW - Log analysis tool)
+.claude/skills/manifest.json          (Update skill registry)
+.claude/skills/USAGE.md               (Document new skill)
+```
+
+**New Configuration Architecture:**
+```
+Environment Variables (highest priority)
+    ↑ override
+strategy.json (strategy-specific overrides)
+    ↑ merge
+config.json (base configuration defaults)
+    ↑ fallback
+Code defaults (hardcoded in services)
+```
+
+**See:** `SESSION_16_FIXES.md` for detailed technical breakdown
+
+---
+
+## 🎯 PHASE 9: LIVE TRADING ENGINE (Next Priority - 2-3 weeks)
+
+**Objective:** Enable safe production deployment with real-time trading
+
+**Key Components to Build:**
+1. **Trading State Machine** - Reliable position lifecycle management
+2. **Order Execution Pipeline** - Atomic order placement and verification
+3. **Real-Time Risk Controls** - Daily limits, drawdown limits, position limits
+4. **Trade Analytics** - Complete journal with PnL, win rate, profit factor
+5. **Monitoring & Alerts** - Real-time dashboard + alerts for edge cases
+6. **Safe Shutdown** - Graceful position closure on bot restart
+
+**Duration:** 2-3 weeks
+**Files to Create:**
+- `src/services/trading-lifecycle.service.ts` - Position lifecycle state machine
+- `src/services/real-time-risk-monitor.service.ts` - Risk monitoring and limits
+- `web-server/src/analytics-api.ts` - Trade analytics endpoints
+- `src/migrations/002_analytics_schema.sql` - Analytics database schema
+
+**Expected Outcomes:**
+- ✅ Safe production trading with position limits
+- ✅ Real-time risk monitoring and alerts
+- ✅ Complete trade audit trail
+- ✅ 24/7 monitoring dashboard
+- ✅ Automated shutdown procedures
+
+---
+
+## 🎯 PHASE 10: MULTI-STRATEGY SUPPORT (Follow-up - 1-2 weeks)
+
+**Objective:** Run multiple trading strategies simultaneously with isolated state
+
+**Key Components to Build:**
+1. **Strategy Manager** - Load/unload strategies without restart
+2. **Strategy Registry** - Track all active strategies and their states
+3. **Isolated State** - Per-strategy journals, positions, contexts
+4. **Dynamic Configuration** - Load strategy configs at runtime
+5. **Strategy Switching** - Seamless migration between strategies
+
+**Expected Outcomes:**
+- ✅ Dynamic strategy loading at runtime
+- ✅ Multiple concurrent strategies
+- ✅ Per-strategy performance tracking
+- ✅ Strategy hot-switching without restart
+
+---
+
+**Next Steps:** Phase 9 - Live Trading Engine (2-3 weeks)
 
 ---
 

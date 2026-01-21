@@ -527,7 +527,8 @@ export class BotServices {
       btcEnabled: orchestratorConfig.btcConfirmation?.enabled,
     });
 
-    // NOTE: TradingOrchestrator still uses BybitService (Phase 2.5+ will migrate to IExchange)
+    // NOTE: TradingOrchestrator now uses BybitService (Phase 2.5+ will migrate to IExchange)
+    // Pass PositionExitingService so exit handlers work properly (FIXED Phase 8.5)
     this.tradingOrchestrator = new TradingOrchestrator(
       orchestratorConfig,
       this.candleProvider,
@@ -537,6 +538,7 @@ export class BotServices {
       this.telegram,
       this.logger,
       riskManager,
+      this.positionExitingService, // FIXED: Added in Phase 8.5
     );
 
     // 11.5. Link Pre-calculation Service to TradingOrchestrator (Phase 0.2 Integration)
