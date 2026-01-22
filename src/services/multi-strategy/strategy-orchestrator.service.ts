@@ -355,7 +355,7 @@ export class StrategyOrchestratorService {
    * Get or create TradingOrchestrator instance for a strategy
    *
    * [Phase 10.3b] Creates isolated orchestrator per strategy using shared services
-   * With strategy-specific configuration (LEGO modular design)
+   * With strategy-specific configuration (composition-based design)
    *
    * @param context Strategy context with isolated configuration
    * @returns Promise<TradingOrchestrator | null> Orchestrator instance or null if creation fails
@@ -379,7 +379,7 @@ export class StrategyOrchestratorService {
       // Reuses shared infrastructure (positionManager, riskManager, etc.)
       // but with strategy-specific config for indicators, analyzers, and orchestration params
       //
-      // This is the LEGO approach: same building blocks, different configurations per strategy
+      // This follows composition pattern: same orchestrator with different configurations per strategy
       const orchestrator = new TradingOrchestrator(
         context.config as any,  // Merged config (base + strategy overrides)
         this.sharedServices.candleProvider,

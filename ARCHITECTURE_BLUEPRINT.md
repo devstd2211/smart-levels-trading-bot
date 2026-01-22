@@ -1,4 +1,4 @@
-# 🧱 LEGO Trading Bot Architecture Blueprint
+# 🏗️ Modular Trading Bot Architecture Blueprint
 
 **Status:** Phase Design Complete | Ready for Implementation
 **Version:** 1.0
@@ -9,7 +9,7 @@
 
 ## 📍 EXECUTIVE SUMMARY
 
-This document defines **ALL components** (LEGO blocks) of the trading bot architecture with:
+This document defines **ALL components** of the trading bot architecture with:
 - ✅ Complete list of 35+ modules
 - ✅ Data flow from signal → position → close
 - ✅ Memory caching strategy (prevent leaks)
@@ -239,7 +239,7 @@ class IndicatorCacheService {
 
   clear(): void { ... } // Called on every new candle
 
-  evictLRU(): void { ... } // If cache grows > maxSize
+  private evictLRU(): void { ... } // If cache grows > maxSize
 }
 
 // Usage in analyzers:
@@ -911,5 +911,5 @@ Each component must satisfy:
 ---
 
 **Document Version:** 1.0
-**Last Updated:** 2026-01-13
-**Status:** Ready for Phase 0.2 Implementation
+**Last Updated:** 2026-01-22
+**Status:** Complete - All 10 layers documented and implemented

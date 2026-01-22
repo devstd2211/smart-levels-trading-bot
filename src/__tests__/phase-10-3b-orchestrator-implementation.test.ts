@@ -2,7 +2,7 @@
  * PHASE 10.3B: ORCHESTRATOR ISOLATION IMPLEMENTATION TESTS
  *
  * Tests for getOrCreateStrategyOrchestrator() implementation
- * Verifies LEGO modular architecture: same building blocks, different strategies
+ * Verifies modular architecture: same orchestrator with different strategies
  *
  * Test Categories:
  * 1. getOrCreateStrategyOrchestrator() core functionality (10 tests)
@@ -230,7 +230,7 @@ describe('Phase 10.3b: Orchestrator Implementation', () => {
       expect((orchestratorService as any).sharedServices).toBeDefined();
     });
 
-    it('should require positionManager for LEGO architecture', () => {
+    it('should require positionManager for modular architecture', () => {
       expect((orchestratorService as any).sharedServices).toBeDefined();
     });
 
@@ -320,7 +320,7 @@ describe('Phase 10.3b: Orchestrator Implementation', () => {
     });
   });
 
-  describe('6. LEGO Modular Architecture', () => {
+  describe('6. Modular Architecture', () => {
     it('should use config-driven indicator loading', () => {
       // Config should drive what indicators are loaded
       // This is handled inside getOrCreateStrategyOrchestrator
@@ -333,9 +333,9 @@ describe('Phase 10.3b: Orchestrator Implementation', () => {
       expect(stats).toHaveProperty('totalStrategies');
     });
 
-    it('should maintain LEGO principle: same blocks, different configs', () => {
+    it('should maintain composition principle: same orchestrator, different configs', () => {
       // TradingOrchestrator is created once per strategy with different config
-      // This is the core LEGO principle
+      // This is the core composition principle
       expect(orchestratorService).toBeDefined();
     });
 

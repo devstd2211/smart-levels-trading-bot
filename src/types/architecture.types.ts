@@ -1,7 +1,7 @@
 /**
  * Architecture Refactoring - Core Type Definitions
  *
- * Defines the interfaces for the 4-layer modular LEGO architecture:
+ * Defines the interfaces for the 4-layer modular architecture:
  * Layer 1: Decision Logic (pure functions)
  * Layer 2: Action Queue (event-driven)
  * Layer 3: Domain Logic (business services)

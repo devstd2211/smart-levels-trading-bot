@@ -100,7 +100,7 @@ Result: Only 4 indicators loaded for simple-levels strategy
 ## Current Project: Architecture Refactoring & Modularization
 
 ### 🎯 Main Objective
-Build LEGO-modular architecture: config-driven indicator loading, SOLID principles, type-safe design, production-ready live trading.
+Build modular architecture: config-driven indicator loading, SOLID principles, type-safe design, production-ready live trading.
 
 **Progress (All Phases 0-10 IN PROGRESS!):**
 - ✅ Phase 0.1: Architecture Types - COMPLETE
@@ -523,7 +523,7 @@ Analyzers (28):
     - Async method with proper error handling
     - Creates isolated TradingOrchestrator per strategy
     - Uses StrategyOrchestratorCacheService for caching
-    - Reuses shared infrastructure (LEGO modular approach)
+    - Reuses shared infrastructure (modular approach with isolated contexts)
     - Simplified vs original plan: no per-service duplication
 
   - ✅ **StrategyOrchestratorCacheService Integration** (20 LOC)
@@ -543,7 +543,7 @@ Analyzers (28):
     - 5 shared services integration tests
     - 8 multi-strategy isolation tests
     - 4 performance/switching tests
-    - 7 LEGO architecture tests
+    - 7 modular architecture tests
     - 3+ backward compatibility tests
 
   - ✅ **0 TypeScript Errors**
@@ -561,7 +561,7 @@ Analyzers (28):
   - Original plan: per-service instance duplication (too complex)
   - Simplified: reuse shared infrastructure with config-driven differences
   - Benefits: less code, easier maintenance, same isolation via config
-  - LEGO principle: same blocks (TradingOrchestrator), different configs (per-strategy)
+  - Composition principle: same orchestrator with different configurations (per-strategy)
 
   **Next: Phase 10.3c (Optional - Not Planned)**
   - Add strategyId tagging to events (if needed for filtering)

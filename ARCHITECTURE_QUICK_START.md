@@ -11,7 +11,7 @@
 Four comprehensive documents defining the entire architecture:
 
 ```
-ARCHITECTURE_LEGO_BLUEPRINT.md
+ARCHITECTURE_BLUEPRINT.md
   └─ Complete list of ALL 35+ components
   └─ How they integrate
   └─ Memory management strategy
@@ -30,7 +30,7 @@ ARCHITECTURE_DATA_FLOW_DIAGRAMS.md
   └─ Config-driven loading
 
 THIS FILE: QUICK START
-  └─ How to implement Phase 0.2 and 0.3
+  └─ How to implement phases
   └─ Checklist for each phase
   └─ Expected outcomes
 ```
@@ -1191,12 +1191,12 @@ When you need to understand something:
 
 | Question | Document | Section |
 |----------|----------|---------|
-| "What are all the components?" | ARCHITECTURE_LEGO_BLUEPRINT.md | Complete Module Inventory |
-| "How does component X work?" | ARCHITECTURE_LEGO_BLUEPRINT.md | TIER sections |
+| "What are all the components?" | ARCHITECTURE_BLUEPRINT.md | Complete Module Inventory |
+| "How does component X work?" | ARCHITECTURE_BLUEPRINT.md | TIER sections |
 | "How do I write component X?" | ARCHITECTURE_IMPLEMENTATION_GUIDE.md | Section for component |
 | "How does data flow in the system?" | ARCHITECTURE_DATA_FLOW_DIAGRAMS.md | Main Trading Cycle |
-| "How do I implement Phase 0.2?" | This file | Phase 0.2 section |
-| "Memory issues?" | ARCHITECTURE_LEGO_BLUEPRINT.md | Memory Management |
+| "How do I implement Phase?" | This file | Phase section |
+| "Memory issues?" | ARCHITECTURE_BLUEPRINT.md | Memory Management |
 
 ---
 
@@ -1350,7 +1350,7 @@ Move hardcoded constants to strategy.json:
 ## 🎓 Learning Resources
 
 **Inside this project:**
-- `ARCHITECTURE_LEGO_BLUEPRINT.md` - Main reference
+- `ARCHITECTURE_BLUEPRINT.md` - Main reference
 - `ARCHITECTURE_IMPLEMENTATION_GUIDE.md` - Code examples
 - `ARCHITECTURE_DATA_FLOW_DIAGRAMS.md` - Visual flows
 - `src/indicators/ema.indicator-new.ts` - Reference implementation

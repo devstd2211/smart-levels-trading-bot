@@ -8,7 +8,7 @@
  * - StrategyOrchestratorService (20 tests)
  * - DynamicConfigManagerService (15 tests)
  *
- * All services follow LEGO modular architecture with complete isolation
+ * All services follow modular architecture with complete isolation
  */
 
 import { StrategyRegistryService } from '../services/multi-strategy/strategy-registry.service';
