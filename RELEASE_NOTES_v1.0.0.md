@@ -1,12 +1,23 @@
-# 🚀 Edison Smart Levels Trading Bot - v1.0.0
+# 🚀 Edison Smart Levels Trading Bot - v1.0.0-alpha
 
 ## First Stable Release
 
 **Date:** January 22, 2026
-**Version:** v1.0.0
-**Status:** ✅ Production Ready
+**Version:** v1.0.0-alpha
+**Status:** ✅ Bug Fixed - monitoring required
 
 ---
+
+## ⚠️ Risk Warning (Read This)
+
+**BEFORE YOU START:** This bot is for DEMO/TESTNET trading only. Using it on real money accounts will likely result in **complete loss of your deposit**. Not a suggestion - a fact.
+
+- 🚨 **Demo ONLY** - Bybit testnet or demo accounts
+- 🚨 **Not profitable** - Past results ≠ future results
+- 🚨 **Can lose everything** - Your responsibility alone
+- 🚨 **NOT financial advice** - Educational demonstration only
+
+
 
 ## 📊 Release Highlights
 
@@ -333,7 +344,7 @@ npm run backtest:walkforward
 
 ## 📄 License
 
-[Add your license here]
+[Click](https://github.com/devstd2211/edison-smart-levels-trading-bot/blob/main/LICENSE)
 
 ---
 
@@ -358,10 +369,12 @@ Special thanks to all contributors and testers!
 
 ---
 
-**v1.0.0 Release - January 22, 2026**
+**v1.0.0-alpha Release - January 22, 2026**
 
-**Status:** ✅ Production Ready
+
 **Build:** Successful
 **Tests:** 3,344+ passing
 **TypeScript:** 0 errors
 **Next Release:** Phase 10.3b (Week 2)
+
+**Full Changelog**: https://github.com/devstd2211/edison-smart-levels-trading-bot/commits/v1.0.0
