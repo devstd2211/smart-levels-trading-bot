@@ -584,8 +584,10 @@ export interface ITradingLifecycleManager {
 export interface IRealTimeRiskMonitor {
   calculatePositionHealth(positionId: string, currentPrice: number): Promise<HealthScore>;
   checkPositionDanger(positionId: string): Promise<DangerLevel>;
-  monitorAllPositions(): Promise<HealthReport>;
-  shouldTriggerAlert(positionId: string): Promise<RiskAlert | null>;
+  // PHASE 13.1a: monitorAllPositions now accepts optional currentPrice (passed from market data)
+  monitorAllPositions(currentPrice?: number): Promise<HealthReport>;
+  // PHASE 13.1a: shouldTriggerAlert now REQUIRES currentPrice for accurate health calculation
+  shouldTriggerAlert(positionId: string, currentPrice: number): Promise<RiskAlert | null>;
 }
 
 /**

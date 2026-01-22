@@ -297,7 +297,11 @@ export class RealTimeRiskMonitor implements IRealTimeRiskMonitor {
   /**
    * Monitor all open positions and return health report
    */
-  public async monitorAllPositions(): Promise<HealthReport> {
+  /**
+   * PHASE 13.1a: Updated to require currentPrice parameter
+   * Caller (WebSocket or candle handler) must provide real market price
+   */
+  public async monitorAllPositions(currentPrice?: number): Promise<HealthReport> {
     const now = Date.now();
     const position = this.positionLifecycleService.getCurrentPosition();
     const scores: HealthScore[] = [];
@@ -305,12 +309,19 @@ export class RealTimeRiskMonitor implements IRealTimeRiskMonitor {
 
     if (position) {
       try {
-        const currentPrice = position.entryPrice; // TODO: Get actual current price from market data
-        const healthScore = await this.calculatePositionHealth(position.id, currentPrice);
+        // PHASE 13.1a: Use provided currentPrice or fallback to entryPrice
+        // WARNING: If currentPrice is not provided, health scoring will be inaccurate!
+        const priceToUse = currentPrice ?? position.entryPrice;
+        if (!currentPrice) {
+          this.logger.warn(
+            `[RealTimeRiskMonitor] No current price provided for ${position.symbol}, using entry price as fallback`
+          );
+        }
+        const healthScore = await this.calculatePositionHealth(position.id, priceToUse);
         scores.push(healthScore);
 
-        // Check for alerts
-        const alert = await this.shouldTriggerAlert(position.id);
+        // Check for alerts (PHASE 13.1a: pass currentPrice for accurate assessment)
+        const alert = await this.shouldTriggerAlert(position.id, priceToUse);
         if (alert) {
           alerts.push(alert);
 
@@ -364,14 +375,19 @@ export class RealTimeRiskMonitor implements IRealTimeRiskMonitor {
   /**
    * Check if position should trigger an alert
    */
-  public async shouldTriggerAlert(positionId: string, currentPrice?: number): Promise<RiskAlert | null> {
+  /**
+   * PHASE 13.1a: Check if position should trigger an alert
+   * NOW REQUIRES: currentPrice parameter for accurate health calculation
+   */
+  public async shouldTriggerAlert(positionId: string, currentPrice: number): Promise<RiskAlert | null> {
     const position = this.positionLifecycleService.getCurrentPosition();
     if (!position || position.id !== positionId) {
       return null;
     }
 
-    const price = currentPrice || position.entryPrice; // TODO: Get actual current price from market data
-    const healthScore = await this.calculatePositionHealth(positionId, price);
+    // PHASE 13.1a: REQUIRED parameter - no fallback to entryPrice
+    // Caller MUST provide real market price for accurate risk assessment
+    const healthScore = await this.calculatePositionHealth(positionId, currentPrice);
 
     // Check for critical danger
     if (healthScore.status === DangerLevel.CRITICAL) {
