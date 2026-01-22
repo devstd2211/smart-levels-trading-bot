@@ -64,6 +64,7 @@ export class EntryOrchestrator {
     private logger: LoggerService,
     private filterOrchestrator?: FilterOrchestrator,
     orchestrationConfig?: EntryOrchestrationConfig,
+    private strategyId?: string,  // Phase 10.3c: Strategy identifier for event tagging
   ) {
     // Phase 4.10: Use provided config or fall back to defaults
     this.orchestrationConfig = orchestrationConfig || DEFAULT_ENTRY_ORCHESTRATION;

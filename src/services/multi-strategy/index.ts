@@ -15,6 +15,10 @@ export { DynamicConfigManagerService } from './dynamic-config-manager.service';
 // Phase 10.3: Isolated TradingOrchestrator Per Strategy (Simplified Approach)
 export { StrategyOrchestratorCacheService } from './strategy-orchestrator-cache.service';
 
+// Phase 10.3c: Event Tagging & Filtering
+export { StrategyEventFilterService } from './event-filter.service';
+export type { StrategyEventCallback } from './event-filter.service';
+
 // Re-export types
 export type {
   StrategyMetadata,

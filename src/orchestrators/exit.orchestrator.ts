@@ -96,7 +96,11 @@ export class ExitOrchestrator {
   // PHASE 4.5: Unified Position State Machine (persisted state + closure reasons)
   private stateMachine: PositionStateMachineService;
 
-  constructor(private logger: LoggerService, stateMachine?: PositionStateMachineService) {
+  constructor(
+    private logger: LoggerService,
+    stateMachine?: PositionStateMachineService,
+    private strategyId?: string,  // Phase 10.3c: Strategy identifier for event tagging
+  ) {
     // Use injected state machine or create new one
     this.stateMachine = stateMachine || new PositionStateMachineService(logger);
 

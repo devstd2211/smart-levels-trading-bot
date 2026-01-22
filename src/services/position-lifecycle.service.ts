@@ -77,6 +77,7 @@ export class PositionLifecycleService {
     private readonly eventBus: BotEventBus,
     private readonly compoundInterestCalculator?: CompoundInterestCalculatorService,
     private readonly sessionStats?: SessionStatsService,
+    private readonly strategyId?: string,  // Phase 10.3c: Strategy identifier for event tagging
   ) {
     this.entryConfirmation = new EntryConfirmationManager(entryConfirmationConfig, logger);
   }
@@ -280,7 +281,10 @@ export class PositionLifecycleService {
 
       // Emit position-opened event
       this.logger.info('📢 Emitting position-opened event', { positionId: position.id });
-      this.eventBus.emit('position-opened', { position });
+      this.eventBus.emit('position-opened', {
+        position,
+        strategyId: this.strategyId,  // Phase 10.3c: Include strategyId for multi-strategy filtering
+      });
       console.log('[EVENT] position-opened emitted:', position.id);
 
       // Initialize TakeProfitManager for partial close tracking
@@ -424,7 +428,10 @@ export class PositionLifecycleService {
 
     // Emit position-closed event
     if (closedPosition) {
-      this.eventBus.emit('position-closed', { position: closedPosition });
+      this.eventBus.emit('position-closed', {
+        position: closedPosition,
+        strategyId: this.strategyId,  // Phase 10.3c: Include strategyId for multi-strategy filtering
+      });
     }
   }
 
