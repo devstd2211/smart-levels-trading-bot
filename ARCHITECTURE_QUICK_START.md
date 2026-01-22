@@ -71,6 +71,51 @@ THIS FILE: QUICK START
 | **10.3c** | Event Tagging & Filtering | ✅ DONE | StrategyEventFilterService + strategyId params + 31 tests | ✅ BUILD SUCCESS (Session 24) - 0 ERRORS, 31/31 TESTS ✅ |
 | **11** | Per-Strategy Circuit Breakers | ✅ DONE | StrategyCircuitBreakerService + 33 tests | ✅ BUILD SUCCESS (Session 24) - 0 ERRORS, 33/33 TESTS ✅ |
 | **12** | Parallel Strategy Processing | ✅ DONE | StrategyProcessingPoolService + 34 tests | ✅ BUILD SUCCESS (Session 24) - 0 ERRORS, 34/34 TESTS ✅ |
+| **13** | Code Quality & Debt Elimination | 🎯 STARTING | Critical TODO completion + Orchestrator tests + Legacy cleanup | 🎯 PHASE PLANNED (Session 24) - Realistic 3-week roadmap |
+
+---
+
+## 🚀 PHASE 13: Production Code Quality & Incremental Refactoring (🎯 STARTING - Session 24)
+
+### Status: 🎯 PHASE PLANNED - Pragmatic 3-Week Roadmap
+
+**What Will Be Implemented (Session 25+):**
+
+**Week 1: Critical TODO Completion (4-5 days)**
+1. ✅ **graceful-shutdown.service.ts** - Implement `cancelAllPendingOrders()`
+   - Problem: Orders not cancelled on bot shutdown
+   - Fix: Wire to IExchange.cancelAllOrders()
+   - Impact: Positions properly close when bot stops
+
+2. ✅ **real-time-risk-monitor.service.ts** - Wire real market prices
+   - Problem: Health scoring uses fallback entryPrice (wrong!)
+   - Fix: Inject ICandleProvider to get current price
+   - Impact: Risk monitoring becomes accurate
+
+3. ✅ **performance-analytics.service.ts** - Implement period-based metrics
+   - Problem: Always returns empty trades array
+   - Fix: Implement ITradingJournal.getTradesForPeriod()
+   - Impact: Performance analytics work in live trading
+
+**Week 2: Orchestrator Test Coverage (4-5 days)**
+- ✅ **Entry Orchestrator Tests** - 40+ tests for signal ranking, confidence, trend alignment
+- ✅ **Exit Orchestrator Tests** - 50+ tests for state transitions, TP/SL detection, trailing
+- ✅ **Filter & Strategy Tests** - 50+ tests for filter combinations and multi-strategy logic
+- **Total: 140+ new orchestrator tests (3,770+ tests overall)**
+
+**Week 3: Legacy Code Consolidation (3-4 days)**
+- ✅ **Analyzer Files** - Remove all `-new.ts` suffixes, archive old versions to `_legacy/`
+- ✅ **Backtest Engines** - Archive v2-v4, keep only v5 (with Phase 7 optimizations)
+- ✅ **Exit Services** - Consolidate duplicate logic or clearly document separation
+
+**Expected Outcomes:**
+- 0 critical TODOs in production code
+- Live trading system 100% functional (no stubs)
+- 140+ tests for critical trading logic
+- Cleaner codebase with 0 duplicate implementations
+- Easier to maintain and extend
+
+**See:** [PHASE_13_CODE_CLEANUP_PLAN.md](./PHASE_13_CODE_CLEANUP_PLAN.md) for detailed implementation plan
 
 ---
 
