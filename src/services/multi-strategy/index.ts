@@ -19,6 +19,9 @@ export { StrategyOrchestratorCacheService } from './strategy-orchestrator-cache.
 export { StrategyEventFilterService } from './event-filter.service';
 export type { StrategyEventCallback } from './event-filter.service';
 
+// Phase 11: Per-Strategy Circuit Breakers
+export { StrategyCircuitBreakerService } from './strategy-circuit-breaker.service';
+
 // Re-export types
 export type {
   StrategyMetadata,
