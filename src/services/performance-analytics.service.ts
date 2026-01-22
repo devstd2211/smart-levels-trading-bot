@@ -119,11 +119,11 @@ export class PerformanceAnalytics implements IPerformanceAnalytics {
 
   /**
    * Get comprehensive statistics for a trade set
+   * PHASE 13.1a: Implemented period-based trade filtering
    */
   public async getMetrics(period: 'ALL' | 'TODAY' | 'WEEK' | 'MONTH'): Promise<TradeStatistics> {
-    // Get trades from journal
-    // TODO: Implement getTradesForPeriod on TradingJournalService or use alternative
-    const trades: any[] = []; // await this.journalService.getTradesForPeriod(period);
+    // Get trades from journal, filtered by period
+    const trades = this.getTradesForPeriod(period);
 
     if (trades.length === 0) {
       return this.getEmptyStatistics();
@@ -179,10 +179,10 @@ export class PerformanceAnalytics implements IPerformanceAnalytics {
 
   /**
    * Get top (best) trades
+   * PHASE 13.1a: Implemented using getTradesForPeriod
    */
   public async getTopTrades(limit: number = 10): Promise<TopTrade[]> {
-    // TODO: Implement getTradesForPeriod or use alternative
-    const trades: any[] = []; // await this.journalService.getTradesForPeriod('ALL');
+    const trades = this.getTradesForPeriod('ALL');
 
     // Sort by PnL descending, take top N
     const topTrades = trades
@@ -207,10 +207,10 @@ export class PerformanceAnalytics implements IPerformanceAnalytics {
 
   /**
    * Get worst (losing) trades
+   * PHASE 13.1a: Implemented using getTradesForPeriod
    */
   public async getWorstTrades(limit: number = 10): Promise<TopTrade[]> {
-    // TODO: Implement getTradesForPeriod or use alternative
-    const trades: any[] = []; // await this.journalService.getTradesForPeriod('ALL');
+    const trades = this.getTradesForPeriod('ALL');
 
     // Sort by PnL ascending (most losses first), take top N
     const worstTrades = trades
@@ -291,6 +291,52 @@ export class PerformanceAnalytics implements IPerformanceAnalytics {
     }
 
     return maxDrawdown * 100; // Return as percentage
+  }
+
+  /**
+   * PHASE 13.1a: Get trades filtered by time period
+   *
+   * Filters trades by:
+   * - ALL: All trades
+   * - TODAY: Trades opened today (UTC)
+   * - WEEK: Trades opened in last 7 days
+   * - MONTH: Trades opened in last 30 days
+   */
+  private getTradesForPeriod(period: 'ALL' | 'TODAY' | 'WEEK' | 'MONTH'): any[] {
+    const allTrades = this.journalService.getAllTrades();
+
+    if (period === 'ALL') {
+      return allTrades;
+    }
+
+    const now = Date.now();
+    let cutoffTime: number;
+
+    switch (period) {
+      case 'TODAY': {
+        // Trades opened today (UTC)
+        const today = new Date();
+        today.setUTCHours(0, 0, 0, 0);
+        cutoffTime = today.getTime();
+        break;
+      }
+      case 'WEEK':
+        // Last 7 days
+        cutoffTime = now - 7 * 24 * 60 * 60 * 1000;
+        break;
+      case 'MONTH':
+        // Last 30 days
+        cutoffTime = now - 30 * 24 * 60 * 60 * 1000;
+        break;
+      default:
+        return allTrades;
+    }
+
+    // Filter trades by openedAt timestamp
+    return allTrades.filter((trade: any) => {
+      const tradeOpenTime = trade.openedAt || trade.entryTime || 0;
+      return tradeOpenTime >= cutoffTime;
+    });
   }
 
   /**
