@@ -579,9 +579,20 @@ export class BotServices {
           this.eventBus,
         );
 
-        this.logger.info('⏳ StrategyOrchestratorService partial init (Phase 10.2)', {
+        // [Phase 10.3b] Set shared services for TradingOrchestrator creation per strategy
+        this.strategyOrchestrator.setSharedServices({
+          candleProvider: this.candleProvider,
+          timeframeProvider: this.timeframeProvider,
+          positionManager: this.positionManager,
+          riskManager: riskManager,
+          telegram: this.telegram,
+          positionExitingService: this.positionExitingService,
+        });
+
+        this.logger.info('⏳ StrategyOrchestratorService initialized (Phase 10.3b)', {
           mode: 'multi-strategy-framework',
-          note: 'Full factory integration deferred to Phase 10.3',
+          sharedServices: 6,
+          note: 'Factory integration deferred to Phase 10.3+',
         });
       } catch (error) {
         this.logger.warn('⚠️  Failed to initialize StrategyOrchestratorService', {

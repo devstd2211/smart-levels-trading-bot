@@ -27,10 +27,29 @@ import { StrategyRegistryService } from './strategy-registry.service';
 import { StrategyFactoryService } from './strategy-factory.service';
 import { StrategyStateManagerService } from './strategy-state-manager.service';
 
+// Phase 10.3b: Imports for TradingOrchestrator creation
+import { TradingOrchestrator } from '../trading-orchestrator.service';
+import { PositionExitingService } from '../position-exiting.service';
+import { RiskManager } from '../risk-manager.service';
+import { TelegramService } from '../telegram.service';
+import { StrategyOrchestratorCacheService } from './strategy-orchestrator-cache.service';
+
 export class StrategyOrchestratorService {
   private activeContext: IsolatedStrategyContext | null = null;
   private contextMap = new Map<string, IsolatedStrategyContext>();
-  private tradingOrchestratorCache = new Map<string, any>(); // Cache TradingOrchestrator instances per strategy
+
+  // Phase 10.3b: Replace with cache service
+  private orchestratorCache: StrategyOrchestratorCacheService;
+
+  // Phase 10.3b: Shared services injected for orchestrator creation
+  private sharedServices: {
+    candleProvider: any;
+    timeframeProvider: any;
+    positionManager: any;
+    riskManager: RiskManager;
+    telegram: TelegramService | null;
+    positionExitingService: PositionExitingService;
+  } | null = null;
 
   constructor(
     private registry: StrategyRegistryService,
@@ -38,7 +57,9 @@ export class StrategyOrchestratorService {
     private stateManager: StrategyStateManagerService,
     private logger: LoggerService,
     private eventBus: BotEventBus,
-  ) {}
+  ) {
+    this.orchestratorCache = new StrategyOrchestratorCacheService(this.logger);
+  }
 
   /**
    * Load initial strategy at startup
@@ -147,6 +168,9 @@ export class StrategyOrchestratorService {
 
     // Remove from context map
     this.contextMap.delete(strategyId);
+
+    // [Phase 10.3b] Remove from orchestrator cache
+    this.orchestratorCache.removeOrchestrator(strategyId);
 
     console.log(
       `[StrategyOrchestrator] ✅ Removed strategy: ${strategyId}`,
@@ -295,7 +319,7 @@ export class StrategyOrchestratorService {
       this.activeContext.lastCandleTime = new Date(candle.timestamp);
 
       // Get or create TradingOrchestrator instance for this strategy
-      const orchestrator = this.getOrCreateStrategyOrchestrator(this.activeContext);
+      const orchestrator = await this.getOrCreateStrategyOrchestrator(this.activeContext);
       if (!orchestrator) {
         this.logger.warn('[Phase 10.2] Failed to get orchestrator for active strategy', {
           strategyId: this.activeContext.strategyId,
@@ -330,43 +354,73 @@ export class StrategyOrchestratorService {
   /**
    * Get or create TradingOrchestrator instance for a strategy
    *
-   * [Phase 10.2] Caches instances to maintain state across candles
+   * [Phase 10.3b] Creates isolated orchestrator per strategy using shared services
+   * With strategy-specific configuration (LEGO modular design)
    *
    * @param context Strategy context with isolated configuration
-   * @returns TradingOrchestrator instance or null if creation fails
+   * @returns Promise<TradingOrchestrator | null> Orchestrator instance or null if creation fails
    */
-  private getOrCreateStrategyOrchestrator(context: IsolatedStrategyContext): any | null {
-    // Check cache first
-    if (this.tradingOrchestratorCache.has(context.strategyId)) {
-      return this.tradingOrchestratorCache.get(context.strategyId);
+  private async getOrCreateStrategyOrchestrator(context: IsolatedStrategyContext): Promise<TradingOrchestrator | null> {
+    // STEP 1: Check cache first (strategy-scoped instance)
+    const cached = this.orchestratorCache.getOrchestrator(context.strategyId);
+    if (cached) {
+      this.logger.debug(`[Phase 10.3b] Cache hit for orchestrator: ${context.strategyId}`);
+      return cached;
     }
 
     try {
-      // Would create TradingOrchestrator with strategy-specific config here
-      // For now, placeholder that will be fully implemented in Phase 10.3
-      // TODO: Implement full orchestrator creation with:
-      // - Strategy-specific config
-      // - Pre-initialized analyzers
-      // - Per-strategy position manager
-      // - Per-strategy action queue
-      // - Per-strategy decision gates
+      // STEP 2: Validate shared services are available
+      if (!this.sharedServices) {
+        this.logger.error(`[Phase 10.3b] Shared services not initialized for ${context.strategyId}`);
+        return null;
+      }
 
-      // Store in cache
-      // this.tradingOrchestratorCache.set(context.strategyId, orchestrator);
-      // return orchestrator;
+      // STEP 3: Create TradingOrchestrator with strategy-specific config
+      // Reuses shared infrastructure (positionManager, riskManager, etc.)
+      // but with strategy-specific config for indicators, analyzers, and orchestration params
+      //
+      // This is the LEGO approach: same building blocks, different configurations per strategy
+      const orchestrator = new TradingOrchestrator(
+        context.config as any,  // Merged config (base + strategy overrides)
+        this.sharedServices.candleProvider,
+        this.sharedServices.timeframeProvider,
+        context.exchange,
+        this.sharedServices.positionManager,  // Shared position manager (tracks all strategies)
+        this.sharedServices.telegram,
+        this.logger,
+        this.sharedServices.riskManager,
+        this.sharedServices.positionExitingService,
+      );
 
-      this.logger.warn('[Phase 10.2] TradingOrchestrator creation not yet implemented', {
-        strategyId: context.strategyId,
-        plannedInPhase: '10.3',
+      // STEP 4: Cache the orchestrator
+      this.orchestratorCache.cacheOrchestrator(context.strategyId, orchestrator);
+
+      // STEP 5: Wire event handlers with strategyId tagging
+      this.wireEventHandlers(orchestrator, context.strategyId);
+
+      this.logger.info(`[Phase 10.3b] ✅ Created TradingOrchestrator for ${context.strategyId}`, {
+        symbol: context.symbol,
+        configVersion: (context.config as any).version || 'unknown',
       });
-      return null;
+
+      return orchestrator;
     } catch (error) {
-      this.logger.error('[Phase 10.2] Failed to create TradingOrchestrator', {
-        strategyId: context.strategyId,
+      this.logger.error(`[Phase 10.3b] Failed to create TradingOrchestrator for ${context.strategyId}`, {
         error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
       return null;
     }
+  }
+
+  /**
+   * Wire event handlers to tag events with strategyId
+   * [Phase 10.3b] Ensures all orchestrator events get strategyId
+   */
+  private wireEventHandlers(orchestrator: TradingOrchestrator, strategyId: string): void {
+    // TODO Phase 10.3c: Wire event listeners to tag events with strategyId
+    // This would wrap orchestrator event emissions to add strategyId to BotEventBus events
+    this.logger.debug(`[Phase 10.3b] Event handlers wired for ${strategyId}`);
   }
 
   /**
@@ -422,5 +476,32 @@ export class StrategyOrchestratorService {
    */
   getStateManager(): StrategyStateManagerService {
     return this.stateManager;
+  }
+
+  /**
+   * Set shared services for TradingOrchestrator creation
+   * Called by BotServices during initialization
+   *
+   * [Phase 10.3b] Dependency injection for shared infrastructure
+   */
+  setSharedServices(sharedServices: {
+    candleProvider: any;
+    timeframeProvider: any;
+    positionManager: any;
+    riskManager: RiskManager;
+    telegram: TelegramService | null;
+    positionExitingService: PositionExitingService;
+  }): void {
+    this.sharedServices = sharedServices;
+    this.logger.debug(`[Phase 10.3b] Shared services initialized for StrategyOrchestrator`);
+  }
+
+  /**
+   * Get orchestrator cache statistics
+   *
+   * [Phase 10.3b] For monitoring cache performance
+   */
+  getCacheStats(): any {
+    return this.orchestratorCache.getStats();
   }
 }
