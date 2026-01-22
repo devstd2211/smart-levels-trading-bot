@@ -406,4 +406,4 @@ Special thanks to all contributors and testers!
 **TypeScript:** 0 errors
 **Next Release:** Phase 10.3b (Week 2)
 
-**Full Changelog**: https://github.com/devstd2211/edison-smart-levels-trading-bot/commits/v1.0.0
+**Full Changelog**: https://github.com/devstd2211/edison-smart-levels-trading-bot/commits/v1.0.0-alpha
