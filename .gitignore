@@ -159,6 +159,16 @@ backtest-results/
 !DISCLAIMER
 !LICENSE
 !LICENSE.md
+# Release documentation (SHOULD be committed)
+!CHANGELOG.md
+!RELEASE_NOTES_v*.md
+!RELEASE_INSTRUCTIONS.md
+!v*.md
+# Phase documentation
+!PHASE_*.md
+!ARCHITECTURE_*.md
+!MIGRATION_PLAN.md
+!SESSION_*.md
 
 # =============================================================================
 # TEST & COVERAGE
