@@ -21,6 +21,25 @@ export class ActionQueueService implements IActionQueue {
   private totalProcessed = 0;
   private totalFailed = 0;
 
+  // Phase 10.3: Multi-Strategy Support
+  // Optional strategyId for event tagging
+  private strategyId?: string;
+
+  /**
+   * Set strategy ID for multi-strategy support (Phase 10.3)
+   * Used for event tagging to identify which strategy emitted the action
+   */
+  setStrategyId(strategyId: string): void {
+    this.strategyId = strategyId;
+  }
+
+  /**
+   * Get strategy ID
+   */
+  getStrategyId(): string | undefined {
+    return this.strategyId;
+  }
+
   /**
    * Add action to queue
    */

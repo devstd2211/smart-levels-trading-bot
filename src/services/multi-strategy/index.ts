@@ -12,6 +12,9 @@ export { StrategyStateManagerService } from './strategy-state-manager.service';
 export { StrategyOrchestratorService } from './strategy-orchestrator.service';
 export { DynamicConfigManagerService } from './dynamic-config-manager.service';
 
+// Phase 10.3: Isolated TradingOrchestrator Per Strategy (Simplified Approach)
+export { StrategyOrchestratorCacheService } from './strategy-orchestrator-cache.service';
+
 // Re-export types
 export type {
   StrategyMetadata,
