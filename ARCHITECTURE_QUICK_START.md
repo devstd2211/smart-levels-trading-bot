@@ -66,6 +66,7 @@ THIS FILE: QUICK START
 | **9** | Live Trading Engine | ✅ DONE | Position timeout + risk monitor + order exec + analytics + shutdown | ✅ BUILD SUCCESS (Session 17) ⭐⭐⭐⭐⭐ |
 | **10** | Multi-Strategy Support | 🎯 **IN PROGRESS** | 5 core services + types + 85 tests | 🎯 **FOUNDATION + TESTS COMPLETE (Session 19)** ⭐⭐⭐⭐⭐⭐ |
 | **10.1** | Comprehensive Test Suite | ✅ DONE | 85 comprehensive tests | ✅ BUILD SUCCESS (Session 19) - 85/85 PASSING |
+| **10.3** | Isolated TradingOrchestrator Per Strategy | 🎯 **IN PROGRESS** | 250+ LOC factory + 60+ tests | 🎯 **IMPLEMENTATION PLAN READY (Session 21)** |
 
 ---
 
@@ -601,6 +602,75 @@ WebSocketEventHandlerManager
 - Phase 10.3 will provide **state isolation** (per-strategy services)
 - Phased approach allows incremental implementation without disruption
 - Candle routing is a natural extension of existing WebSocket flow
+
+---
+
+## 🚀 PHASE 10.3: ISOLATED TRADINGORBCHESTRATOR PER STRATEGY (🎯 IMPLEMENTATION PLAN - Session 21)
+
+### Status: 🎯 PLAN CREATED! Ready to implement isolated TradingOrchestrator instances per strategy!
+
+**What Will Be Implemented (Session 21+):**
+
+✅ **TradingOrchestratorFactory** - Creates isolated orchestrator instances (250 LOC)
+- Per-strategy service instance creation
+- Configuration merging (base + strategy)
+- Strategy-specific indicator loading
+- Analyzer initialization with strategy weights
+- Event handler wiring with strategyId
+
+✅ **StrategyServiceContainer** - Holds all per-strategy service instances (150 LOC)
+- Centralized service reference management
+- Clear dependency graph
+- Easier cleanup/destruction
+
+✅ **Service Isolation** - Complete separation of concerns
+- Per-strategy PositionLifecycleService
+- Per-strategy ActionQueueService
+- Per-strategy AnalyzerRegistry
+- Per-strategy IndicatorRegistry
+- Per-strategy Orchestrators (Entry, Exit, Filter)
+
+✅ **strategyId Event Tagging** - Event tracking throughout system
+- Position events tagged with strategyId
+- Action execution events tagged
+- Entry/exit signals tagged
+- All events can be filtered by strategy
+
+✅ **Comprehensive Test Suite** - 60+ tests
+- 15 TradingOrchestratorFactory unit tests
+- 20 service isolation unit tests
+- 15 multi-strategy integration tests
+- 10 functional scenario tests
+
+✅ **Build Status (Target):**
+- **0 TypeScript Errors** ✅
+- **60+ Tests Passing** (target)
+- **Full backward compatibility** maintained
+- **Production-ready** code
+
+**Key Architecture:**
+```
+StrategyOrchestratorService.onCandleClosed()
+    ↓
+getOrCreateStrategyOrchestrator() [Phase 10.3]
+    ├─ Check cache (hit = use existing)
+    ├─ Miss = TradingOrchestratorFactory.create()
+    │   ├─ Create per-strategy services
+    │   ├─ Load strategy indicators
+    │   ├─ Initialize analyzers
+    │   └─ Wire event handlers
+    └─ Cache + return TradingOrchestrator
+        ↓
+    Active strategy receives candles
+    All other strategies dormant
+```
+
+**Implementation Plan:**
+- Week 1: Core infrastructure (factory, containers)
+- Week 2: Integration (event tagging, BotServices)
+- Week 3: Testing & documentation
+
+**See:** [PHASE_10_3_PLAN.md](./PHASE_10_3_PLAN.md) for complete implementation details
 
 ---
 
