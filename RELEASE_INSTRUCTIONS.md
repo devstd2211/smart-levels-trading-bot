@@ -1,14 +1,14 @@
-# 🚀 Release Instructions - v1.0.0
+# 🚀 Release Instructions - v1.0.0-alpha
 
-Complete guide for creating the GitHub Release for v1.0.0
+Complete guide for creating the GitHub Release for v1.0.0-alpha
 
 ---
 
 ## ✅ What We've Done
 
 - ✅ Created `CHANGELOG.md` - Complete changelog
-- ✅ Created `RELEASE_NOTES_v1.0.0.md` - Release highlights
-- ✅ Created git tag `v1.0.0`
+- ✅ Created `RELEASE_NOTES_v1.0.0-alpha.md` - Release highlights
+- ✅ Created git tag `v1.0.0-alpha`
 - ✅ Created release commit `c060139`
 - ✅ Built & tested all code (0 errors, 3,344+ tests passing)
 
@@ -19,7 +19,7 @@ Complete guide for creating the GitHub Release for v1.0.0
 Before creating the GitHub Release, verify:
 
 - [x] All code committed
-- [x] Git tag created (`v1.0.0`)
+- [x] Git tag created (`v1.0.0-alpha`)
 - [x] Changelog updated
 - [x] Release notes written
 - [x] Build successful (`npm run build`)
@@ -57,26 +57,26 @@ gh auth login
 ### Step 3: Push Tag to GitHub
 ```bash
 # From the edison-smart-levels-trading-bot directory
-git push origin v1.0.0
+git push origin v1.0.0-alpha
 ```
 
 ### Step 4: Create Release with gh CLI
 ```bash
 # Option A: Using release notes file
-gh release create v1.0.0 \
-  --title "v1.0.0 - Complete LEGO-Modular Architecture" \
-  --notes-file RELEASE_NOTES_v1.0.0.md \
+gh release create v1.0.0-alpha \
+  --title "v1.0.0-alpha - Complete LEGO-Modular Architecture" \
+  --notes-file RELEASE_NOTES_v1.0.0-alpha.md \
   --draft=false \
   --latest=true
 
 # Option B: Interactive mode
-gh release create v1.0.0 --title "v1.0.0" --notes "Release notes here"
+gh release create v1.0.0-alpha --title "v1.0.0-alpha" --notes "Release notes here"
 ```
 
 ### Step 5: Verify Release
 ```bash
 # View the release
-gh release view v1.0.0
+gh release view v1.0.0-alpha
 
 # List all releases
 gh release list
@@ -89,7 +89,7 @@ gh release list
 ### Step 1: Push Tags to GitHub
 ```bash
 # Ensure tags are pushed
-git push origin v1.0.0
+git push origin v1.0.0-alpha
 ```
 
 ### Step 2: Go to GitHub Repository
@@ -98,13 +98,13 @@ git push origin v1.0.0
 3. Click "Create a new release"
 
 ### Step 3: Fill in Release Details
-- **Choose a tag:** v1.0.0
-- **Release title:** v1.0.0 - Complete LEGO-Modular Architecture
-- **Describe this release:** (Copy content from RELEASE_NOTES_v1.0.0.md)
+- **Choose a tag:** v1.0.0-alpha
+- **Release title:** v1.0.0-alpha - Complete LEGO-Modular Architecture
+- **Describe this release:** (Copy content from RELEASE_NOTES_v1.0.0-alpha.md)
 
 ### Step 4: Release Content Template
 
-Copy and paste this (from RELEASE_NOTES_v1.0.0.md):
+Copy and paste this (from RELEASE_NOTES_v1.0.0-alpha.md):
 
 ```markdown
 🚀 FIRST STABLE RELEASE
@@ -120,7 +120,7 @@ ALL PHASES 0-10.3a COMPLETE:
 ✅ Multi-strategy support foundation (strategy orchestrator cache)
 ✅ 0 TypeScript errors
 
-[... rest of content from RELEASE_NOTES_v1.0.0.md ...]
+[... rest of content from RELEASE_NOTES_v1.0.0-alpha.md ...]
 ```
 
 ### Step 5: Publish Release
@@ -133,8 +133,8 @@ ALL PHASES 0-10.3a COMPLETE:
 ## 📊 What the Release Includes
 
 ### Code Status
-- ✅ **Commit:** c060139 (v1.0.0 release)
-- ✅ **Tag:** v1.0.0
+- ✅ **Commit:** c060139 (v1.0.0-alpha release)
+- ✅ **Tag:** v1.0.0-alpha
 - ✅ **Branch:** main
 
 ### Build Status
@@ -145,7 +145,7 @@ ALL PHASES 0-10.3a COMPLETE:
 
 ### Documentation Included
 - CHANGELOG.md - Complete changelog
-- RELEASE_NOTES_v1.0.0.md - Release highlights
+- RELEASE_NOTES_v1.0.0-alpha.md - Release highlights
 - ARCHITECTURE_QUICK_START.md - Getting started
 - 50+ phase-specific documents
 
@@ -155,7 +155,7 @@ ALL PHASES 0-10.3a COMPLETE:
 
 ### Release Title
 ```
-v1.0.0 - Complete LEGO-Modular Architecture
+v1.0.0-alpha - Complete LEGO-Modular Architecture
 ```
 
 ### Release Description
@@ -177,7 +177,7 @@ Include these sections:
 - <100ms strategy switching
 
 #### 4. What's New
-[Copy from RELEASE_NOTES_v1.0.0.md]
+[Copy from RELEASE_NOTES_v1.0.0-alpha.md]
 
 #### 5. Getting Started
 ```bash
@@ -198,10 +198,10 @@ npm start
 ### Check Release Created
 ```bash
 # Via CLI
-gh release view v1.0.0
+gh release view v1.0.0-alpha
 
 # Via Web
-https://github.com/devstd2211/edison-smart-levels-trading-bot/releases/tag/v1.0.0
+https://github.com/devstd2211/edison-smart-levels-trading-bot/releases/tag/v1.0.0-alpha
 ```
 
 ### Check Tag Visible
@@ -240,11 +240,11 @@ The release page should show:
 - **Main:** https://github.com/devstd2211/edison-smart-levels-trading-bot
 - **Releases:** https://github.com/devstd2211/edison-smart-levels-trading-bot/releases
 - **Tags:** https://github.com/devstd2211/edison-smart-levels-trading-bot/tags
-- **v1.0.0 Release:** https://github.com/devstd2211/edison-smart-levels-trading-bot/releases/tag/v1.0.0
+- **v1.0.0-alpha Release:** https://github.com/devstd2211/edison-smart-levels-trading-bot/releases/tag/v1.0.0-alpha
 
 ### Documentation
 - **Changelog:** CHANGELOG.md
-- **Release Notes:** RELEASE_NOTES_v1.0.0.md
+- **Release Notes:** RELEASE_NOTES_v1.0.0-alpha.md
 - **Quick Start:** ARCHITECTURE_QUICK_START.md
 - **README:** README.md
 
@@ -272,27 +272,27 @@ For future releases, follow this same process:
 
 ```bash
 # View release info
-gh release view v1.0.0
+gh release view v1.0.0-alpha
 
 # List all releases
 gh release list
 
 # Delete a release (if needed)
-gh release delete v1.0.0
+gh release delete v1.0.0-alpha
 
 # View release assets
-gh release view v1.0.0 --json assets
+gh release view v1.0.0-alpha --json assets
 
 # Create release with file
-gh release create v1.0.0 \
-  --title "v1.0.0" \
-  --notes-file RELEASE_NOTES_v1.0.0.md
+gh release create v1.0.0-alpha \
+  --title "v1.0.0-alpha" \
+  --notes-file RELEASE_NOTES_v1.0.0-alpha.md
 
 # Push all tags
 git push origin --tags
 
 # Push specific tag
-git push origin v1.0.0
+git push origin v1.0.0-alpha
 ```
 
 ---
@@ -327,7 +327,7 @@ git push origin v1.0.0
 
 ---
 
-**v1.0.0 Release**
+**v1.0.0-alpha Release**
 **Status:** Ready for GitHub Release
 **Next:** Create GitHub Release via CLI or web interface
 **Time Estimate:** 5-10 minutes
