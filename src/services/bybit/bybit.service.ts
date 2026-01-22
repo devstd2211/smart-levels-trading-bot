@@ -63,7 +63,7 @@ export class BybitService {
       key: config.apiKey,
       secret: config.apiSecret,
       recv_window: RECV_WINDOW,
-      sync_time_api: false, // SDK sync doesn't work - we'll do manual offset
+      sync_time_api: true, // CRITICAL FIX: SDK will sync time with server before each request
     };
 
     // Select environment
