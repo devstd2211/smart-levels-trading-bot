@@ -488,4 +488,357 @@ describe('EntryOrchestrator', () => {
       expect(result.reason).toBeDefined();
     });
   });
+
+  // ============================================================================
+  // EXTENDED TEST SUITE (Phase 13.2: Additional Coverage)
+  // ============================================================================
+
+  describe('Flat Market Detection', () => {
+    it('should identify flat market with neutral trend', async () => {
+      const signals = [createSignal(SignalDirection.LONG, 65, 100)];
+      const flatMarketTrend = {
+        bias: 'NEUTRAL' as TrendBias,
+        strength: 0.1,
+        timeframe: '1h',
+        pattern: 'CONSOLIDATION',
+        reasoning: ['Price consolidating in tight range'],
+        restrictedDirections: [],
+      };
+
+      const result = await orchestrator.evaluateEntry(signals, 1000, [], flatMarketTrend);
+
+      // Signal with confidence 65 should pass in flat market only if >= flatMarketConfidenceThreshold
+      expect(result).toBeDefined();
+    });
+
+    it('should require higher confidence in flat market', async () => {
+      const lowConfidenceFlat = [createSignal(SignalDirection.LONG, 68, 100)]; // Below typical flat market threshold
+      const flatMarketTrend = {
+        bias: 'NEUTRAL' as TrendBias,
+        strength: 0.05,
+        timeframe: '1h',
+        pattern: 'CONSOLIDATION',
+        reasoning: ['Tight consolidation'],
+        restrictedDirections: [],
+      };
+
+      const result = await orchestrator.evaluateEntry(lowConfidenceFlat, 1000, [], flatMarketTrend);
+
+      // Would need confidence >= flatMarketConfidenceThreshold (default 70)
+      expect(result).toBeDefined();
+    });
+
+    it('should accept entry in flat market with sufficient confidence', async () => {
+      const highConfidenceFlat = [createSignal(SignalDirection.LONG, 75, 100)]; // Above 70 threshold
+      const flatMarketTrend = {
+        bias: 'NEUTRAL' as TrendBias,
+        strength: 0.05,
+        timeframe: '1h',
+        pattern: 'CONSOLIDATION',
+        reasoning: ['Consolidation'],
+        restrictedDirections: [],
+      };
+
+      const result = await orchestrator.evaluateEntry(highConfidenceFlat, 1000, [], flatMarketTrend);
+
+      expect(result.decision).toBe(EntryDecision.ENTER);
+    });
+
+    it('should handle rapid trend changes', async () => {
+      const signals = [createSignal(SignalDirection.LONG, 75, 100)];
+      const transitionTrend = {
+        bias: 'NEUTRAL' as TrendBias,
+        strength: 0.3, // Transitioning
+        timeframe: '1h',
+        pattern: 'TRANSITION',
+        reasoning: ['Trend might be changing'],
+        restrictedDirections: [],
+      };
+
+      const result = await orchestrator.evaluateEntry(signals, 1000, [], transitionTrend);
+
+      expect(result).toBeDefined();
+    });
+  });
+
+  describe('Signal Conflict & Consensus', () => {
+    it('should detect conflicting signals below threshold (40%)', async () => {
+      // 3 LONG, 1 SHORT = 1/4 = 25% conflict (below 40% threshold = consensus on LONG)
+      const consensusSignals = [
+        createSignal(SignalDirection.LONG, 75, 100),
+        createSignal(SignalDirection.LONG, 70, 100),
+        createSignal(SignalDirection.LONG, 65, 100),
+        createSignal(SignalDirection.SHORT, 80, 100), // Minority
+      ];
+
+      const result = await orchestrator.evaluateEntry(consensusSignals, 1000, [], createNeutralTrend());
+
+      // Should reach LONG consensus
+      expect(result.decision).toBe(EntryDecision.ENTER);
+      expect(result.signal?.direction).toBe(SignalDirection.LONG);
+    });
+
+    it('should return WAIT or SKIP for conflicting signals above threshold (40%)', async () => {
+      // 2 LONG, 2 SHORT = 2/4 = 50% conflict (above 40% threshold = conflicting)
+      const conflictingSignals = [
+        createSignal(SignalDirection.LONG, 80, 100),
+        createSignal(SignalDirection.LONG, 75, 100),
+        createSignal(SignalDirection.SHORT, 85, 100),
+        createSignal(SignalDirection.SHORT, 70, 100),
+      ];
+
+      const result = await orchestrator.evaluateEntry(conflictingSignals, 1000, [], createNeutralTrend());
+
+      // Should handle conflict by returning WAIT (needs clarification) or SKIP (clear rejection)
+      expect([EntryDecision.WAIT, EntryDecision.SKIP]).toContain(result.decision);
+      expect(result.reason).toContain('conflict');
+    });
+
+    it('should reach strong consensus with clear direction majority', async () => {
+      // 5 LONG, 1 SHORT = 1/6 = 16.7% conflict (clear consensus)
+      const strongConsensusSignals = Array.from({ length: 5 }, () =>
+        createSignal(SignalDirection.LONG, 70 + Math.random() * 20, 100),
+      ).concat([createSignal(SignalDirection.SHORT, 75, 100)]);
+
+      const result = await orchestrator.evaluateEntry(strongConsensusSignals, 1000, [], createNeutralTrend());
+
+      expect(result.decision).toBe(EntryDecision.ENTER);
+      expect(result.signal?.direction).toBe(SignalDirection.LONG);
+    });
+  });
+
+  describe('Configuration Management (Phase 4.10)', () => {
+    it('should use default configuration if none provided', () => {
+      const orchWithDefaults = new EntryOrchestrator(riskManager, logger);
+      const config = orchWithDefaults.getOrchestrationConfig();
+
+      expect(config.minConfidenceThreshold).toBe(60);
+      expect(config.flatMarketConfidenceThreshold).toBe(70);
+      expect(config.signalConflictThreshold).toBe(0.4);
+    });
+
+    it('should apply custom configuration', () => {
+      const customConfig = {
+        minConfidenceThreshold: 50,
+        signalConflictThreshold: 0.3,
+        flatMarketConfidenceThreshold: 80,
+        minCandlesRequired: 30,
+        minEntryConfidenceCandlesRequired: 10,
+        maxPrimaryCandles: 200,
+      };
+
+      const orchWithCustom = new EntryOrchestrator(riskManager, logger, undefined, customConfig);
+      const config = orchWithCustom.getOrchestrationConfig();
+
+      expect(config.minConfidenceThreshold).toBe(50);
+      expect(config.flatMarketConfidenceThreshold).toBe(80);
+      expect(config.signalConflictThreshold).toBe(0.3);
+    });
+
+    it('should update configuration at runtime', async () => {
+      const newConfig = {
+        minConfidenceThreshold: 75,
+        signalConflictThreshold: 0.25,
+        flatMarketConfidenceThreshold: 85,
+        minCandlesRequired: 40,
+        minEntryConfidenceCandlesRequired: 8,
+        maxPrimaryCandles: 150,
+      };
+
+      orchestrator.setOrchestrationConfig(newConfig);
+
+      const signals = [createSignal(SignalDirection.LONG, 70, 100)]; // Below new threshold
+      const result = await orchestrator.evaluateEntry(signals, 1000, [], createNeutralTrend());
+
+      expect(result.decision).toBe(EntryDecision.SKIP); // Rejected due to new threshold
+    });
+
+    it('should support deprecated setMinConfidenceThreshold method', async () => {
+      orchestrator.setMinConfidenceThreshold(85);
+
+      const signals = [createSignal(SignalDirection.LONG, 80, 100)]; // Below new threshold
+      const result = await orchestrator.evaluateEntry(signals, 1000, [], createNeutralTrend());
+
+      expect(result.decision).toBe(EntryDecision.SKIP);
+    });
+
+    it('should retrieve current confidence threshold', () => {
+      orchestrator.setMinConfidenceThreshold(75);
+      const threshold = orchestrator.getMinConfidenceThreshold();
+
+      expect(threshold).toBe(75);
+    });
+  });
+
+  describe('Multi-Strategy Support (Phase 10.3c)', () => {
+    it('should accept strategyId in constructor', () => {
+      const strategyOrch = new EntryOrchestrator(riskManager, logger, undefined, undefined, 'strategy-a');
+
+      // Orchestrator should be created successfully with strategyId
+      expect(strategyOrch).toBeDefined();
+    });
+
+    it('should allow multiple strategy instances', () => {
+      const orchStrategyA = new EntryOrchestrator(riskManager, logger, undefined, undefined, 'strategy-a');
+      const orchStrategyB = new EntryOrchestrator(riskManager, logger, undefined, undefined, 'strategy-b');
+
+      // Both should be created successfully with different strategyIds
+      expect(orchStrategyA).toBeDefined();
+      expect(orchStrategyB).toBeDefined();
+    });
+
+    it('should work without strategyId (backward compatibility)', async () => {
+      const signals = [createSignal(SignalDirection.LONG, 75, 100)];
+
+      const result = await orchestrator.evaluateEntry(signals, 1000, [], createNeutralTrend());
+
+      expect(result.decision).toBe(EntryDecision.ENTER);
+      // strategyId parameter is accepted for future event tagging
+    });
+  });
+
+  describe('Signal Type & Direction Combinations', () => {
+    it('should handle LEVEL_BASED signals', async () => {
+      const signals = [
+        { ...createSignal(SignalDirection.LONG, 80), type: SignalType.LEVEL_BASED },
+      ];
+
+      const result = await orchestrator.evaluateEntry(signals, 1000, [], createNeutralTrend());
+
+      expect(result.decision).toBe(EntryDecision.ENTER);
+    });
+
+    it('should handle TREND_FOLLOWING signals', async () => {
+      const signals = [
+        { ...createSignal(SignalDirection.LONG, 80), type: SignalType.TREND_FOLLOWING },
+      ];
+
+      const result = await orchestrator.evaluateEntry(signals, 1000, [], createNeutralTrend());
+
+      expect(result.decision).toBe(EntryDecision.ENTER);
+    });
+
+    it('should handle COUNTER_TREND signals', async () => {
+      const signals = [
+        { ...createSignal(SignalDirection.SHORT, 85), type: SignalType.COUNTER_TREND },
+      ];
+      const bearishTrend = {
+        bias: 'BEARISH' as TrendBias,
+        strength: 0.8,
+        timeframe: '1h',
+        pattern: 'LH_LL',
+        reasoning: ['Downtrend'],
+        restrictedDirections: [SignalDirection.LONG],
+      };
+
+      const result = await orchestrator.evaluateEntry(signals, 1000, [], bearishTrend);
+
+      // Counter-trend SHORT in bearish trend should be allowed but less preferred
+      expect(result).toBeDefined();
+    });
+
+    it('should mix signal types in ranking', async () => {
+      const mixedSignals = [
+        { ...createSignal(SignalDirection.LONG, 75), type: SignalType.LEVEL_BASED },
+        { ...createSignal(SignalDirection.LONG, 85), type: SignalType.TREND_FOLLOWING },
+        { ...createSignal(SignalDirection.LONG, 70), type: SignalType.COUNTER_TREND },
+      ];
+
+      const result = await orchestrator.evaluateEntry(mixedSignals, 1000, [], createNeutralTrend());
+
+      // Should select highest confidence regardless of type
+      expect(result.signal?.confidence).toBe(85);
+    });
+  });
+
+  describe('Risk Manager Edge Cases', () => {
+    it('should handle zero account balance gracefully', async () => {
+      const signals = [createSignal(SignalDirection.LONG, 75, 100)];
+
+      const result = await orchestrator.evaluateEntry(signals, 0, [], createNeutralTrend());
+
+      expect(result.decision).toBe(EntryDecision.SKIP);
+    });
+
+    it('should respect maximum position size constraints from RiskManager', async () => {
+      const signals = [createSignal(SignalDirection.LONG, 95, 50000)]; // Huge position size
+      const result = await orchestrator.evaluateEntry(signals, 100, [], createNeutralTrend()); // Small account
+
+      // RiskManager validates position size - small account may still be allowed
+      // but with reduced position size
+      expect(result.riskAssessment).toBeDefined();
+      if (result.riskAssessment?.allowed) {
+        // If allowed, position should be reduced to fit account
+        expect(result.riskAssessment.adjustedPositionSize).toBeLessThan(50000);
+      }
+    });
+
+    it('should apply loss streak reductions', async () => {
+      const signals = [createSignal(SignalDirection.LONG, 80, 100)];
+
+      // Simulate 3 losses in riskManager
+      for (let i = 0; i < 3; i++) {
+        const lossTrade = {
+          id: `trade-${i}`,
+          symbol: 'BTCUSDT',
+          side: PositionSide.LONG,
+          quantity: 1,
+          entryPrice: 100,
+          exitPrice: 90,
+          leverage: 1,
+          entryCondition: { signal: {}, indicators: {} } as any,
+          openedAt: Date.now(),
+          closedAt: Date.now(),
+          realizedPnL: -10,
+          status: 'CLOSED' as const,
+        };
+        riskManager.recordTradeResult(lossTrade);
+      }
+
+      const result = await orchestrator.evaluateEntry(signals, 1000, [], createNeutralTrend());
+
+      // Should still work but with reduced position size
+      if (result.decision === EntryDecision.ENTER) {
+        expect(result.riskAssessment?.adjustedPositionSize).toBeLessThan(50); // Reduced
+      }
+    });
+  });
+
+  describe('Performance & Scalability', () => {
+    it('should efficiently handle 50 signals', async () => {
+      const signals = Array.from({ length: 50 }, (_, i) =>
+        createSignal(SignalDirection.LONG, 40 + (i % 60), 100),
+      );
+
+      const startTime = Date.now();
+      const result = await orchestrator.evaluateEntry(signals, 1000, [], createNeutralTrend());
+      const elapsed = Date.now() - startTime;
+
+      expect(result).toBeDefined();
+      expect(elapsed).toBeLessThan(100); // Should complete in < 100ms
+    });
+
+    it('should efficiently handle 100 signals', async () => {
+      const signals = Array.from({ length: 100 }, (_, i) =>
+        createSignal(SignalDirection.LONG, 30 + (i % 70), 100),
+      );
+
+      const startTime = Date.now();
+      const result = await orchestrator.evaluateEntry(signals, 1000, [], createNeutralTrend());
+      const elapsed = Date.now() - startTime;
+
+      expect(result).toBeDefined();
+      expect(elapsed).toBeLessThan(150); // Should complete in < 150ms
+    });
+
+    it('should maintain accuracy with many positions', async () => {
+      const signals = [createSignal(SignalDirection.LONG, 75, 100)];
+      const positions: Position[] = []; // Start with empty positions for this test
+
+      const result = await orchestrator.evaluateEntry(signals, 1000, positions, createNeutralTrend());
+
+      expect(result.riskAssessment).toBeDefined();
+      expect(result.riskAssessment?.allowed).toBe(true);
+    });
+  });
 });

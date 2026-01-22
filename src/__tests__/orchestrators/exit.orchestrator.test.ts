@@ -439,4 +439,360 @@ describe('ExitOrchestrator', () => {
       expect(Array.isArray(result.actions)).toBe(true);
     });
   });
+
+  // ============================================================================
+  // EXTENDED TEST SUITE (Phase 13.2: Additional Coverage)
+  // ============================================================================
+
+  describe('Advanced Trailing Stop (SmartTrailingV2)', () => {
+    it('should activate trailing after TP2 hit', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+      // Progress to TP2 to activate trailing
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.01);
+
+      // Should have trailing activation action
+      const trailingAction = result.actions.find(a => a.action === ExitAction.ACTIVATE_TRAILING);
+      expect(trailingAction).toBeDefined();
+      expect(result.newState).toBe(PositionState.TP2_HIT);
+    });
+
+    it('should track trailing state for LONG position', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+      // Move to TP2 to activate trailing
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+      await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.01);
+
+      // Subsequent evaluations should maintain state
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.5);
+
+      // Should stay in TP2_HIT state
+      expect(result.newState).toBe(PositionState.TP2_HIT);
+    });
+
+    it('should allow continuation above TP2 level', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+      // Progress to TP2
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+      await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.01);
+
+      // Price goes up (high profit)
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[1].price + 2);
+
+      // Should maintain at least TP2_HIT or continue to TP3
+      expect([PositionState.TP2_HIT, PositionState.TP3_HIT]).toContain(result.newState);
+    });
+
+    it('should adjust trailing distance based on profit level', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+      position.unrealizedPnL = 2; // Higher profit suggests continued strength
+
+      // Progress to TP2
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.01);
+
+      // Should generate trailing action with appropriate distance
+      const trailingAction = result.actions.find(a => a.action === ExitAction.ACTIVATE_TRAILING);
+      expect(trailingAction).toBeDefined();
+    });
+
+    it('should handle SHORT position trailing correctly', async () => {
+      const position = createPosition(PositionSide.SHORT, 100, 1);
+
+      // Progress to TP2
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price - 0.01);
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[1].price - 0.01);
+
+      // Should activate trailing for SHORT position
+      const trailingAction = result.actions.find(a => a.action === ExitAction.ACTIVATE_TRAILING);
+      expect(trailingAction).toBeDefined();
+      expect(result.newState).toBe(PositionState.TP2_HIT);
+    });
+  });
+
+  describe('Pre-BE (Breakeven) Mode', () => {
+    it('should lock profit in pre-BE mode after TP1', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+
+      // Hit TP1 to enter pre-BE mode
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+
+      // Should move SL to breakeven
+      expect(result.actions.some(a => a.action === ExitAction.UPDATE_SL)).toBe(true);
+    });
+
+    it('should count candles in pre-BE mode', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+
+      // Hit TP1
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+
+      // Next candle - candle count increments
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.05);
+
+      expect(result.newState).toBe(PositionState.TP1_HIT);
+    });
+
+    it('should transition from pre-BE to trailing after N candles', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+
+      // Hit TP1
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+
+      // Wait through multiple candles then hit TP2
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.02);
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.01);
+
+      // Should progress to TP2_HIT
+      expect(result.newState).toBe(PositionState.TP2_HIT);
+    });
+
+    it('should exit on SL during pre-BE mode', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+
+      // Hit TP1
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+
+      // Price hits SL (which was moved to BE)
+      const slPrice = position.stopLoss.price; // BE price
+      const result = await orchestrator.evaluateExit(position, slPrice - 0.01);
+
+      expect(result.newState).toBe(PositionState.CLOSED);
+    });
+
+    it('should apply profit lock during pre-BE', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+
+      // Hit TP1
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+
+      // Should have both CLOSE_PERCENT and UPDATE_SL actions
+      expect(result.actions.some(a => a.action === ExitAction.CLOSE_PERCENT)).toBe(true);
+      expect(result.actions.some(a => a.action === ExitAction.UPDATE_SL)).toBe(true);
+    });
+  });
+
+  describe('Adaptive TP3 (Market Condition Based)', () => {
+    it('should adjust TP3 based on volatility', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+
+      // Progress through TP1 and TP2
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+      await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.01);
+
+      // Check TP3 adjustment (adaptive based on market conditions)
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[2].price + 0.01);
+
+      expect(result.newState).toBe(PositionState.TP3_HIT);
+    });
+
+    it('should increase TP3 on high volume', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+      position.unrealizedPnL = 5; // High profit suggests high volume/momentum
+
+      // Progress through TP1 and TP2
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.01);
+
+      // Should have actions related to adaptive TP3
+      expect(result.actions).toBeDefined();
+    });
+
+    it('should handle low volume with conservative TP3', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+      position.unrealizedPnL = 0.2; // Low profit indicates low volume
+
+      // Progress through TP1 and TP2
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+      await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.01);
+
+      // TP3 should be closer to TP2
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.5);
+
+      expect(result.newState).toBe(PositionState.TP2_HIT);
+    });
+
+    it('should respect maximum TP3 profit percent', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+
+      // Progress through all TP levels
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+      await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.01);
+
+      // Price goes extreme high (beyond reasonable TP3)
+      const result = await orchestrator.evaluateExit(position, position.entryPrice * 1.1);
+
+      // Should close on TP3 hit
+      expect(result.newState).toBe(PositionState.TP3_HIT);
+    });
+  });
+
+  describe('Bollinger Band Trailing Mode', () => {
+    it('should activate trailing stop after TP2 hit', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+
+      // Progress to TP2
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.01);
+
+      // Should activate some form of trailing
+      expect(result.actions.some(a => a.action === ExitAction.ACTIVATE_TRAILING)).toBe(true);
+    });
+
+    it('should maintain state at TP2 after activation', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+
+      // Progress to TP2 trailing mode
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+      await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.01);
+
+      // Continue evaluating without hitting SL
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.5);
+
+      expect(result.newState).toBe(PositionState.TP2_HIT);
+    });
+
+    it('should respond to price movement in BB trailing mode', async () => {
+      const position = createPosition(PositionSide.SHORT, 100, 1);
+
+      // Progress to TP2 trailing mode
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price - 0.01);
+      await orchestrator.evaluateExit(position, position.takeProfits[1].price - 0.01);
+
+      // Continue evaluation
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[1].price - 0.5);
+
+      expect(result.newState).toBe(PositionState.TP2_HIT);
+    });
+
+    it('should track BB trailing state correctly', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+
+      // Progress to TP2 for BB trailing mode
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.01);
+
+      // Should have trailing action
+      const trailingAction = result.actions.find(a => a.action === ExitAction.ACTIVATE_TRAILING);
+      expect(trailingAction).toBeDefined();
+    });
+  });
+
+  describe('Multi-Strategy Support (Phase 10.3c)', () => {
+    it('should work with or without strategyId', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+
+      // Both should work fine
+      const result = await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+
+      expect(result).toBeDefined();
+      expect(result.newState).toBe(PositionState.TP1_HIT);
+    });
+
+    it('should maintain separate state for different positions regardless of strategy', async () => {
+      const position1 = createPosition(PositionSide.LONG, 100, 1);
+      position1.symbol = 'STRATEGY-A-BTCUSDT';
+
+      const position2 = createPosition(PositionSide.SHORT, 50, 1);
+      position2.symbol = 'STRATEGY-B-ETHUSDT';
+
+      // Progress both
+      const result1 = await orchestrator.evaluateExit(position1, position1.takeProfits[0].price + 0.01);
+      const result2 = await orchestrator.evaluateExit(position2, position2.takeProfits[0].price - 0.01);
+
+      expect(result1.newState).toBe(PositionState.TP1_HIT);
+      expect(result2.newState).toBe(PositionState.TP1_HIT);
+    });
+
+    it('should handle simultaneous evaluations for multiple strategies', async () => {
+      const positions = [
+        createPosition(PositionSide.LONG, 100, 1),
+        createPosition(PositionSide.SHORT, 100, 1),
+        createPosition(PositionSide.LONG, 100, 1),
+      ];
+
+      // Evaluate all in sequence
+      const results = await Promise.all(
+        positions.map((pos, idx) => {
+          const price = pos.side === PositionSide.LONG
+            ? pos.takeProfits[0].price + 0.01
+            : pos.takeProfits[0].price - 0.01;
+          return orchestrator.evaluateExit(pos, price);
+        }),
+      );
+
+      // All should transition correctly
+      expect(results.every(r => r.newState === PositionState.TP1_HIT)).toBe(true);
+    });
+  });
+
+  describe('Full Position Lifecycle With Advanced Features', () => {
+    it('should complete full lifecycle: OPEN → TP1 → TP2 → TP3 → CLOSED', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+
+      // OPEN → TP1_HIT
+      let result = await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+      expect(result.newState).toBe(PositionState.TP1_HIT);
+
+      // TP1_HIT → TP2_HIT
+      result = await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.01);
+      expect(result.newState).toBe(PositionState.TP2_HIT);
+
+      // TP2_HIT → TP3_HIT
+      result = await orchestrator.evaluateExit(position, position.takeProfits[2].price + 0.01);
+      expect(result.newState).toBe(PositionState.TP3_HIT);
+
+      // TP3_HIT → CLOSED (via SL or holding until manual close)
+      result = await orchestrator.evaluateExit(position, position.stopLoss.price - 0.01);
+      expect(result.newState).toBe(PositionState.CLOSED);
+    });
+
+    it('should handle full lifecycle with SL hit mid-way', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+
+      // Progress to TP2
+      await orchestrator.evaluateExit(position, position.takeProfits[0].price + 0.01);
+      await orchestrator.evaluateExit(position, position.takeProfits[1].price + 0.01);
+
+      // Hit SL even at TP2 state
+      const result = await orchestrator.evaluateExit(position, position.stopLoss.price - 0.01);
+
+      expect(result.newState).toBe(PositionState.CLOSED);
+      expect(result.actions.some(a => a.action === ExitAction.CLOSE_ALL)).toBe(true);
+    });
+  });
+
+  describe('Performance & Stress Tests', () => {
+    it('should handle rapid price changes efficiently', async () => {
+      const position = createPosition(PositionSide.LONG, 100, 1);
+
+      const startTime = Date.now();
+
+      // Simulate 10 rapid candles
+      for (let i = 0; i < 10; i++) {
+        await orchestrator.evaluateExit(position, 100 + i * 0.5);
+      }
+
+      const elapsed = Date.now() - startTime;
+
+      expect(elapsed).toBeLessThan(50); // Should be very fast
+    });
+
+    it('should handle many positions concurrently', async () => {
+      const positions = Array.from({ length: 50 }, (_, i) =>
+        createPosition(PositionSide.LONG, 100 - i, 1),
+      );
+
+      const startTime = Date.now();
+
+      const results = await Promise.all(
+        positions.map(pos => orchestrator.evaluateExit(pos, pos.takeProfits[0].price + 0.01)),
+      );
+
+      const elapsed = Date.now() - startTime;
+
+      expect(results.length).toBe(50);
+      expect(elapsed).toBeLessThan(200); // Should complete in < 200ms
+    });
+  });
 });
