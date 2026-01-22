@@ -71,31 +71,47 @@ THIS FILE: QUICK START
 | **10.3c** | Event Tagging & Filtering | ✅ DONE | StrategyEventFilterService + strategyId params + 31 tests | ✅ BUILD SUCCESS (Session 24) - 0 ERRORS, 31/31 TESTS ✅ |
 | **11** | Per-Strategy Circuit Breakers | ✅ DONE | StrategyCircuitBreakerService + 33 tests | ✅ BUILD SUCCESS (Session 24) - 0 ERRORS, 33/33 TESTS ✅ |
 | **12** | Parallel Strategy Processing | ✅ DONE | StrategyProcessingPoolService + 34 tests | ✅ BUILD SUCCESS (Session 24) - 0 ERRORS, 34/34 TESTS ✅ |
-| **13** | Code Quality & Debt Elimination | 🎯 STARTING | Critical TODO completion + Orchestrator tests + Legacy cleanup | 🎯 PHASE PLANNED (Session 24) - Realistic 3-week roadmap |
+| **13.1a** | Critical TODO Completion | ✅ DONE | cancelAllPendingOrders() + Real market prices + getTradesForPeriod() | ✅ BUILD SUCCESS (Session 24) - 3640/3640 TESTS ✅ |
+| **13.2** | Orchestrator Tests (Week 2) | 🎯 NEXT | 140+ tests: Entry (40) + Exit (50) + Filter/Strategy (50) | 🎯 PLANNED - Session 25+ |
+| **13.3** | Legacy Code Cleanup (Week 3) | 🎯 PLANNED | Analyzer consolidation + Backtest engines archive | 🎯 PLANNED - Session 25+ |
 
 ---
 
-## 🚀 PHASE 13: Production Code Quality & Incremental Refactoring (🎯 STARTING - Session 24)
+## 🚀 PHASE 13: Production Code Quality & Incremental Refactoring (✅ 13.1a COMPLETE - Session 24)
 
-### Status: 🎯 PHASE PLANNED - Pragmatic 3-Week Roadmap
+### Status: ✅ PHASE 13.1a COMPLETE! All 3 Critical TODOs Resolved!
 
-**What Will Be Implemented (Session 25+):**
+**Week 1: Critical TODO Completion** ✅ **DONE (Session 24)**
 
-**Week 1: Critical TODO Completion (4-5 days)**
 1. ✅ **graceful-shutdown.service.ts** - Implement `cancelAllPendingOrders()`
-   - Problem: Orders not cancelled on bot shutdown
-   - Fix: Wire to IExchange.cancelAllOrders()
-   - Impact: Positions properly close when bot stops
+   - **DONE:** Implemented full order cancellation logic
+   - Cancels hanging orders for current symbol
+   - Cancels all conditional orders (TP/SL)
+   - Replaced `any` type with proper IExchange interface
+   - 8 comprehensive tests created
+   - **Commit:** b6332cf
 
 2. ✅ **real-time-risk-monitor.service.ts** - Wire real market prices
-   - Problem: Health scoring uses fallback entryPrice (wrong!)
-   - Fix: Inject ICandleProvider to get current price
-   - Impact: Risk monitoring becomes accurate
+   - **DONE:** Updated to REQUIRE currentPrice parameter
+   - monitorAllPositions() now accepts optional currentPrice
+   - shouldTriggerAlert() now REQUIRES currentPrice (no fallback)
+   - Health scoring now accurate with real market prices
+   - **Commit:** 81bdecb
 
 3. ✅ **performance-analytics.service.ts** - Implement period-based metrics
-   - Problem: Always returns empty trades array
-   - Fix: Implement ITradingJournal.getTradesForPeriod()
-   - Impact: Performance analytics work in live trading
+   - **DONE:** Implemented getTradesForPeriod() private method
+   - Period filtering: ALL, TODAY, WEEK, MONTH
+   - Uses TradingJournalService.getAllTrades() as source
+   - Fixed 3 TODO comments
+   - Analytics now return real data instead of empty arrays
+   - **Commit:** 6fccba8
+
+**Build Status After 13.1a:**
+- ✅ **0 TypeScript Errors**
+- ✅ **3640/3640 Tests Passing** (+8 graceful-shutdown tests)
+- ✅ **165 Test Suites Passing**
+
+**What Will Be Implemented Next (Session 25+):**
 
 **Week 2: Orchestrator Test Coverage (4-5 days)**
 - ✅ **Entry Orchestrator Tests** - 40+ tests for signal ranking, confidence, trend alignment
