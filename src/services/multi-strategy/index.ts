@@ -22,6 +22,10 @@ export type { StrategyEventCallback } from './event-filter.service';
 // Phase 11: Per-Strategy Circuit Breakers
 export { StrategyCircuitBreakerService } from './strategy-circuit-breaker.service';
 
+// Phase 12: Parallel Strategy Processing
+export { StrategyProcessingPoolService } from './strategy-processing-pool.service';
+export type { ProcessingFunction } from './strategy-processing-pool.service';
+
 // Re-export types
 export type {
   StrategyMetadata,
