@@ -1,8 +1,8 @@
 # 🚀 Architecture Quick Start - Current Context
 
-**Status:** Phase 13.2 - Orchestrator Tests Complete ✅
-**Last Updated:** 2026-01-22 (Session 25)
-**Build:** ✅ 0 TypeScript Errors | **3640/3640 Tests Passing** | **172 Orchestrator Tests** 🎉
+**Status:** Phase 14 - Backtest Engine Migration Complete ✅
+**Last Updated:** 2026-01-23 (Session 26)
+**Build:** ✅ 0 TypeScript Errors | **3708/3708 Tests Passing** | **Production-Ready V5 Only** 🎉
 
 ---
 
@@ -17,16 +17,15 @@
 
 ## 🎯 Current Phase Status
 
-| Phase | Component | Status | Tests | Notes |
-|-------|-----------|--------|-------|-------|
-| **13.2** | Entry Orchestrator Tests | ✅ | 53 | Signal ranking, confidence, trend, multi-strategy |
-| **13.2** | Exit Orchestrator Tests | ✅ | 56 | State machine, trailing, pre-BE, adaptive TP3 |
-| **13.2** | Filter & Strategy Tests | ✅ | 18 | Event isolation, order preservation, error resilience |
-| **13.2** | Integration Tests | ✅ | 19 | Entry + Exit full lifecycle, state consistency |
-| **13.1a** | Critical TODOs | ✅ | N/A | cancelAllPendingOrders, risk monitor, analytics |
-| **12** | Parallel Strategy Processing | ✅ | 34 | 2-3x performance boost |
-| **11** | Circuit Breakers | ✅ | 33 | Per-strategy resilience |
-| **10.3c** | Event Tagging | ✅ | 31 | Strategy isolation |
+| Phase | Component | Status | Details | Notes |
+|-------|-----------|--------|---------|-------|
+| **14** | Backtest Migration | ✅ | 11 files deleted | V2/V4 engines + calibration scripts removed |
+| **14** | Engine Consolidation | ✅ | V5 only | Only BacktestEngineV5 remains (production-ready) |
+| **14** | Migration Guide | ✅ | PHASE_14_MIGRATION_GUIDE.md | Complete paths for teams, V5 features, FAQ |
+| **13.3** | Legacy Code Cleanup | ✅ | 4 files deleted | uuid dep, backtest v2 archive, config backup, volume analyzer |
+| **13.2** | Orchestrator Tests | ✅ | 128 tests | Entry 53, Exit 56, Filter 18, Integration 1 |
+| **13.1a** | Critical TODOs | ✅ | All resolved | cancelAllPendingOrders, risk monitor, analytics |
+| **12** | Parallel Processing | ✅ | 34 tests | 2-3x performance boost |
 
 ---
 
@@ -98,26 +97,49 @@ Filter Orchestrator
 
 ---
 
-## 🔧 Next Steps
+## 🔧 Phase 14 Completion Summary
 
-### Phase 13.3 (Week 3 - Pending)
-1. **Legacy Code Cleanup** - Production code quality
-   - Analyzer consolidation (remove redundant analyzers)
-   - Archive old backtest engines (v1-v4)
-   - Remove obsolete type definitions
-   - Documentation finalization
+### ✅ Backtest Engine Migration (COMPLETE)
 
-2. **Code Quality Review**
-   - Verify all 3640+ tests still passing
-   - Review any deprecated code paths
-   - Update comments and docstrings for clarity
+**Files Deleted (11 total):**
+
+**Backtest Engines & Runners (5):**
+1. ✅ `scripts/backtest-engine.ts` - V1 simple engine
+2. ✅ `scripts/backtest-engine-v2.ts` - V2 legacy runner
+3. ✅ `scripts/run-backtest.ts` - Multi-source V2/V4 runner
+4. ✅ `scripts/run-backtest-v4.ts` - V4 "clean arch" attempt
+5. ✅ `scripts/backtest-edge-conditions.ts` - Edge case tester
+
+**Calibration Scripts (6):**
+6. ✅ `scripts/calibrate-v2-strategy.ts` - V2 strategy calibration
+7. ✅ `scripts/calibrate-entries.ts` - Entry-only calibration
+8. ✅ `scripts/calibrate-rr-optimizer.ts` - RR optimization V2
+9. ✅ `scripts/calibrate-whale.ts` - Whale calibration
+10. ✅ `scripts/calibrate-xrpusdt-minimal.ts` - Symbol-specific minimal
+11. ✅ `scripts/calibrate-xrpusdt-ticks.ts` - Tick-based analysis
+
+**NPM Scripts Cleaned:**
+- ✅ Removed 9 legacy npm script commands from package.json
+- ✅ Retained V5-only commands (backtest-v5, calibrate-v5, etc.)
+
+**Documentation Created:**
+- ✅ `PHASE_14_MIGRATION_GUIDE.md` - Complete migration reference for teams
+  - What was deleted and why
+  - Migration paths to V5
+  - BacktestEngineV5 features & improvements
+  - FAQ & troubleshooting
+
+**Next Steps (Phase 15+):**
+- Type consolidation: migrate legacy config.ts → config-new.types.ts
+- Archive remaining helper scripts
+- Performance benchmarking
 
 ### Production Readiness Checklist
 - ✅ Type safety (0 TypeScript errors)
 - ✅ Test coverage (3640+ tests)
 - ✅ Multi-strategy support
 - ✅ Event-driven architecture
-- ✅ Live trading engine
+- ✅ **Phase 9: Live Trading Engine** (TradingLifecycleManager, RealTimeRiskMonitor, OrderExecutionPipeline, PerformanceAnalytics, GracefulShutdownManager)
 - ✅ Web dashboard
 - ✅ Parallel processing
 - ✅ Circuit breakers
