@@ -1,26 +1,37 @@
 # Claude Code Session Guide
 
-## 🎯 Current Status (Session 28 Continued - Phase 9.1 Complete!)
+## 🎯 Current Status (Session 28 Continued - CRITICAL DECISION: Safety First!)
 
-**BUILD STATUS:** ✅ **SUCCESS** | **3839 Tests Passing** (+80 Phase 9.1 tests!) | **Phase 14 (Production) + Phase 9.1 (Live Trading)**
-- ✅ Main app: TypeScript clean (0 errors)
-- ✅ web-server: Compiles successfully
-- ✅ web-client: Vite build successful
-- 🔒 Security: TP NaN crash fixed (critical)
-- ✅ **Phase 9.1: UNIT TESTS COMPLETE** - All 4 services tested (+123 tests total)
+**BUILD STATUS:** ✅ **SUCCESS** | **3839 Tests Passing** | **Phase 14 (Production) + Phase 9.1 (Complete!)**
+
+### Key Findings from Risk Analysis:
+- ✅ Phase 9.1: UNIT TESTS COMPLETE (+123 tests) ✅
   - ✅ RealTimeRiskMonitor (35 tests)
   - ✅ PerformanceAnalytics (29 tests)
   - ✅ GracefulShutdownManager (28 tests)
   - ✅ OrderExecutionPipeline (31 tests)
 
+- 🔴 **INTEGRATION RISKS IDENTIFIED:**
+  - Race conditions (timeout ↔ close)
+  - Data contract mismatches (string vs number)
+  - State synchronization issues (journal desync)
+  - Error handling gaps (silent failures)
+  - Backward compatibility issues (old positions)
+
+- ⚠️ **DECISION: NO PHASE 9.2 WITHOUT P0-P2**
+  - Integration without safety guards = **HIGH risk of bot breakage**
+  - New sequence: Phase 9.1 → P0-P2 (55 tests) → Phase 9.2
+  - Estimated effort: 7-10 hours for P0-P2 safety implementation
+
 ## 📋 Quick Reference
 
 ### System State
-- **Active Phase:** 14 (Production) | **Live Trading:** 9.1 (Unit Tests COMPLETE ✅)
-- **Last Work:** Phase 9.1 unit tests for 4 services (GracefulShutdownManager, OrderExecutionPipeline, etc.)
-- **Next Task:** Phase 9.2 Service Integration (wire Phase 9 services into bot-services.ts)
+- **Active Phase:** 14 (Production) | **Live Trading:** 9.1 (Unit Tests ✅) → 9.P0-P2 (Safety First!)
+- **Current Focus:** CRITICAL DECISION - P0-P2 Implementation REQUIRED before Phase 9.2
+- **Risk Level:** HIGH - Integration without safety guards = bot breakage
+- **Next Task:** Phase 9.P0 (atomic locks, validation) - BLOCKING Phase 9.2
 - **Security:** ✅ TP NaN crash patch applied
-- **Test Progress:** 3839 tests passing (170 test suites)
+- **Test Progress:** 3839 tests passing (170 test suites) → +55 P0-P2 tests planned
 
 ### Key Features
 - ✅ Phase 14: V5 Backtest Engine (no legacy)
@@ -69,6 +80,34 @@ Trading Bot
 ├─ Event-Driven Pipeline (ActionQueue, EventBus)
 └─ Web Dashboard (React SPA + WebSocket)
 ```
+
+## 🔴 CRITICAL: P0-P2 Implementation REQUIRED
+
+**Decision:** NO Phase 9.2 integration without P0-P2 safety guards!
+
+### Phase 9.P0: Atomic Locks & Validation (3-4 hours) 🔴
+- Atomic lock for position close (prevent timeout ↔ close race)
+- Runtime validation (catch NaN type mismatches)
+- Atomic snapshots (prevent WebSocket ↔ monitor race)
+- **Tests:** 17 unit tests | **Blocker:** YES
+
+### Phase 9.P1: Integration Safeguards (2-3 hours) 🔴
+- Transactional close with rollback (prevent journal desync)
+- Health score cache invalidation (prevent stale scores)
+- E2E test suite (8 complete Phase 9 workflows)
+- **Tests:** 18 integration tests | **Blocker:** YES
+
+### Phase 9.P2: Chaos & Compatibility (2-3 hours) 🔴
+- Order timeout verification (prevent duplicates)
+- Error propagation (no silent failures)
+- Shutdown timeout enforcement
+- Backward compatibility (old positions)
+- Chaos testing (network failures, cascades)
+- **Tests:** 20 unit + chaos tests | **Blocker:** YES
+
+**Total:** 7-10 hours | 55 new tests | Final: 3894 tests passing
+
+See `PHASE_9_SAFETY_IMPLEMENTATION_PLAN.md` for full details
 
 ## 🔧 Commands
 
