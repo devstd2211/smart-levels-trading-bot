@@ -1,0 +1,50 @@
+{
+  "plansDirectory": "./docs/plans",
+  "language": "russian",
+  "alwaysThinkingEnabled": false,
+  "enableAllProjectMcpServers": true,
+  "autoUpdatesChannel": "stable",
+  "cleanupPeriodDays": 14,
+
+  "permissions": {
+    "allow": [
+      "Bash(pnpm:*)",
+      "Bash(npm:*)",
+      "Bash(git:*)",
+      "Bash(bd:*)",
+      "mcp__context7__*"
+    ],
+    "deny": [
+      "Read(.env*)",
+      "Read(**/credentials*)",
+      "Bash(rm -rf:*)"
+    ],
+    "defaultMode": "acceptEdits"
+  },
+
+  "attribution": {
+    "commit": "Co-Authored-By: Claude <noreply@anthropic.com>",
+    "pr": ""
+  },
+
+  "env": {
+    "ENABLE_TOOL_SEARCH": "auto:5",
+    "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "85",
+    "MAX_MCP_OUTPUT_TOKENS": "30000"
+  },
+
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bd prime",
+            "once": true
+          }
+        ]
+      }
+    ]
+  }
+}
