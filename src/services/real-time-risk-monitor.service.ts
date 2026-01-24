@@ -82,6 +82,14 @@ export class RealTimeRiskMonitor implements IRealTimeRiskMonitor {
     this.positionLifecycleService = positionLifecycleService;
     this.logger = logger;
     this.eventBus = eventBus;
+
+    // [P1] Subscribe to position-closed event for cache invalidation
+    if (this.eventBus && typeof this.eventBus.subscribe === 'function') {
+      this.eventBus.subscribe('position-closed', (data: any) => {
+        this.onPositionClosed(data);
+      });
+      this.logger.debug('[RealTimeRiskMonitor] Subscribed to position-closed events');
+    }
   }
 
   /**
@@ -445,6 +453,25 @@ export class RealTimeRiskMonitor implements IRealTimeRiskMonitor {
   public clearHealthScoreCache(): void {
     this.healthScoreCache.clear();
     this.logger.debug('[RealTimeRiskMonitor] Cleared health score cache');
+  }
+
+  /**
+   * [P1] Handle position-closed event
+   * Invalidate health score cache when position closes
+   */
+  private onPositionClosed(data: { position: Position; strategyId?: string }): void {
+    const positionId = data.position?.id;
+
+    if (!positionId) {
+      this.logger.warn('[RealTimeRiskMonitor] position-closed event missing ID');
+      return;
+    }
+
+    // Clear cache for this position
+    this.healthScoreCache.delete(positionId);
+    this.generatedAlerts.delete(positionId);
+
+    this.logger.debug('[RealTimeRiskMonitor] Cache invalidated', { positionId });
   }
 
   /**

@@ -286,30 +286,57 @@ export class PositionExitingService {
         });
       }
 
-      // Record in journal
-      await this.recordPositionCloseInJournal(position, exitPrice, realizedPnL, exitReason, exitType, tpLevelsHit, holdingTimeMs);
+      // [P1] Record in journal with rollback capability
+      let journalResult: { rollback: () => void } | null = null;
+      try {
+        journalResult = await this.recordPositionCloseInJournal(position, exitPrice, realizedPnL, exitReason, exitType, tpLevelsHit, holdingTimeMs);
+      } catch (journalError) {
+        // [P1] Journal recording failed - log error but don't fail close
+        // Position is already marked CLOSED, journal will be retried later
+        this.logger.error('❌ Journal recording failed', {
+          error: journalError instanceof Error ? journalError.message : String(journalError),
+          positionId: position.id,
+        });
+        // Continue with stats update since position close succeeded on exchange
+      }
 
-      // Update session stats
+      // [P1] Update session stats with error handling (rollback on failure)
       if (this.sessionStats && position.journalId) {
         const priceDiff = exitPrice - position.entryPrice;
         const isLong = position.side === PositionSide.LONG;
         const pnlMultiplier = isLong ? 1 : -1;
         const pnlPercent = (priceDiff / position.entryPrice) * PERCENT_MULTIPLIER * pnlMultiplier;
 
-        this.sessionStats.updateTradeExit(position.journalId, {
-          exitPrice,
-          pnl: realizedPnL,
-          pnlPercent,
-          exitType,
-          tpHitLevels: tpLevelsHit,
-          holdingTimeMs,
-          stopLoss: {
-            initial: position.stopLoss.initialPrice || position.stopLoss.price,
-            final: position.stopLoss.price,
-            movedToBreakeven: position.stopLoss.isBreakeven,
-            trailingActivated: position.stopLoss.isTrailing,
-          },
-        });
+        try {
+          this.sessionStats.updateTradeExit(position.journalId, {
+            exitPrice,
+            pnl: realizedPnL,
+            pnlPercent,
+            exitType,
+            tpHitLevels: tpLevelsHit,
+            holdingTimeMs,
+            stopLoss: {
+              initial: position.stopLoss.initialPrice || position.stopLoss.price,
+              final: position.stopLoss.price,
+              movedToBreakeven: position.stopLoss.isBreakeven,
+              trailingActivated: position.stopLoss.isTrailing,
+            },
+          });
+        } catch (statsError) {
+          // [P1] CRITICAL: Session stats update failed - rollback journal
+          this.logger.error('❌ CRITICAL: Session stats update failed - rolling back journal', {
+            error: statsError instanceof Error ? statsError.message : String(statsError),
+            journalId: position.journalId,
+          });
+
+          // Rollback journal if we have rollback function
+          if (journalResult?.rollback) {
+            journalResult.rollback();
+          }
+
+          position.status = 'OPEN'; // Revert status
+          return false;
+        }
       }
 
       // Send exit notification
@@ -328,6 +355,7 @@ export class PositionExitingService {
         error: error instanceof Error ? error.message : String(error),
         positionId: position.id,
       });
+      position.status = 'OPEN'; // Revert status on any error
       return false;
     }
   }
@@ -415,7 +443,8 @@ export class PositionExitingService {
   }
 
   /**
-   * Record position close in journal with full details
+   * [P1] Record position close in journal with full details
+   * Returns rollback function for transactional error handling
    *
    * @private
    */
@@ -427,14 +456,14 @@ export class PositionExitingService {
     exitType: ExitType,
     tpLevelsHit: number[],
     holdingTimeMs: number,
-  ): Promise<void> {
+  ): Promise<{ rollback: () => void }> {
     try {
       // Skip if position has no journalId (restored from WebSocket without journal entry)
       if (!position.journalId) {
         this.logger.warn('Skipping journal recording - position has no journalId', {
           positionId: position.id,
         });
-        return;
+        return { rollback: () => {} }; // No-op rollback if no journalId
       }
 
       const holdingTimeMinutes = holdingTimeMs / TIME_UNITS.MINUTE;
@@ -443,7 +472,8 @@ export class PositionExitingService {
       const pnlMultiplier = isLong ? 1 : -1;
       const pnlPercent = (priceDiff / position.entryPrice) * PERCENT_MULTIPLIER * pnlMultiplier;
 
-      await this.journal.recordTradeClose({
+      // [P1] Get rollback function from journal
+      const journalResult = this.journal.recordTradeClose({
         id: position.journalId,
         exitPrice,
         realizedPnL,
@@ -475,11 +505,16 @@ export class PositionExitingService {
         pnlPercent: pnlPercent.toFixed(DECIMAL_PLACES.PERCENT) + '%',
         holdingTime: `${holdingTimeMinutes.toFixed(1)}m`,
       });
+
+      // [P1] Return rollback function for caller to use if needed
+      return journalResult;
     } catch (error) {
       this.logger.error('Failed to record position close in journal', {
         error: error instanceof Error ? error.message : String(error),
         journalId: position.journalId,
       });
+      // Return empty rollback function if journal fails (graceful degradation)
+      return { rollback: () => {} };
     }
   }
 

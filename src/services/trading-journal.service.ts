@@ -170,18 +170,33 @@ export class TradingJournalService {
   }
 
   /**
-   * Record trade closing
+   * [P1] Create snapshot of trade state before update
+   */
+  private snapshotTradeState(tradeId: string): TradeRecord | null {
+    const trade = this.trades.get(tradeId);
+    return trade ? { ...trade } : null;
+  }
+
+  /**
+   * Record trade closing with rollback capability
+   * Returns rollback function for transactional failure handling
    */
   recordTradeClose(params: {
     id: string;
     exitPrice: number;
     exitCondition: ExitCondition;
     realizedPnL: number;
-  }): void {
+  }): { rollback: () => void } {
     const trade = this.trades.get(params.id);
 
     if (trade === undefined) {
       throw new Error(`Trade ${params.id} not found`);
+    }
+
+    // [P1] Snapshot state BEFORE update
+    const snapshot = this.snapshotTradeState(params.id);
+    if (!snapshot) {
+      throw new Error(`Failed to snapshot trade state for ${params.id}`);
     }
 
     // Get virtual balance BEFORE update
@@ -298,6 +313,34 @@ export class TradingJournalService {
       tpHit: params.exitCondition.tpLevelsHit.join(', ') || 'none',
       virtualBalance: balanceAfter.toFixed(DECIMAL_PLACES.PERCENT) + ' USDT',
     });
+
+    // [P1] Return rollback function for transactional error handling
+    return {
+      rollback: () => {
+        if (!snapshot) {
+          this.logger.error('❌ CRITICAL: Cannot rollback - snapshot missing');
+          return;
+        }
+
+        // Restore trade state
+        this.trades.set(snapshot.id, snapshot);
+        this.saveJournal();
+
+        // Restore virtual balance if it was updated
+        const balanceAfterUpdate = this.virtualBalance?.getCurrentBalance() || 0;
+        if (balanceAfterUpdate !== balanceBefore) {
+          const balanceDiff = balanceAfterUpdate - balanceBefore;
+          if (this.virtualBalance) {
+            this.virtualBalance.updateBalance(-balanceDiff, `ROLLBACK_${params.id}`);
+          }
+        }
+
+        this.logger.info('✅ Journal rollback complete', {
+          tradeId: params.id,
+          balanceRestored: balanceBefore,
+        });
+      },
+    };
   }
 
   /**
