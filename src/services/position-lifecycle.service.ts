@@ -65,6 +65,9 @@ export class PositionLifecycleService {
   private takeProfitManager: TakeProfitManagerService | null = null;
   private entryConfirmation: EntryConfirmationManager;
 
+  // PHASE 9.P0: Atomic lock for position close (prevent timeout ↔ close race)
+  private positionClosing = new Map<string, Promise<void>>();
+
   constructor(
     private readonly bybitService: IExchange,
     private readonly tradingConfig: TradingConfig,
@@ -648,5 +651,78 @@ export class PositionLifecycleService {
     }
 
     return currentPosition;
+  }
+
+  // =========================================================================
+  // PHASE 9.P0: Safety Guards for Live Trading Integration
+  // =========================================================================
+
+  /**
+   * P0.1: Close position with atomic guarantee
+   * Prevents timeout ↔ close race condition by using atomic lock
+   *
+   * Returns early if position already closing (returns same promise)
+   * Multiple concurrent calls to same position wait for first close to complete
+   */
+  async closePositionWithAtomicLock(positionId: string, reason: string): Promise<void> {
+    // Check if already closing this position
+    if (this.positionClosing.has(positionId)) {
+      this.logger.warn(`[P0.1] Position already closing: ${positionId}`);
+      return this.positionClosing.get(positionId)!; // Wait for in-progress close
+    }
+
+    // Create close promise
+    const closePromise = this.performClose(positionId, reason);
+    this.positionClosing.set(positionId, closePromise);
+
+    try {
+      await closePromise;
+    } finally {
+      // Clean up lock
+      this.positionClosing.delete(positionId);
+    }
+  }
+
+  /**
+   * P0.1 helper: Perform actual close operation
+   */
+  private async performClose(positionId: string, reason: string): Promise<void> {
+    const position = this.getCurrentPosition();
+    if (!position || position.id !== positionId) {
+      this.logger.info(`[P0.1] Position already closed or not found: ${positionId}`);
+      return;
+    }
+
+    try {
+      this.logger.info(`[P0.1] Closing position: ${positionId}`, { reason });
+
+      // Close via exchange (using clearPosition pattern which already exists)
+      await this.clearPosition();
+
+      this.logger.info(`[P0.1] Position closed successfully: ${positionId}`);
+    } catch (error) {
+      this.logger.error(`[P0.1] Failed to close position: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * P0.3: Get atomic snapshot of current position
+   * Prevents WebSocket updates from changing fields mid-calculation
+   * Used by Phase 9 services for concurrent-safe position reads
+   *
+   * Returns deep copy so concurrent WebSocket updates don't affect snapshot
+   */
+  getPositionSnapshot(): Position | null {
+    const position = this.getCurrentPosition();
+    if (!position) return null;
+
+    // Deep copy = atomic read (WebSocket changes won't affect copy)
+    try {
+      return JSON.parse(JSON.stringify(position));
+    } catch (error) {
+      this.logger.error('[P0.3] Failed to create position snapshot', { error });
+      return position; // Fallback to reference if copy fails
+    }
   }
 }
