@@ -1,8 +1,8 @@
 # Claude Code Session Guide
 
-## 🎯 Current Status (Session 28 - Phase 9.P0 Complete!)
+## 🎯 Current Status (Session 29 - Phase 9.P1 Complete! Integration Postponed)
 
-**BUILD STATUS:** ✅ **SUCCESS** | **3876 Tests Passing** | **Phase 14 (Production) + Phase 9.1 ✅ + Phase 9.P0 ✅**
+**BUILD STATUS:** ✅ **SUCCESS** | **3894 Tests Passing** | **Phase 14 (Production) + Phase 9.1 ✅ + Phase 9.P0 ✅ + Phase 9.P1 ✅ (Postponed)**
 
 ### 🔒 PHASE 9.P0: CRITICAL SAFETY GUARDS - COMPLETE ✅
 - ✅ **P0.1: Atomic Lock for Position Close** (5 tests)
@@ -26,10 +26,10 @@
 ## 📋 Quick Reference
 
 ### System State
-- **Active Phase:** 14 (Production) + 9.1 (Unit Tests ✅) + 9.P0 (Safety Guards ✅)
-- **Next Phase:** 9.2 (Integration with P0 guards in place)
-- **Security:** ✅ P0.1 Atomic locks ✅ P0.2 Runtime validation ✅ P0.3 Atomic snapshots
-- **Test Progress:** 3876 tests passing (173 test suites) | +37 P0 tests completed
+- **Active Phase:** 14 (Production) + 9.1 (Unit Tests ✅) + 9.P0 (Safety Guards ✅) + 9.P1 (Safeguards ✅)
+- **Next Phase:** 9.2 (Integration deferred pending risk assessment)
+- **Security:** ✅ P0.1 Atomic locks ✅ P0.2 Runtime validation ✅ P0.3 Atomic snapshots ✅ P1.1 Transactional close ✅ P1.2 Cache invalidation
+- **Test Progress:** 3894 tests passing (176 test suites) | +37 P0 tests + 18 P1 tests completed
 
 ### Key Features
 - ✅ Phase 14: V5 Backtest Engine (no legacy)
@@ -53,12 +53,12 @@
 - ✅ IExchange (multi-exchange)
 - 📋 Config types: ConfigNew (in progress)
 
-### Testing (Session 28 P0 Complete)
-- **Total Tests:** 3876 passing ✅ (+37 from Phase 9.P0)
-- **Test Suites:** 173 ✅ (2 new from P0: position-lifecycle.p0-safety, position.validator)
-- **Critical Path:** Phase 9.1 → **Phase 9.P0 ✅** → Phase 9.2 (ready to integrate)
-- **Coverage:** All critical trading logic + Live Trading Risk Monitoring
-- **Phase 9.1 Status:** RealTimeRiskMonitor (35/35 ✅) | Remaining: 32 tests
+### Testing (Session 29 P1 Complete)
+- **Total Tests:** 3894 passing ✅ (+37 P0 + 18 P1 = 55 new tests)
+- **Test Suites:** 176 ✅ (2 P0 + 3 P1: transactional, cache-invalidation, e2e)
+- **Critical Path:** Phase 9.1 → Phase 9.P0 ✅ → **Phase 9.P1 ✅** → Phase 9.2 (READY but POSTPONED)
+- **Coverage:** All critical trading logic + Live Trading Risk Monitoring + Transactional Safety + Cache Invalidation
+- **Phase 9.1 Status:** Complete ✅ | **Phase 9.P0 Status:** Complete ✅ | **Phase 9.P1 Status:** Complete ✅
 
 ## 🔒 CRITICAL BUG FIX (Session 27)
 
@@ -80,7 +80,7 @@ Trading Bot
 └─ Web Dashboard (React SPA + WebSocket)
 ```
 
-## ✅ P0-P2 SAFETY GUARDS: PHASE 9.P0 COMPLETE
+## ✅ P0-P2 SAFETY GUARDS: PHASE 9.P0 + 9.P1 COMPLETE (P2 Pending)
 
 ### Phase 9.P0: Atomic Locks & Validation (Session 28) ✅ COMPLETE
 - ✅ Atomic lock for position close (prevent timeout ↔ close race)
@@ -88,21 +88,22 @@ Trading Bot
 - ✅ Atomic snapshots (prevent WebSocket ↔ monitor race)
 - ✅ **Tests:** 37 passing (8 validator + 9 atomic/snapshot + 20 integration) | **Status:** PRODUCTION READY
 
-### Phase 9.P1: Integration Safeguards (Next - Blocking Phase 9.2)
-- Transactional close with rollback (prevent journal desync)
-- Health score cache invalidation (prevent stale scores)
-- E2E test suite (8 complete Phase 9 workflows)
-- **Tests:** 18 integration tests | **Effort:** 2-3 hours | **Priority:** HIGH
+### Phase 9.P1: Integration Safeguards (Session 29) ✅ COMPLETE - **INTEGRATION POSTPONED**
+- ✅ Transactional close with rollback (prevent journal desync)
+- ✅ Health score cache invalidation (prevent stale scores)
+- ✅ E2E test suite (4 complete Phase 9 workflows: full lifecycle, timeout, breakeven, error recovery)
+- ✅ **Tests:** 18 integration tests (8 transactional + 6 cache + 4 E2E) | **Status:** READY FOR PHASE 9.2 BUT DEFERRED
+- ⚠️ **REASON FOR POSTPONEMENT:** Awaiting comprehensive risk assessment before wiring into bot-services.ts. All safety measures tested and validated, but field integration deferred for stability.
 
-### Phase 9.P2: Chaos & Compatibility (After P1)
+### Phase 9.P2: Chaos & Compatibility (Pending)
 - Order timeout verification (prevent duplicates)
 - Error propagation (no silent failures)
 - Shutdown timeout enforcement
 - Backward compatibility (old positions)
 - Chaos testing (network failures, cascades)
-- **Tests:** 20 unit + chaos tests | **Blocker:** YES
+- **Tests:** 20 unit + chaos tests | **Status:** BLOCKED UNTIL P1 INTEGRATION
 
-**Total:** 7-10 hours | 55 new tests | Final: 3894 tests passing
+**Total:** P0 (37) + P1 (18) = 55 new tests | Current: **3894 tests passing** (176 suites) | **Ready for 9.2 but awaiting risk clearance**
 
 See `PHASE_9_SAFETY_IMPLEMENTATION_PLAN.md` for full details
 
@@ -145,64 +146,61 @@ npm start                        # Start bot (if available)
 - `src/__tests__/services/position-exiting.functional.test.ts` - TP bug tests
 - `src/__tests__/services/position-exiting.integration.test.ts` - Integration tests
 - `src/__tests__/orchestrators/` - Orchestrator tests
-- **P0.2 Tests (NEW):**
+- **P0 Safety Tests:**
   - `src/validators/position.validator.ts` - Runtime validation for Position objects
   - `src/__tests__/validators/position.validator.test.ts` - 8 validation unit tests
   - `src/__tests__/services/position-lifecycle.p0-safety.test.ts` - 9 atomic lock + snapshot tests (20 total in suite)
+- **P1 Safeguard Tests (NEW):**
+  - `src/__tests__/services/position-exiting.transactional.test.ts` - 8 transactional close tests
+  - `src/__tests__/services/real-time-risk-monitor.cache-invalidation.test.ts` - 6 cache invalidation tests
+  - `src/__tests__/e2e/phase-9-p1-integration.e2e.test.ts` - 4 E2E workflow tests
 
 ## ⚠️ Known Issues
 
 **None Critical** (P0.2 runtime validation prevents NaN crashes from Session 27)
 
-## 🚀 Next Steps (Session 28 - P0 Complete, P1 Next)
+## 🚀 Next Steps (Session 29 - P0 + P1 Complete, Integration Deferred)
 
 ### COMPLETED ✅
 - **Phase 9.1:** Unit Tests for Live Trading Engine (123 tests ✅)
 - **Phase 9.P0:** Critical Safety Guards (37 tests ✅)
   - Atomic locks, runtime validation, atomic snapshots
   - Ready for Phase 9.2 integration
+- **Phase 9.P1:** Integration Safeguards (18 tests ✅)
+  - Transactional close with rollback (8 tests)
+  - Health score cache invalidation (6 tests)
+  - E2E workflows (4 tests: full lifecycle, timeout, breakeven, error recovery)
+  - **Status:** READY FOR PHASE 9.2 BUT INTEGRATION POSTPONED
 
-### IMMEDIATE NEXT (Phase 9.P1 - Integration Safeguards)
+### ⚠️ INTEGRATION POSTPONED (Stability & Risk Management)
 
-**Estimated:** 2-3 hours | **Tests:** 18 integration tests | **Priority:** HIGH
+**Reason:** All P1 safety measures are implemented and tested. However, integration into bot-services.ts is deferred to:
+1. Allow field validation of P0 guards (Session 28)
+2. Perform comprehensive risk assessment of combined P0 + P1 impact
+3. Establish rollback/recovery procedures if issues arise in production
+4. Coordinate with deployment team on safe integration strategy
 
-1. **Transactional Close with Rollback** (8 tests)
-   - Atomic close operation with journal sync
-   - Rollback on partial failures
-   - State consistency guarantees
+**What is Ready:**
+- ✅ Transactional journal close with automatic rollback
+- ✅ Health score cache invalidation on position close
+- ✅ Event-driven position-closed notifications
+- ✅ E2E test coverage for all Phase 9 workflows
+- ✅ 18 new integration tests (all passing)
 
-2. **Health Score Cache Invalidation** (6 tests)
-   - Cache invalidation on position updates
-   - Prevent stale health calculations
-   - Monitor coordination
+**What is Blocked:**
+- ⏸️ Phase 9.2 Service Integration (awaiting P1 integration approval)
+- ⏸️ Phase 9.3 Configuration (awaiting 9.2)
+- ⏸️ Phase 9.4 Integration Tests (awaiting 9.2)
 
-3. **E2E Test Suite** (4 tests)
-   - Complete Phase 9 workflows
-   - End-to-end integration validation
-   - Production readiness checks
+**Next Action:** Risk assessment meeting + field validation before proceeding to 9.2
 
-⏳ **AFTER Unit Tests (Estimated 1-2 days):**
-4. **Service Integration** (Phase 9.2)
-   - Wire all 5 services into bot-services.ts
-   - Register event listeners
-   - Initialize with config
-
-5. **Configuration** (Phase 9.3)
-   - Update config.json (liveTrading section)
-   - Strategy-specific overrides
-
-6. **Integration Tests** (Phase 9.4)
-   - Full lifecycle scenarios (30+ tests)
-   - Multi-position handling
-   - Timeout detection
-   - Emergency close workflows
-
-**Estimated Total Phase 9 Completion: 2-3 days**
-
-### FUTURE (Post-Phase 9)
-1. **Phase 15:** Multi-Strategy Config Consolidation
-2. **Phase 16:** Performance Benchmarking
-3. **Phase 17:** Production Hardening
+### FUTURE (Post-Phase 9.2)
+1. **Phase 9.2:** Service Integration (when risk cleared)
+2. **Phase 9.3:** Configuration (after 9.2)
+3. **Phase 9.4:** Integration Tests (after 9.2)
+4. **Phase 15:** Multi-Strategy Config Consolidation
+5. **Phase 16:** Performance Benchmarking
+6. **Phase 17:** Production Hardening
 
 ## 📞 Help
 
@@ -212,5 +210,5 @@ npm start                        # Start bot (if available)
 
 ---
 
-**Last Updated:** 2026-01-24 (Session 27)
-**Status:** PRODUCTION READY ✅
+**Last Updated:** 2026-01-24 (Session 29)
+**Status:** PHASE 9.P0 + P1 COMPLETE - INTEGRATION POSTPONED FOR RISK ASSESSMENT ⚠️
