@@ -1,21 +1,23 @@
 # Claude Code Session Guide
 
-## 🎯 Current Status (Session 28 - Phase 2.3 Complete!)
+## 🎯 Current Status (Session 28 - Phase 9.1 Unit Tests In Progress)
 
-**BUILD STATUS:** ✅ **SUCCESS** | **2618+ Tests Passing** | **Phase 14 (Production) + Modular Refactor 96% Complete**
-- ✅ Main app: TypeScript clean
+**BUILD STATUS:** ✅ **SUCCESS** | **3759 Tests Passing** (+1141 new) | **Phase 14 (Production) + Phase 9.1 (Live Trading)**
+- ✅ Main app: TypeScript clean (0 errors)
 - ✅ web-server: Compiles successfully
 - ✅ web-client: Vite build successful
 - 🔒 Security: TP NaN crash fixed (critical)
-- 🚀 Refactoring: **Phase 0-2.3 COMPLETE (100%)** | Overall: 96% Complete
+- 🚀 **Phase 9.1: RealTimeRiskMonitor (35/35 tests ✅)** - NEXT: PerformanceAnalytics (12 tests)
 
 ## 📋 Quick Reference
 
 ### System State
-- **Active Phase:** 14 (Production) | **Refactor:** 2.3 (Service Integration - IN PROGRESS)
-- **Last Commit:** 96cef99 - Session 27 complete (TP NaN crash fix)
-- **Security:** ✅ TP NaN crash patch applied (e0edd52)
-- **Next Phase:** 2.3 Continue (replace BybitService → IExchange in dependent services)
+- **Active Phase:** 14 (Production) | **Live Trading:** 9.1 (Unit Tests IN PROGRESS)
+- **Last Commits:**
+  - ef2af7e - Phase 9.1: RealTimeRiskMonitor tests (35 tests, +1141 total)
+  - bc635ab - Phase 2.3 Complete (Service Integration)
+- **Security:** ✅ TP NaN crash patch applied
+- **Current Task:** Unit tests for Phase 9 live trading engine (35/67 done, 32 remaining)
 
 ### Key Features
 - ✅ Phase 14: V5 Backtest Engine (no legacy)
@@ -39,10 +41,11 @@
 - ✅ IExchange (multi-exchange)
 - 📋 Config types: ConfigNew (in progress)
 
-### Testing
-- **Total Tests:** 2618 passing
-- **Test Suites:** 165
-- **Coverage:** All critical trading logic
+### Testing (Session 28 Update)
+- **Total Tests:** 3759 passing ✅ (+1141 from Phase 9.1)
+- **Test Suites:** 169 ✅ (4 new from Phase 9)
+- **Coverage:** All critical trading logic + Live Trading Risk Monitoring
+- **Phase 9.1 Status:** RealTimeRiskMonitor (35/35 ✅) | Remaining: 32 tests
 
 ## 🔒 CRITICAL BUG FIX (Session 27)
 
@@ -108,47 +111,60 @@ npm start                        # Start bot (if available)
 
 **None Critical** (Phase 27 session resolved last critical issue)
 
-## 🚀 Next Steps
+## 🚀 Next Steps (Session 28 Continuation)
 
-### IMMEDIATE (Session 28+ - Phase 9: Live Trading Engine Integration)
+### CURRENT (Phase 9.1 - Unit Tests for Live Trading Engine)
 
-**Phase 9 Status:** 5 core services implemented (2,650+ LOC), but NOT INTEGRATED
-- ✅ TradingLifecycleManager (500 LOC, 25 tests)
-- ✅ RealTimeRiskMonitor (450 LOC, tests TBD)
-- ✅ OrderExecutionPipeline (350 LOC, tests TBD)
-- ✅ PerformanceAnalytics (400 LOC, tests TBD)
-- ✅ GracefulShutdownManager (550 LOC, tests TBD)
+**Phase 9.1 Progress: 35/67 Unit Tests Complete**
 
-**What's Needed to Complete Phase 9:**
-1. **Unit Tests** (60+ tests needed)
-   - RealTimeRiskMonitor (12 tests)
-   - OrderExecutionPipeline (10 tests)
-   - PerformanceAnalytics (12 tests)
-   - GracefulShutdownManager (10 tests)
+✅ **DONE:**
+- RealTimeRiskMonitor (35/35 tests ✅)
 
-2. **Service Integration**
-   - Wire into bot-services.ts (dependency injection)
-   - Register signal handlers (GracefulShutdownManager)
-   - Add event subscriptions
+⏳ **IN PROGRESS (Estimated 1 day):**
+1. **PerformanceAnalytics** (12 tests)
+   - Win rate calculation
+   - Profit factor analysis
+   - Sharpe/Sortino ratio calculation
+   - Max drawdown analysis
+   - Period-based metrics (ALL/TODAY/WEEK/MONTH)
+   - Top/worst trades
 
-3. **Configuration**
-   - Add liveTrading section to config.json
-   - Per-strategy overrides
+2. **GracefulShutdownManager** (10 tests)
+   - Signal handler registration
+   - Shutdown sequence
+   - Position closure
+   - State persistence & recovery
+   - Timeout protection
 
-4. **Integration Tests** (30+ tests)
-   - Full lifecycle scenarios
-   - Position timeout handling
-   - Risk monitoring workflows
+3. **OrderExecutionPipeline** (10 tests)
+   - Order placement with retry
+   - Timeout handling
+   - Slippage calculation
+   - Metrics tracking
+   - Status polling
+
+⏳ **AFTER Unit Tests (Estimated 1-2 days):**
+4. **Service Integration** (Phase 9.2)
+   - Wire all 5 services into bot-services.ts
+   - Register event listeners
+   - Initialize with config
+
+5. **Configuration** (Phase 9.3)
+   - Update config.json (liveTrading section)
+   - Strategy-specific overrides
+
+6. **Integration Tests** (Phase 9.4)
+   - Full lifecycle scenarios (30+ tests)
+   - Multi-position handling
+   - Timeout detection
+   - Emergency close workflows
+
+**Estimated Total Phase 9 Completion: 2-3 days**
 
 ### FUTURE (Post-Phase 9)
-1. **Phase 15:** Multi-Strategy Config (Type Consolidation)
-   - Migrate to ConfigNew type system
-   - Per-strategy configuration support
-   - Global defaults with overrides
-
+1. **Phase 15:** Multi-Strategy Config Consolidation
 2. **Phase 16:** Performance Benchmarking
 3. **Phase 17:** Production Hardening
-4. **Phase 18:** Documentation & Examples
 
 ## 📞 Help
 
