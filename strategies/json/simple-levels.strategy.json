@@ -148,18 +148,18 @@
     "takeProfits": [
       {
         "level": 1,
-        "percent": 1.5,
-        "sizePercent": 50
+        "percent": 0.5,
+        "sizePercent": 33
       },
       {
         "level": 2,
-        "percent": 3.0,
-        "sizePercent": 35
+        "percent": 1.0,
+        "sizePercent": 33
       },
       {
         "level": 3,
-        "percent": 5.0,
-        "sizePercent": 15
+        "percent": 1.5,
+        "sizePercent": 34
       }
     ],
     "trailing": {

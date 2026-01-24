@@ -377,12 +377,29 @@ export class WebSocketManagerService extends EventEmitter {
     }
 
     // Position opened or updated
+    // CRITICAL FIX: Check for EMPTY strings, not just null/undefined
+    // parseFloat('') = NaN, so we must validate before parsing
+    const parseEntryPrice = (): number => {
+      // Try entryPrice first (must be non-empty)
+      if (posData.entryPrice && posData.entryPrice.trim()) {
+        const price = parseFloat(posData.entryPrice);
+        if (!isNaN(price)) return price;
+      }
+      // Fall back to avgPrice (must be non-empty)
+      if (posData.avgPrice && posData.avgPrice.trim()) {
+        const price = parseFloat(posData.avgPrice);
+        if (!isNaN(price)) return price;
+      }
+      // Default to 0 if both are invalid
+      return 0;
+    };
+
     const position: Position = {
       id: `${this.symbol}_${posData.side ?? 'unknown'}`,
       symbol: this.symbol,
       side: posData.side === 'Buy' ? PositionSide.LONG : PositionSide.SHORT,
       quantity: size,
-      entryPrice: parseFloat(posData.entryPrice ?? posData.avgPrice ?? '0'),
+      entryPrice: parseEntryPrice(),
       leverage: parseFloat(posData.leverage ?? '1'),
       marginUsed: parseFloat(posData.positionIM ?? '0'), // Initial margin
       stopLoss: {

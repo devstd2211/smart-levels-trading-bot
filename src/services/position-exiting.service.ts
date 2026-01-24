@@ -551,31 +551,88 @@ export class PositionExitingService {
 
   /**
    * Handle TP1 hit - activate Smart Breakeven or move SL to breakeven
+   *
+   * GRACEFUL HANDLING: If entryPrice is invalid (NaN/undefined), use fallback
+   * instead of throwing error that could cause position to be orphaned
    */
   private async handleTP1Hit(position: Position, currentPrice: number): Promise<void> {
     if (position.stopLoss.isBreakeven) {
       return; // Already in breakeven
     }
 
-    const breakevenPrice = this.calculateBreakevenPrice(position, this.riskConfig.breakevenOffsetPercent);
+    try {
+      // VALIDATION: Check if entry price is valid
+      if (!position.entryPrice || isNaN(position.entryPrice) || position.entryPrice <= 0) {
+        this.logger.error('❌ CRITICAL: Invalid entry price for breakeven calculation', {
+          positionId: position.id,
+          entryPrice: position.entryPrice,
+          isNaN: isNaN(position.entryPrice),
+          currentPrice,
+          currentSL: position.stopLoss.price,
+        });
 
-    this.logger.info('🎯 Moving SL to breakeven after TP1', {
-      positionId: position.id,
-      currentSL: position.stopLoss.price.toFixed(DECIMAL_PLACES.PRICE),
-      newSL: breakevenPrice.toFixed(DECIMAL_PLACES.PRICE),
-    });
+        // FALLBACK: Use current SL + small offset instead of throwing
+        // This prevents position from being orphaned
+        const fallbackBreakevenPrice = this.calculateFallbackBreakevenPrice(position, currentPrice);
 
-    await this.bybitService.updateStopLoss({
-      positionId: position.id,
-      newPrice: breakevenPrice,
-    });
-    position.stopLoss.price = breakevenPrice;
-    position.stopLoss.isBreakeven = true;
-    position.stopLoss.updatedAt = Date.now();
+        this.logger.warn('⚠️ Using fallback breakeven SL', {
+          positionId: position.id,
+          reason: 'Invalid entry price',
+          fallbackSL: fallbackBreakevenPrice.toFixed(DECIMAL_PLACES.PRICE),
+        });
 
-    await this.telegram.sendAlert(
-      `🎯 Breakeven Activated\nSL moved to: ${breakevenPrice.toFixed(8)}`,
-    );
+        await this.bybitService.updateStopLoss({
+          positionId: position.id,
+          newPrice: fallbackBreakevenPrice,
+        });
+        position.stopLoss.price = fallbackBreakevenPrice;
+        position.stopLoss.isBreakeven = true;
+        position.stopLoss.updatedAt = Date.now();
+
+        await this.telegram.sendAlert(
+          `⚠️ Breakeven activated (with fallback due to data issue)\nSL: ${fallbackBreakevenPrice.toFixed(8)}`,
+        );
+        return;
+      }
+
+      const breakevenPrice = this.calculateBreakevenPrice(position, this.riskConfig.breakevenOffsetPercent);
+
+      // Double-check result is valid
+      if (isNaN(breakevenPrice)) {
+        throw new Error(`calculateBreakevenPrice returned NaN (entry=${position.entryPrice})`);
+      }
+
+      this.logger.info('🎯 Moving SL to breakeven after TP1', {
+        positionId: position.id,
+        currentSL: position.stopLoss.price.toFixed(DECIMAL_PLACES.PRICE),
+        newSL: breakevenPrice.toFixed(DECIMAL_PLACES.PRICE),
+      });
+
+      await this.bybitService.updateStopLoss({
+        positionId: position.id,
+        newPrice: breakevenPrice,
+      });
+      position.stopLoss.price = breakevenPrice;
+      position.stopLoss.isBreakeven = true;
+      position.stopLoss.updatedAt = Date.now();
+
+      await this.telegram.sendAlert(
+        `🎯 Breakeven Activated\nSL moved to: ${breakevenPrice.toFixed(8)}`,
+      );
+    } catch (error) {
+      this.logger.error('Failed to move SL to breakeven', {
+        error: error instanceof Error ? error.message : String(error),
+        positionId: position.id,
+        entryPrice: position.entryPrice,
+        currentPrice,
+      });
+
+      // CRITICAL: Don't rethrow - position must remain managed
+      // Log for debugging but allow position to continue
+      await this.telegram.sendAlert(
+        `⚠️ Failed to move SL to breakeven. Position will be managed with current SL.`,
+      );
+    }
   }
 
   /**
@@ -772,6 +829,25 @@ export class PositionExitingService {
     const offset = (position.entryPrice * offsetPercent) / PERCENT_MULTIPLIER;
     const isLong = position.side === PositionSide.LONG;
     return isLong ? position.entryPrice + offset : position.entryPrice - offset;
+  }
+
+  /**
+   * FALLBACK: Calculate breakeven when entry price is corrupted
+   * Uses current SL as anchor point instead of entry price
+   * This prevents position from being orphaned
+   */
+  private calculateFallbackBreakevenPrice(position: Position, currentPrice: number): number {
+    const isLong = position.side === PositionSide.LONG;
+    const safeOffsetPercent = 0.1; // 0.1% offset (smaller than regular 0.3%)
+
+    // Use current SL as the base, move it slightly in favorable direction
+    if (isLong) {
+      // LONG: Move SL up by 0.1% from current SL
+      return position.stopLoss.price * (1 + safeOffsetPercent / PERCENT_MULTIPLIER);
+    } else {
+      // SHORT: Move SL down by 0.1% from current SL
+      return position.stopLoss.price * (1 - safeOffsetPercent / PERCENT_MULTIPLIER);
+    }
   }
 
   /**
