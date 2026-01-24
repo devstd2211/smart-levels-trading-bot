@@ -89,7 +89,7 @@ const createMockConfig = (): Config => ({
   system: {} as any,
   dataSubscriptions: {
     candles: { enabled: true, calculateIndicators: true },
-    orderbook: { enabled: false },
+    orderbook: { enabled: false, updateIntervalMs: 5000 },
     ticks: { enabled: false, calculateDelta: false },
   },
   entryConfig: {} as any,

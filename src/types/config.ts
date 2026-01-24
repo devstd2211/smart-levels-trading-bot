@@ -68,6 +68,7 @@ export interface TradingConfig {
   leverage: number;
   riskPercent: number;
   maxPositions: number;
+  positionSizeUsdt?: number; // Optional: position size in USDT for testing
   tradingCycleIntervalMs: number;
   orderType: OrderType;
   tradingFeeRate: number; // Trading fee rate (0.0002 = 0.02% per trade)

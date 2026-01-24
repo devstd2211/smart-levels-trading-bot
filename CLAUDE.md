@@ -838,3 +838,42 @@ Analyzers (28):
   - **Build Status:** ✅ 0 TypeScript errors
   - **Tests:** ✅ 3503 tests passing (Phase 10: 129/129 passing)
   - **Commit:** 187127b - Refactor: Clean up codebase - remove LEGO terminology
+
+**Session 27 (Phase 14 + TP Fix Integration & Rollback - 2026-01-24):**
+
+🎯 **KEY ACCOMPLISHMENT:** Integrated critical security patch (TP NaN crash fix) on top of Phase 14
+✅ **ROLLBACK DECISION:** Phase 15.1a-c config consolidation not yet ready (complex refactoring deferred)
+
+**WHAT HAPPENED:**
+- Session 27 attempted Phase 15 config consolidation (migrate ConfigNew)
+- ✅ **Identified & fixed critical TP bug:** Empty entryPrice string causing NaN crash on TP1 execution
+- ❌ **Phase 15 consolidation** was too ambitious without proper foundation
+- ✅ **Decision:** Roll back Phase 15, keep only security patch
+
+**BUG FIX INTEGRATED:**
+- **Problem:** After TP1 execution, WebSocket sends `entryPrice=""` → parseFloat("") = NaN
+- **Impact:** Position orphaned, unmanageable, trade loss guaranteed
+- **Solution:** Check for EMPTY strings, validate parseFloat, proper fallback chain
+- **Protection:** Added graceful fallback in TakeProfitManager
+- **Tests:** 16 new functional + integration tests added
+- **Status:** ✅ PRODUCTION CRITICAL - MUST KEEP
+
+**ERRORS FIXED:**
+- ✅ Fixed worker-pool.ts error handling (unknown → Error type guard)
+- ✅ Added positionSizeUsdt to TradingConfig (optional field)
+- ✅ Updated test configs with updateIntervalMs field
+- ✅ Updated @types/node in all 3 packages
+
+**Build Status:** ✅ **BUILD SUCCESS!**
+- Main app: ✅ All TypeScript errors resolved
+- web-server: ✅ Compiled successfully
+- web-client: ✅ Vite build successful (421KB JS, gzipped 123KB)
+- Tests: ✅ 2618 tests passing (core application)
+
+**CURRENT STATE (STABLE):**
+- ✅ Phase 14 complete (V5 backtest only)
+- ✅ TP security patch applied (critical)
+- ✅ All services functional
+- ⏸️ Phase 15 deferred (requires careful planning)
+
+**COMMIT:** e0edd52 - Fix: TP NaN crash (cherry-picked on Phase 14)

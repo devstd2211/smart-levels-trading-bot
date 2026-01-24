@@ -75,8 +75,9 @@ export class WorkerPool<TTask = any, TResult = any> extends EventEmitter {
         this.handleWorkerMessage(index, message);
       });
 
-      worker.on('error', (error) => {
-        this.handleWorkerError(index, error, attempt);
+      worker.on('error', (error: unknown) => {
+        const err = error instanceof Error ? error : new Error(String(error));
+        this.handleWorkerError(index, err, attempt);
       });
 
       worker.on('exit', (code) => {
