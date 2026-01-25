@@ -139,21 +139,23 @@ describe('PositionLifecycleService - P0 Safety Tests', () => {
       // Set position in service
       (service as any).currentPosition = position;
 
-      await service.closePositionWithAtomicLock(position.id, 'Test close');
+      await service.closePositionWithAtomicLock('Test close');
 
       // Position should be cleared after closing
       expect((service as any).currentPosition).toBeNull();
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('[P0.1] Position closed successfully')
+      // Check that the message contains the expected text (ignoring second arg object)
+      const infoCall = mockLogger.info.mock.calls.find((call: any[]) =>
+        call[0]?.includes('[P0.1 + P3] Position closed successfully')
       );
+      expect(infoCall).toBeDefined();
     });
 
     test('AL2: Concurrent close attempts wait for first', async () => {
       (service as any).currentPosition = position;
 
       // Start two concurrent closes
-      const promise1 = service.closePositionWithAtomicLock(position.id, 'Close 1');
-      const promise2 = service.closePositionWithAtomicLock(position.id, 'Close 2');
+      const promise1 = service.closePositionWithAtomicLock('Close 1');
+      const promise2 = service.closePositionWithAtomicLock('Close 2');
 
       await Promise.all([promise1, promise2]);
 
@@ -161,15 +163,16 @@ describe('PositionLifecycleService - P0 Safety Tests', () => {
       expect((service as any).currentPosition).toBeNull();
 
       // Both should complete - second should warn about already closing
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('[P0.1] Position already closing')
+      const warnCall = mockLogger.warn.mock.calls.find((call: any[]) =>
+        call[0]?.includes('[P0.1 + P3] Position already closing')
       );
+      expect(warnCall).toBeDefined();
     });
 
     test('AL3: Lock released after successful close', async () => {
       (service as any).currentPosition = position;
 
-      await service.closePositionWithAtomicLock(position.id, 'Close 1');
+      await service.closePositionWithAtomicLock('Close 1');
 
       // Lock should be cleaned up
       const positionClosing = (service as any).positionClosing;
@@ -181,7 +184,7 @@ describe('PositionLifecycleService - P0 Safety Tests', () => {
       mockExchange.closePosition.mockRejectedValueOnce(new Error('Exchange error'));
 
       try {
-        await service.closePositionWithAtomicLock(position.id, 'Close fail');
+        await service.closePositionWithAtomicLock('Close fail');
       } catch {
         // Expected
       }
@@ -194,11 +197,12 @@ describe('PositionLifecycleService - P0 Safety Tests', () => {
     test('AL5: Null reference check on stale position', async () => {
       (service as any).currentPosition = null; // Position already cleared
 
-      await service.closePositionWithAtomicLock(position.id, 'Stale position');
+      await service.closePositionWithAtomicLock('Stale position');
 
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        expect.stringContaining('[P0.1] Position already closed or not found')
+      const infoCall = mockLogger.info.mock.calls.find((call: any[]) =>
+        call[0]?.includes('[P0.1 + P3] Position already closed or not found')
       );
+      expect(infoCall).toBeDefined();
       expect(mockExchange.closePosition).not.toHaveBeenCalled();
     });
   });
@@ -331,7 +335,7 @@ describe('PositionLifecycleService - P0 Safety Tests', () => {
 
       // Simulate: Health monitor gets snapshot while close happens
       const snapshotPromise = Promise.resolve(service.getPositionSnapshot());
-      const closePromise = service.closePositionWithAtomicLock(position.id, 'Race test');
+      const closePromise = service.closePositionWithAtomicLock('Race test');
 
       const [snapshot] = await Promise.all([snapshotPromise]);
 

@@ -73,68 +73,91 @@ export class WebSocketEventHandler {
   async handlePositionClosed(): Promise<void> {
     this.logger.info('WebSocket: Position closed');
 
+    // [P3] Use atomic lock to prevent concurrent close attempts
+    // This prevents the race condition where:
+    // 1. WebSocket triggers position close (this handler)
+    // 2. Timeout handler simultaneously tries to close the position
+    // 3. Both try to clearPosition() → "Position not found" error
+    await this.positionManager.closePositionWithAtomicLock(
+      'EXTERNAL_CLOSE', // reason: closed externally by WebSocket
+      () => this._handlePositionClosedInternal(), // Callback to execute within lock
+    );
+  }
+
+  /**
+   * [P3] Internal: Handle position close using atomic lock
+   * Called by closePositionWithAtomicLock from PositionLifecycleService
+   * This executes within the atomic lock to prevent race conditions
+   *
+   * @private
+   */
+  async _handlePositionClosedInternal(): Promise<void> {
     const position = this.positionManager.getCurrentPosition();
-    if (position) {
-      // Check if position was already closed by another handler (e.g., TIME_BASED_EXIT)
-      // Use journalId if available, fallback to exchange id for backward compatibility
-      const journalId = position.journalId || position.id;
-      const journalEntry = this.journal.getTrade(journalId);
-      if (journalEntry?.status === 'CLOSED') {
-        this.logger.debug('🧹 Position already closed in journal, skipping duplicate record', {
-          positionId: position.id,
-          journalId,
-          exitType: journalEntry.exitCondition?.exitType,
-        });
-      } else {
-        // Position closed by exchange (SL/TP/Trailing) - record it
-        const currentPrice = await this.bybitService.getCurrentPrice();
-        const pnl = position.unrealizedPnL || 0;
-        const pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * INTEGER_MULTIPLIERS.ONE_HUNDRED;
-
-        // Record position close in journal
-        const tpHits = position.takeProfits.filter(tp => tp.hit).map(tp => tp.level);
-
-        // Determine exitType based on actual close reason from WebSocket
-        const lastCloseReason = this.webSocketManager.getLastCloseReason();
-        let exitType: ExitType;
-
-        if (lastCloseReason === 'TP') {
-          // Position closed by TP - use last TP hit
-          exitType = tpHits.length > 0
-            ? (ExitType[`TAKE_PROFIT_${tpHits[tpHits.length - 1]}` as 'TAKE_PROFIT_1' | 'TAKE_PROFIT_2' | 'TAKE_PROFIT_3'])
-            : ExitType.STOP_LOSS; // Fallback (shouldn't happen)
-        } else if (lastCloseReason === 'TRAILING') {
-          exitType = ExitType.TRAILING_STOP;
-        } else if (lastCloseReason === 'SL') {
-          exitType = ExitType.STOP_LOSS;
-        } else {
-          // Fallback to old logic if lastCloseReason is null (shouldn't happen)
-          exitType = tpHits.length > 0
-            ? (ExitType[`TAKE_PROFIT_${tpHits[tpHits.length - 1]}` as 'TAKE_PROFIT_1' | 'TAKE_PROFIT_2' | 'TAKE_PROFIT_3'])
-            : (position.stopLoss?.isTrailing ? ExitType.TRAILING_STOP : ExitType.STOP_LOSS);
-        }
-
-        // Reset lastCloseReason for next position
-        this.webSocketManager.resetLastCloseReason();
-
-        // Record position close in journal using PositionExitingService
-        await this.positionExitingService.closeFullPosition(
-          position,
-          currentPrice,
-          'Position closed (SL/TP/Trailing)',
-          exitType,
-        );
-
-        // Send Telegram notification before clearing position
-        void this.telegram.notifyPositionClosed(
-          position,
-          'Position closed (SL/TP/Trailing)',
-          currentPrice,
-          pnl,
-          pnlPercent,
-        );
-      }
+    if (!position) {
+      this.logger.debug('No position to close (already cleared)');
+      return;
     }
+
+    // Check if position was already closed by another handler (e.g., TIME_BASED_EXIT)
+    // Use journalId if available, fallback to exchange id for backward compatibility
+    const journalId = position.journalId || position.id;
+    const journalEntry = this.journal.getTrade(journalId);
+    if (journalEntry?.status === 'CLOSED') {
+      this.logger.debug('🧹 Position already closed in journal, skipping duplicate record', {
+        positionId: position.id,
+        journalId,
+        exitType: journalEntry.exitCondition?.exitType,
+      });
+      return;
+    }
+
+    // Position closed by exchange (SL/TP/Trailing) - record it
+    const currentPrice = await this.bybitService.getCurrentPrice();
+    const pnl = position.unrealizedPnL || 0;
+    const pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * INTEGER_MULTIPLIERS.ONE_HUNDRED;
+
+    // Record position close in journal
+    const tpHits = position.takeProfits.filter(tp => tp.hit).map(tp => tp.level);
+
+    // Determine exitType based on actual close reason from WebSocket
+    const lastCloseReason = this.webSocketManager.getLastCloseReason();
+    let exitType: ExitType;
+
+    if (lastCloseReason === 'TP') {
+      // Position closed by TP - use last TP hit
+      exitType = tpHits.length > 0
+        ? (ExitType[`TAKE_PROFIT_${tpHits[tpHits.length - 1]}` as 'TAKE_PROFIT_1' | 'TAKE_PROFIT_2' | 'TAKE_PROFIT_3'])
+        : ExitType.STOP_LOSS; // Fallback (shouldn't happen)
+    } else if (lastCloseReason === 'TRAILING') {
+      exitType = ExitType.TRAILING_STOP;
+    } else if (lastCloseReason === 'SL') {
+      exitType = ExitType.STOP_LOSS;
+    } else {
+      // Fallback to old logic if lastCloseReason is null (shouldn't happen)
+      exitType = tpHits.length > 0
+        ? (ExitType[`TAKE_PROFIT_${tpHits[tpHits.length - 1]}` as 'TAKE_PROFIT_1' | 'TAKE_PROFIT_2' | 'TAKE_PROFIT_3'])
+        : (position.stopLoss?.isTrailing ? ExitType.TRAILING_STOP : ExitType.STOP_LOSS);
+    }
+
+    // Reset lastCloseReason for next position
+    this.webSocketManager.resetLastCloseReason();
+
+    // Record position close in journal using PositionExitingService
+    await this.positionExitingService.closeFullPosition(
+      position,
+      currentPrice,
+      'Position closed (SL/TP/Trailing)',
+      exitType,
+    );
+
+    // Send Telegram notification before clearing position
+    void this.telegram.notifyPositionClosed(
+      position,
+      'Position closed (SL/TP/Trailing)',
+      currentPrice,
+      pnl,
+      pnlPercent,
+    );
 
     // NOTE: DO NOT cancel conditional orders here!
     // When position closes on exchange, all associated orders (TP/SL) are automatically cancelled by Bybit
@@ -143,6 +166,7 @@ export class WebSocketEventHandler {
     // and cleanup incorrectly deletes the NEW position's TP orders thinking they're orphaned
     // See: Session #33 ticket - microwall position closed TP level 1 was deleted
 
+    // CRITICAL: Clear position ONLY within atomic lock to prevent race conditions
     await this.positionManager.clearPosition();
   }
 

@@ -199,18 +199,29 @@ export class PositionExitingService {
    * @param exitType - Exit type
    */
   async closeFullPosition(
-    position: Position,
+    position: Position | null | undefined,
     exitPrice: number,
     exitReason: string,
     exitType: ExitType,
   ): Promise<boolean> {
     try {
+      // [P3] Idempotent close: gracefully handle missing position
+      if (!position) {
+        this.logger.warn('❌ closeFullPosition called with null/undefined position', {
+          exitReason,
+          exitType,
+        });
+        return false;
+      }
+
       // Mark as CLOSED BEFORE any async operations (prevent race conditions)
       const wasAlreadyClosed = position.status === 'CLOSED';
       position.status = 'CLOSED';
 
       if (wasAlreadyClosed) {
-        this.logger.debug('Position already marked closed');
+        this.logger.debug('Position already marked closed, skipping', {
+          positionId: position.id,
+        });
         return false;
       }
 
@@ -353,9 +364,11 @@ export class PositionExitingService {
     } catch (error) {
       this.logger.error('Failed to close full position', {
         error: error instanceof Error ? error.message : String(error),
-        positionId: position.id,
+        positionId: position?.id || 'UNKNOWN',
       });
-      position.status = 'OPEN'; // Revert status on any error
+      if (position) {
+        position.status = 'OPEN'; // Revert status on any error
+      }
       return false;
     }
   }

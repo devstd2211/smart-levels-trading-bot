@@ -664,15 +664,28 @@ export class PositionLifecycleService {
    * Returns early if position already closing (returns same promise)
    * Multiple concurrent calls to same position wait for first close to complete
    */
-  async closePositionWithAtomicLock(positionId: string, reason: string): Promise<void> {
+  /**
+   * [P0.1 + P3] Close position with atomic lock
+   * Prevents race conditions between timeout close, WebSocket close, and local close
+   *
+   * @param reason - Reason for close ('EXTERNAL_CLOSE', 'TIMEOUT', etc)
+   * @param onCloseInternal - Optional callback to execute within the lock (e.g., WebSocket handler)
+   */
+  async closePositionWithAtomicLock(
+    reason: string,
+    onCloseInternal?: () => Promise<void>,
+  ): Promise<void> {
+    const position = this.getCurrentPosition();
+    const positionId = position?.id || 'UNKNOWN';
+
     // Check if already closing this position
     if (this.positionClosing.has(positionId)) {
-      this.logger.warn(`[P0.1] Position already closing: ${positionId}`);
+      this.logger.warn(`[P0.1 + P3] Position already closing: ${positionId}`, { reason });
       return this.positionClosing.get(positionId)!; // Wait for in-progress close
     }
 
     // Create close promise
-    const closePromise = this.performClose(positionId, reason);
+    const closePromise = this.performClose(positionId, reason, onCloseInternal);
     this.positionClosing.set(positionId, closePromise);
 
     try {
@@ -684,24 +697,45 @@ export class PositionLifecycleService {
   }
 
   /**
-   * P0.1 helper: Perform actual close operation
+   * [P0.1 + P3] Perform actual close operation within atomic lock
+   * If onCloseInternal is provided, it executes within the lock (for WebSocket handler)
+   * Otherwise, just clears the position (for timeout-based close)
    */
-  private async performClose(positionId: string, reason: string): Promise<void> {
+  private async performClose(
+    positionId: string,
+    reason: string,
+    onCloseInternal?: () => Promise<void>,
+  ): Promise<void> {
     const position = this.getCurrentPosition();
-    if (!position || position.id !== positionId) {
-      this.logger.info(`[P0.1] Position already closed or not found: ${positionId}`);
+    if (!position) {
+      this.logger.info(`[P0.1 + P3] Position already closed or not found: ${positionId}`, {
+        reason,
+      });
       return;
     }
 
     try {
-      this.logger.info(`[P0.1] Closing position: ${positionId}`, { reason });
+      this.logger.info(`[P0.1 + P3] Closing position with atomic lock: ${positionId}`, {
+        reason,
+        hasCloseHandler: !!onCloseInternal,
+      });
 
-      // Close via exchange (using clearPosition pattern which already exists)
-      await this.clearPosition();
+      // If custom close handler provided (e.g., WebSocket), execute it within the lock
+      if (onCloseInternal) {
+        await onCloseInternal();
+      } else {
+        // Standard timeout-based close: just clear position
+        await this.clearPosition();
+      }
 
-      this.logger.info(`[P0.1] Position closed successfully: ${positionId}`);
+      this.logger.info(`[P0.1 + P3] Position closed successfully: ${positionId}`, {
+        reason,
+      });
     } catch (error) {
-      this.logger.error(`[P0.1] Failed to close position: ${error}`);
+      this.logger.error(`[P0.1 + P3] Failed to close position: ${positionId}`, {
+        error: error instanceof Error ? error.message : String(error),
+        reason,
+      });
       throw error;
     }
   }

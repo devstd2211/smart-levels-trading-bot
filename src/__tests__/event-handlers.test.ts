@@ -255,6 +255,14 @@ describe('WebSocketEventHandler', () => {
       clearPosition: jest.fn().mockResolvedValue(undefined),
       recordPositionClose: jest.fn().mockResolvedValue(undefined),
       onTakeProfitHit: jest.fn().mockResolvedValue(undefined),
+      closePositionWithAtomicLock: jest.fn().mockImplementation(async (reason: string, callback?: () => Promise<void>) => {
+        // Execute callback if provided (like WebSocket handler would)
+        if (callback) {
+          await callback();
+        }
+        // Otherwise just clear position (like timeout close)
+        return mockPositionManager.clearPosition();
+      }),
     };
 
     mockPositionExitingService = {
@@ -312,7 +320,8 @@ describe('WebSocketEventHandler', () => {
     it('should clear position on close', async () => {
       await handler.handlePositionClosed();
 
-      expect(mockPositionManager.clearPosition).toHaveBeenCalled();
+      // [P3] Now uses atomic lock which calls callback internally
+      expect(mockPositionManager.closePositionWithAtomicLock).toHaveBeenCalled();
     });
 
     it('should record position close', async () => {
