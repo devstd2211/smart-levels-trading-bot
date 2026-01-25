@@ -82,13 +82,22 @@ export interface MTFSnapshot {
  */
 export interface SnapshotValidationResult {
   valid: boolean; // Is snapshot still valid?
-  expired: boolean; // Did snapshot expire (>60s old)?
+  expired: boolean; // Did snapshot expire (>TTL old)?
   biasMismatch: boolean; // Did HTF bias reverse against signal?
   reason: string; // Human-readable reason
   currentBias?: TrendBias; // Current HTF bias at validation time
   conflictingDirections?: {
     signal: SignalDirection; // Signal direction
     currentBias: TrendBias; // Current HTF bias
+  };
+
+  // FIX: Add diagnostic information for better logging
+  diagnostics?: {
+    snapshotId?: string; // Which snapshot was being validated
+    snapshotFound: boolean; // Was snapshot in storage?
+    capturedBias?: TrendBias; // What bias was captured (not hardcoded)
+    ageMs?: number; // How old was snapshot
+    expiresInMs?: number; // How much time left before expiry
   };
 }
 
@@ -99,8 +108,8 @@ export interface SnapshotValidationResult {
 export class MTFSnapshotGate {
   private snapshots = new Map<string, MTFSnapshot>();
   private activeSnapshotId: string | null = null;
-  private readonly SNAPSHOT_TTL = 60000; // 60 seconds
-  private readonly SNAPSHOT_CLEANUP_INTERVAL = 30000; // 30 seconds
+  private readonly SNAPSHOT_TTL = 120000; // 120 seconds (FIX: was 60s, too short for PRIMARY→ENTRY delay)
+  private readonly SNAPSHOT_CLEANUP_INTERVAL = 60000; // 60 seconds (FIX: was 30s, too aggressive)
 
   constructor(private logger: LoggerService) {
     // Periodically clean up expired snapshots
@@ -173,38 +182,64 @@ export class MTFSnapshotGate {
 
   /**
    * Validate snapshot at ENTRY close
+   * FIX: Now accepts explicit snapshotId to avoid race conditions with activeSnapshotId
+   *
    * Checks: 1) Not expired, 2) HTF bias hasn't reversed against signal
+   *
+   * @param currentHTFBias Current HTF bias at ENTRY validation time
+   * @param snapshotId Optional explicit snapshot ID (from pendingEntryDecision)
+   *                   If provided, checks this specific snapshot instead of activeSnapshotId
    */
-  validateSnapshot(currentHTFBias: TrendBias): SnapshotValidationResult {
-    const snapshot = this.getActiveSnapshot();
+  validateSnapshot(currentHTFBias: TrendBias, snapshotId?: string): SnapshotValidationResult {
+    // FIX: Use explicit snapshotId if provided (from pendingEntryDecision)
+    // Otherwise fall back to activeSnapshotId
+    const targetSnapshotId = snapshotId || this.activeSnapshotId;
+    const snapshot = targetSnapshotId ? this.snapshots.get(targetSnapshotId) : null;
 
     if (!snapshot) {
+      const now = Date.now();
       return {
         valid: false,
         expired: false,
         biasMismatch: false,
         reason: 'No active snapshot found',
+        // FIX: Add diagnostic information
+        diagnostics: {
+          snapshotId: targetSnapshotId || 'none',
+          snapshotFound: false,
+          ageMs: undefined,
+          expiresInMs: undefined,
+        },
       };
     }
 
     // Check 1: Expiration
     const now = Date.now();
+    const ageMs = now - snapshot.timestamp;
+    const expiresInMs = snapshot.expiresAt - now;
+
     if (now > snapshot.expiresAt) {
       this.logger.warn(
-        `[MTF-SNAPSHOT] Snapshot expired (${now - snapshot.timestamp}ms old)`
+        `[MTF-SNAPSHOT] Snapshot expired (${Math.round(ageMs / 1000)}s old, TTL=${Math.round(this.SNAPSHOT_TTL / 1000)}s)`
       );
       return {
         valid: false,
         expired: true,
         biasMismatch: false,
-        reason: `Snapshot expired (${Math.round((now - snapshot.timestamp) / 1000)}s old)`,
+        reason: `Snapshot expired (${Math.round(ageMs / 1000)}s old)`,
         currentBias: currentHTFBias,
+        diagnostics: {
+          snapshotId: snapshot.id,
+          snapshotFound: true,
+          capturedBias: snapshot.htfBias,
+          ageMs,
+          expiresInMs,
+        },
       };
     }
 
     // Check 2: HTF Bias mismatch
     // Determine what bias direction the signal expects
-    const signalExpectsLong = snapshot.signal.direction === SignalDirection.LONG;
     const currentBiasAllowsSignal = this.isBiasCompatibleWithSignal(
       currentHTFBias,
       snapshot.signal.direction
@@ -226,12 +261,19 @@ export class MTFSnapshotGate {
           signal: snapshot.signal.direction,
           currentBias: currentHTFBias,
         },
+        diagnostics: {
+          snapshotId: snapshot.id,
+          snapshotFound: true,
+          capturedBias: snapshot.htfBias,
+          ageMs,
+          expiresInMs,
+        },
       };
     }
 
     // Snapshot is valid!
     this.logger.info(
-      `[MTF-SNAPSHOT] Snapshot valid (${Math.round((now - snapshot.timestamp) / 1000)}s old) | ` +
+      `[MTF-SNAPSHOT] Snapshot valid (${Math.round(ageMs / 1000)}s old, ${Math.round(expiresInMs / 1000)}s left) | ` +
       `HTF: ${currentHTFBias} (consistent) | Signal: ${snapshot.signal.direction}`
     );
 
@@ -241,6 +283,13 @@ export class MTFSnapshotGate {
       biasMismatch: false,
       reason: 'Snapshot valid - HTF bias consistent with signal',
       currentBias: currentHTFBias,
+      diagnostics: {
+        snapshotId: snapshot.id,
+        snapshotFound: true,
+        capturedBias: snapshot.htfBias,
+        ageMs,
+        expiresInMs,
+      },
     };
   }
 

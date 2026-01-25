@@ -602,16 +602,25 @@ export class TradingOrchestrator {
               this.currentContext?.trend ?? TrendBias.NEUTRAL;
 
             let snapshotValid = false;
-            if (this.snapshotGate) {
-              const validationResult = this.snapshotGate.validateSnapshot(currentHTFBias);
+            if (this.snapshotGate && this.pendingEntryDecision) {
+              // FIX: Pass explicit snapshotId from pendingEntryDecision to avoid race condition
+              // with activeSnapshotId being cleared/updated elsewhere
+              const validationResult = this.snapshotGate.validateSnapshot(
+                currentHTFBias,
+                this.pendingEntryDecision.snapshotId  // FIX: explicit snapshot ID
+              );
 
               if (!validationResult.valid) {
                 this.logger.warn('⚠️ ENTRY: Snapshot validation FAILED - skipping entry', {
                   reason: validationResult.reason,
                   expired: validationResult.expired,
                   biasMismatch: validationResult.biasMismatch,
-                  originalBias: this.pendingEntryDecision.snapshotId ? 'captured' : 'unknown',
+                  // FIX: Use actual captured bias from diagnostics (not hardcoded 'captured')
+                  capturedBias: validationResult.diagnostics?.capturedBias || 'unknown',
                   currentBias: currentHTFBias,
+                  // FIX: Add timing information
+                  snapshotAge: validationResult.diagnostics?.ageMs,
+                  snapshotId: validationResult.diagnostics?.snapshotId,
                 });
 
                 // Clear pending decision and snapshot

@@ -1,8 +1,8 @@
 # Claude Code Session Guide
 
-## 🎯 Current Status (Session 29.4 - Phase 3: Pure Strategy Coordinator Complete!)
+## 🎯 Current Status (Session 29.4b - MTF Snapshot Race Condition Hotfix!)
 
-**BUILD STATUS:** ✅ **SUCCESS** | **3977+ Tests Passing** | **Phase 14 (Production) + Phase 9 (Complete) + Phase 3 ✅ + Phase 0-2.3 ✅**
+**BUILD STATUS:** ✅ **SUCCESS** | **3977+ Tests Passing** | **Phase 14 (Production) + Phase 9 (Complete) + Phase 3 ✅ + Hotfix ✅**
 
 ### 🔒 PHASE 9.P0: CRITICAL SAFETY GUARDS - COMPLETE ✅
 - ✅ **P0.1: Atomic Lock for Position Close** (5 tests)
@@ -189,6 +189,95 @@ Create `AnalyzerEngineService` to centralize:
 - Error handling standardization
 - Result caching per timeframe
 - Performance metrics
+
+---
+
+## 🔥 HOTFIX: MTF Snapshot Race Condition (Session 29.4b)
+
+**Issue:** Snapshot disappearing between PRIMARY and ENTRY candle closes
+```
+Log: ⚠️ ENTRY: Snapshot validation FAILED - skipping entry
+     reason: "No active snapshot found"
+     originalBias: "captured"  ← Hardcoded, not real!
+     currentBias: "NEUTRAL"
+```
+
+### Root Causes Identified & Fixed
+
+**Problem #1: Race Condition with Cleanup**
+- SNAPSHOT_TTL was **60 seconds** but CLEANUP_INTERVAL was **30 seconds**
+- Cleanup ran before ENTRY could validate snapshot
+- ActiveSnapshotId cleared elsewhere (line 481, 619, 682)
+
+**Problem #2: Using activeSnapshotId Instead of pendingEntryDecision.snapshotId**
+- PRIMARY candle creates snapshot, stores ID in pendingEntryDecision
+- ENTRY validates using activeSnapshotId (which could be null!)
+- Two different ID sources = race condition
+
+**Problem #3: Poor Diagnostics in Logging**
+- "originalBias": "captured" was hardcoded
+- No actual captured bias shown
+- No timing/age information
+- Can't diagnose why snapshot disappeared
+
+### Fixes Applied
+
+**Fix #1: Increase Timeouts**
+```typescript
+// MTFSnapshotGate.ts
+SNAPSHOT_TTL = 120000;          // Was 60s → Now 120s
+SNAPSHOT_CLEANUP_INTERVAL = 60000; // Was 30s → Now 60s
+```
+✅ Cleanup now won't delete snapshot before ENTRY validates
+
+**Fix #2: Pass Explicit snapshotId to validateSnapshot()**
+```typescript
+// MTFSnapshotGate.ts
+validateSnapshot(currentHTFBias: TrendBias, snapshotId?: string)
+  // Now checks explicit snapshotId from pendingEntryDecision
+  // Falls back to activeSnapshotId if not provided
+
+// TradingOrchestrator.ts (line 615-620)
+const validationResult = this.snapshotGate.validateSnapshot(
+  currentHTFBias,
+  this.pendingEntryDecision.snapshotId  // ← Explicit ID!
+);
+```
+✅ No more race condition with activeSnapshotId being cleared
+
+**Fix #3: Rich Diagnostic Information**
+```typescript
+// MTFSnapshotGate.ts - Updated SnapshotValidationResult
+diagnostics?: {
+  snapshotId?: string;     // Which snapshot ID
+  snapshotFound: boolean;  // Was it in storage?
+  capturedBias?: TrendBias;// Actual captured bias (not hardcoded!)
+  ageMs?: number;          // How old is snapshot
+  expiresInMs?: number;    // How much time left
+}
+
+// TradingOrchestrator.ts - Improved logging
+logger.warn('⚠️ ENTRY: Snapshot validation FAILED', {
+  reason: validationResult.reason,
+  capturedBias: validationResult.diagnostics?.capturedBias, // Real value!
+  currentBias: currentHTFBias,
+  snapshotAge: validationResult.diagnostics?.ageMs,
+  snapshotId: validationResult.diagnostics?.snapshotId,
+});
+```
+✅ Now can see exactly what happened and why
+
+### Impact
+- ✅ Snapshot no longer disappears between PRIMARY and ENTRY
+- ✅ Better diagnostics for future debugging
+- ✅ 120-second window ensures PRIMARY→ENTRY flow completes safely
+- ✅ Fail-safe behavior preserved (skips entry if snapshot invalid)
+
+### Test Status
+- ✅ 0 TypeScript errors (full build passed)
+- ✅ All 3977+ tests still passing
+- ✅ No regressions introduced
+- ✅ Production ready
 
 ---
 
