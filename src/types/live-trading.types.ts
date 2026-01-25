@@ -91,6 +91,29 @@ export enum EmergencyCloseReason {
 }
 
 // ============================================================================
+// LIVE TRADING ENGINE CONFIGURATION
+// ============================================================================
+
+/**
+ * Complete Live Trading Engine Configuration (Phase 9.2+)
+ *
+ * Combines all Phase 9 subsystems:
+ * - Position lifecycle (timeouts, monitoring)
+ * - Real-time risk monitoring (health scores)
+ * - Order execution pipeline (retries, verification)
+ * - Performance analytics (metrics, reporting)
+ * - Graceful shutdown (state persistence)
+ */
+export interface LiveTradingConfig {
+  enabled: boolean; // Enable entire Phase 9 system
+  riskMonitoring: RiskMonitoringConfig; // P1.2: Health score caching + invalidation
+  positionLifecycle?: PositionLifecycleConfig; // P0.1: Timeout detection
+  orderExecution?: OrderExecutionConfig; // P9.2: Retry logic
+  performanceAnalytics?: PerformanceAnalyticsConfig; // Phase 9.4
+  gracefulShutdown?: GracefulShutdownConfig; // Phase 9.5
+}
+
+// ============================================================================
 // REAL-TIME RISK MONITORING TYPES
 // ============================================================================
 
@@ -212,17 +235,6 @@ export interface HealthReport {
 // ============================================================================
 
 /**
- * Configuration for order execution
- */
-export interface OrderExecutionConfig {
-  maxRetries: number; // Default: 3
-  retryDelayMs: number; // Default: 1000
-  orderTimeoutSeconds: number; // Default: 30
-  maxSlippagePercent: number; // Default: 0.5
-  backoffMultiplier: number; // Exponential backoff (default: 2.0)
-}
-
-/**
  * Order request with execution metadata
  */
 export interface OrderRequest {
@@ -263,6 +275,29 @@ export enum OrderStatus {
   CANCELLED = 'CANCELLED',
   FAILED = 'FAILED',
   TIMEOUT = 'TIMEOUT',
+}
+
+/**
+ * Configuration for order execution pipeline
+ */
+export interface OrderExecutionConfig {
+  enabled: boolean;
+  maxRetries: number; // Max retry attempts
+  retryDelayMs: number; // Delay between retries
+  timeoutMs: number; // Order timeout (max 5000ms for 0DTE)
+  verifyBeforeRetry: boolean; // Check order status before retry
+  slippagePercent: number; // Max acceptable slippage
+}
+
+/**
+ * Configuration for graceful shutdown
+ */
+export interface GracefulShutdownConfig {
+  enabled: boolean;
+  timeoutMs: number; // Max time for graceful shutdown
+  forceExitOnTimeout: boolean; // Force exit if timeout exceeded
+  closeAllPositions: boolean; // Close all positions on shutdown
+  persistState: boolean; // Save state to file
 }
 
 /**
@@ -408,16 +443,6 @@ export interface PerformanceMetricsResponse {
 // ============================================================================
 
 /**
- * Configuration for graceful shutdown
- */
-export interface GracefulShutdownConfig {
-  closePositionsOnShutdown: boolean; // Default: false (persist instead)
-  shutdownTimeoutSeconds: number; // Default: 60
-  cancelOrdersOnShutdown: boolean; // Default: true
-  persistStateOnShutdown: boolean; // Default: true
-}
-
-/**
  * Shutdown sequence result
  */
 export interface ShutdownResult {
@@ -481,19 +506,6 @@ export interface BotStateSnapshot {
 // LIVE TRADING CONFIG (Main Configuration Interface)
 // ============================================================================
 
-/**
- * Combined Phase 9 configuration
- * Injected into BotConfig at root level
- */
-export interface LiveTradingConfig {
-  enabled: boolean; // Master switch for all Phase 9 features
-
-  lifecycle: PositionLifecycleConfig;
-  riskMonitoring: RiskMonitoringConfig;
-  orderExecution: OrderExecutionConfig;
-  performanceAnalytics: PerformanceAnalyticsConfig;
-  shutdown: GracefulShutdownConfig;
-}
 
 // ============================================================================
 // EVENT TYPES (for EventBus)

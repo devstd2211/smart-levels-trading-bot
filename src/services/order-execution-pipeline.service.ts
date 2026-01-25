@@ -98,9 +98,10 @@ export class OrderExecutionPipeline implements IOrderExecutionPipeline {
     // Retry loop
     for (let attempt = 1; attempt <= executionConfig.maxRetries; attempt++) {
       try {
-        // Apply exponential backoff delay on retries
+        // Apply backoff delay on retries
         if (attempt > 1) {
-          const delayMs = executionConfig.retryDelayMs * Math.pow(executionConfig.backoffMultiplier, attempt - 2);
+          // Linear backoff: delay * attempt number
+          const delayMs = executionConfig.retryDelayMs * attempt;
           this.logger.debug(`[OrderExecutionPipeline] Retry attempt ${attempt}, waiting ${delayMs}ms...`);
           await this.delay(delayMs);
           retryCount++;
@@ -129,13 +130,13 @@ export class OrderExecutionPipeline implements IOrderExecutionPipeline {
 
           // Validate slippage
           if (!this.validateSlippage(slippageAnalysis.slippagePercent, {
-            maxSlippagePercent: executionConfig.maxSlippagePercent,
+            slippagePercent: executionConfig.slippagePercent,
           })) {
             this.logger.warn(`[OrderExecutionPipeline] Slippage exceeds limits: ${slippageAnalysis.slippagePercent.toFixed(2)}%`, {
               orderId: result.orderId,
               expectedPrice: order.price,
               actualPrice: slippageAnalysis.actualPrice,
-              maxAllowed: executionConfig.maxSlippagePercent,
+              maxAllowed: executionConfig.slippagePercent,
             });
           }
 
@@ -266,15 +267,15 @@ export class OrderExecutionPipeline implements IOrderExecutionPipeline {
       actualPrice,
       slippageAmount,
       slippagePercent,
-      withinLimits: slippagePercent <= this.config.maxSlippagePercent,
+      withinLimits: slippagePercent <= this.config.slippagePercent,
     };
   }
 
   /**
    * Validate slippage against limits
    */
-  public validateSlippage(slippagePercent: number, limits: { maxSlippagePercent: number }): boolean {
-    return slippagePercent <= limits.maxSlippagePercent;
+  public validateSlippage(slippagePercent: number, limits: { slippagePercent: number }): boolean {
+    return slippagePercent <= limits.slippagePercent;
   }
 
   /**

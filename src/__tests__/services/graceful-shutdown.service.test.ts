@@ -50,10 +50,11 @@ describe('GracefulShutdownManager', () => {
   let mockEventBus: jest.Mocked<BotEventBus>;
 
   const mockConfig: GracefulShutdownConfig = {
-    shutdownTimeoutSeconds: 30,
-    cancelOrdersOnShutdown: true,
-    closePositionsOnShutdown: true,
-    persistStateOnShutdown: true,
+    enabled: true,
+    timeoutMs: 30000, // 30 seconds
+    forceExitOnTimeout: true,
+    closeAllPositions: true,
+    persistState: true,
   };
 
   const createMockPosition = (): Position => ({
@@ -360,21 +361,14 @@ describe('GracefulShutdownManager', () => {
       expect(result).toBe(1);
     });
 
-    it('should skip cancellation if disabled in config', async () => {
-      const noCancelConfig = { ...mockConfig, cancelOrdersOnShutdown: false };
-      const noCancelManager = new GracefulShutdownManager(
-        noCancelConfig,
-        mockPositionLifecycleService,
-        mockActionQueue,
-        mockExchange,
-        mockLogger,
-        mockEventBus,
-        './test-shutdown-state'
-      );
+    it('should always cancel orders on shutdown', async () => {
+      // Orders are always cancelled on shutdown for safety (Phase 9.2)
+      // No config flag for this - it's a required safety measure
+      await shutdownManager.initiateShutdown('Always cancel orders');
 
-      await noCancelManager.initiateShutdown('No cancel');
-
-      expect(mockExchange.cancelAllOrders).not.toHaveBeenCalled();
+      // Verify orders are cancelled
+      expect(mockExchange.cancelAllOrders).toHaveBeenCalled();
+      expect(mockExchange.cancelAllConditionalOrders).toHaveBeenCalled();
     });
   });
 
@@ -406,7 +400,7 @@ describe('GracefulShutdownManager', () => {
     });
 
     it('should skip closure if disabled in config', async () => {
-      const noCloseConfig = { ...mockConfig, closePositionsOnShutdown: false };
+      const noCloseConfig = { ...mockConfig, closeAllPositions: false };
       const noCloseManager = new GracefulShutdownManager(
         noCloseConfig,
         mockPositionLifecycleService,
@@ -465,7 +459,7 @@ describe('GracefulShutdownManager', () => {
     });
 
     it('should skip persistence if disabled in config', async () => {
-      const noPersistConfig = { ...mockConfig, persistStateOnShutdown: false };
+      const noPersistConfig = { ...mockConfig, persistState: false };
       const noPersistManager = new GracefulShutdownManager(
         noPersistConfig,
         mockPositionLifecycleService,

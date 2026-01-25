@@ -139,7 +139,7 @@ export class GracefulShutdownManager implements IGracefulShutdownManager {
       data: {
         reason,
         timestamp: Date.now(),
-        timeoutSeconds: this.config.shutdownTimeoutSeconds,
+        timeoutMs: this.config.timeoutMs,
       },
       timestamp: Date.now(),
     });
@@ -149,37 +149,32 @@ export class GracefulShutdownManager implements IGracefulShutdownManager {
       const shutdownTimer = setTimeout(() => {
         this.logger.error('[GracefulShutdownManager] Shutdown timeout exceeded, forcing exit');
         process.exit(1);
-      }, this.config.shutdownTimeoutSeconds * 1000);
+      }, this.config.timeoutMs);
 
       let closedPositions = 0;
       let cancelledOrders = 0;
 
       // Step 1: Cancel all pending orders
-      if (this.config.cancelOrdersOnShutdown) {
-        this.logger.info('[GracefulShutdownManager] Cancelling pending orders...');
-        try {
-          cancelledOrders = await this.cancelAllPendingOrders();
-          this.logger.info(`[GracefulShutdownManager] Cancelled ${cancelledOrders} orders`);
-        } catch (error) {
-          this.logger.warn(`[GracefulShutdownManager] Error cancelling orders: ${error}`);
-        }
+      // Always attempt to cancel orders on shutdown
+      this.logger.info('[GracefulShutdownManager] Cancelling pending orders...');
+      try {
+        cancelledOrders = await this.cancelAllPendingOrders();
+        this.logger.info(`[GracefulShutdownManager] Cancelled ${cancelledOrders} orders`);
+      } catch (error) {
+        this.logger.warn(`[GracefulShutdownManager] Error cancelling orders: ${error}`);
       }
 
       // Step 2: Close or persist positions
-      if (this.config.closePositionsOnShutdown) {
+      if (this.config.closeAllPositions) {
         this.logger.info('[GracefulShutdownManager] Closing all open positions...');
         await this.closeAllPositions(EmergencyCloseReason.BOT_SHUTDOWN);
         closedPositions = 1; // Could be 0 or more
         this.logger.info(`[GracefulShutdownManager] Closed ${closedPositions} positions`);
-      } else {
-        this.logger.info('[GracefulShutdownManager] Persisting position state...');
-        await this.persistState();
-        this.logger.info('[GracefulShutdownManager] Position state persisted');
       }
 
       // Step 3: Wait for action queue to empty
       this.logger.info('[GracefulShutdownManager] Waiting for action queue to complete...');
-      const queueEmptyTimeout = Math.min(10000, this.config.shutdownTimeoutSeconds * 1000 / 2);
+      const queueEmptyTimeout = Math.min(10000, this.config.timeoutMs / 2);
       try {
         await this.actionQueue.waitEmpty(queueEmptyTimeout);
         this.logger.info('[GracefulShutdownManager] Action queue completed');
@@ -187,9 +182,13 @@ export class GracefulShutdownManager implements IGracefulShutdownManager {
         this.logger.warn('[GracefulShutdownManager] Action queue did not empty within timeout');
       }
 
-      // Step 4: Final state persistence
-      if (this.config.persistStateOnShutdown) {
+      // Step 4: Final state persistence (save state regardless of closeAllPositions if enabled)
+      if (this.config.persistState) {
+        if (!this.config.closeAllPositions) {
+          this.logger.info('[GracefulShutdownManager] Persisting position state...');
+        }
         await this.persistState();
+        this.logger.info('[GracefulShutdownManager] Position state persisted');
       }
 
       const duration = Date.now() - startTime;
@@ -200,7 +199,7 @@ export class GracefulShutdownManager implements IGracefulShutdownManager {
         duration,
         closedPositions,
         cancelledOrders,
-        persistedState: this.config.persistStateOnShutdown,
+        persistedState: this.config.persistState,
         timestamp: Date.now(),
       };
 

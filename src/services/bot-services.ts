@@ -53,6 +53,7 @@ import { WallTrackerService } from './wall-tracker.service';
 import { ConsoleDashboardService } from './console-dashboard.service';
 import { INTEGER_MULTIPLIERS } from '../constants';
 import { RealityCheckService } from './reality-check.service';
+import { RealTimeRiskMonitor } from './real-time-risk-monitor.service';
 import { StrategyOrchestratorService } from './multi-strategy/strategy-orchestrator.service';
 import { StrategyRegistryService } from './multi-strategy/strategy-registry.service';
 import { StrategyFactoryService } from './multi-strategy/strategy-factory.service';
@@ -90,6 +91,9 @@ export class BotServices {
   readonly positionManager: PositionLifecycleService;
   readonly positionExitingService: PositionExitingService;
   readonly realityCheck: RealityCheckService;
+
+  // Phase 9: Live Trading Engine (Risk Monitoring)
+  readonly realTimeRiskMonitor: RealTimeRiskMonitor;
 
   // WebSocket & Data
   readonly webSocketManager: WebSocketManagerService;
@@ -432,6 +436,33 @@ export class BotServices {
       this.realityCheck, // For analyzing trades when they close
     );
 
+    // 8.6 Initialize Real-Time Risk Monitor (Phase 9.2 Integration)
+    // [P1.2] Listens to position-closed events for cache invalidation
+    // Get liveTrading config from settings, with fallback defaults
+    const liveTradingConfig = (config as any).liveTrading;
+    const riskMonitoringConfig = liveTradingConfig?.riskMonitoring || {
+      enabled: true,
+      checkIntervalCandles: 5,
+      healthScoreThreshold: 30,
+      emergencyCloseOnCritical: true,
+    };
+
+    this.realTimeRiskMonitor = new RealTimeRiskMonitor(
+      riskMonitoringConfig,
+      this.positionManager,
+      this.logger,
+      this.eventBus,
+    );
+
+    this.logger.info('🛡️  Real-Time Risk Monitor initialized (Phase 9.2)', {
+      enabled: riskMonitoringConfig.enabled,
+      checkIntervalCandles: riskMonitoringConfig.checkIntervalCandles,
+      healthScoreThreshold: riskMonitoringConfig.healthScoreThreshold,
+      emergencyCloseOnCritical: riskMonitoringConfig.emergencyCloseOnCritical,
+      p1CacheInvalidation: 'ENABLED - subscribed to position-closed events for cache invalidation',
+      configSource: liveTradingConfig ? 'config.liveTrading.riskMonitoring' : 'defaults',
+    });
+
     // 9. Initialize WebSocket managers
     const orderExecutionDetector = new OrderExecutionDetectorService(this.logger);
     const authService = new WebSocketAuthenticationService();
@@ -652,6 +683,7 @@ export class BotServices {
       sessionStats: this.sessionStats,
       positionManager: this.positionManager,
       positionExitingService: this.positionExitingService,
+      realTimeRiskMonitor: this.realTimeRiskMonitor, // [Phase 9.2] Live trading risk monitoring
       webSocketManager: this.webSocketManager,
       publicWebSocket: this.publicWebSocket,
       orderbookManager: this.orderbookManager,

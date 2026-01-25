@@ -261,3 +261,13 @@ export {
   VALID_STATE_TRANSITIONS,
   ACTIVE_EXIT_MODES_BY_STATE,
 } from './position-state-machine.interface';
+
+// Re-export live trading types (Phase 9.2+)
+export type {
+  LiveTradingConfig,
+  PositionLifecycleConfig,
+  RiskMonitoringConfig,
+  OrderExecutionConfig,
+  GracefulShutdownConfig,
+  PerformanceAnalyticsConfig,
+} from './live-trading.types';

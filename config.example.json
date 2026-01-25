@@ -629,5 +629,55 @@
     "_analyzers_comment": "Analyzer engine configuration",
     "enabled": true,
     "_enabled_comment": "Enable analyzer-based signal generation"
+  },
+
+  "liveTrading": {
+    "_comment": "Phase 9: Live Trading Engine Configuration (Session 29.2)",
+    "enabled": true,
+    "riskMonitoring": {
+      "enabled": true,
+      "_enabled_comment": "Enable real-time position health monitoring",
+      "checkIntervalCandles": 5,
+      "_checkIntervalCandles_comment": "Check position health every N candles",
+      "healthScoreThreshold": 30,
+      "_healthScoreThreshold_comment": "Below this % triggers CRITICAL danger level",
+      "emergencyCloseOnCritical": true,
+      "_emergencyCloseOnCritical_comment": "Auto-close positions when health score drops below threshold"
+    },
+    "positionLifecycle": {
+      "enabled": true,
+      "maxHoldingTimeMinutes": 240,
+      "_maxHoldingTimeMinutes_comment": "Max time to hold a position (4 hours = 240 minutes)",
+      "warningThresholdMinutes": 180,
+      "_warningThresholdMinutes_comment": "Emit warning before timeout (3 hours = 180 minutes)",
+      "enableAutomaticTimeout": true,
+      "_enableAutomaticTimeout_comment": "Auto-close positions that exceed max holding time"
+    },
+    "orderExecution": {
+      "enabled": true,
+      "_enabled_comment": "Enable order execution pipeline with retries",
+      "maxRetries": 3,
+      "_maxRetries_comment": "Maximum retry attempts for failed orders",
+      "retryDelayMs": 500,
+      "_retryDelayMs_comment": "Initial delay between retry attempts (will increase with linear backoff)",
+      "timeoutMs": 5000,
+      "_timeoutMs_comment": "Order timeout in milliseconds (5 seconds recommended for derivatives)",
+      "verifyBeforeRetry": true,
+      "_verifyBeforeRetry_comment": "Check order status before retrying to prevent duplicates",
+      "slippagePercent": 0.5,
+      "_slippagePercent_comment": "Maximum acceptable slippage % before warning"
+    },
+    "gracefulShutdown": {
+      "enabled": true,
+      "_enabled_comment": "Enable graceful shutdown with state persistence",
+      "timeoutMs": 30000,
+      "_timeoutMs_comment": "Shutdown timeout in milliseconds (30 seconds recommended)",
+      "forceExitOnTimeout": true,
+      "_forceExitOnTimeout_comment": "Force exit process if shutdown timeout exceeded",
+      "closeAllPositions": false,
+      "_closeAllPositions_comment": "Auto-close all positions on shutdown (false = persist state instead)",
+      "persistState": true,
+      "_persistState_comment": "Save bot state to disk for recovery on restart"
+    }
   }
 }

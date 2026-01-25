@@ -25,11 +25,12 @@ describe('OrderExecutionPipeline', () => {
   let mockBybitService: any;
   let mockLogger: jest.Mocked<LoggerService>;
   const config: OrderExecutionConfig = {
+    enabled: true,
     maxRetries: 3,
     retryDelayMs: 100,
-    backoffMultiplier: 2,
-    orderTimeoutSeconds: 30,
-    maxSlippagePercent: 0.5,
+    timeoutMs: 30000, // 30 seconds
+    verifyBeforeRetry: true,
+    slippagePercent: 0.5,
   };
 
   const createMockOrder = (): OrderRequest => ({
@@ -287,7 +288,7 @@ describe('OrderExecutionPipeline', () => {
   describe('Slippage Validation', () => {
     it('should validate slippage within limits', () => {
       const isValid = pipeline.validateSlippage(0.3, {
-        maxSlippagePercent: 0.5,
+        slippagePercent: 0.5,
       });
 
       expect(isValid).toBe(true);
@@ -295,7 +296,7 @@ describe('OrderExecutionPipeline', () => {
 
     it('should reject slippage exceeding limits', () => {
       const isValid = pipeline.validateSlippage(0.6, {
-        maxSlippagePercent: 0.5,
+        slippagePercent: 0.5,
       });
 
       expect(isValid).toBe(false);
@@ -303,7 +304,7 @@ describe('OrderExecutionPipeline', () => {
 
     it('should accept slippage at exact limit', () => {
       const isValid = pipeline.validateSlippage(0.5, {
-        maxSlippagePercent: 0.5,
+        slippagePercent: 0.5,
       });
 
       expect(isValid).toBe(true);
