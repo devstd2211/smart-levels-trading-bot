@@ -5,10 +5,10 @@
   "meta": {
     "_meta_comment": "Metadata about this configuration",
     "description": "Trading Bot Configuration - Strategy-Driven Architecture",
-    "lastUpdated": "2026-01-10",
+    "lastUpdated": "2026-01-25",
     "strategy": "level-trading-v2",
     "_strategy_comment": "Which strategy JSON file to use (e.g., level-trading-v2, level-trading-v1, etc.)",
-    "notes": "V2 Strategy (Momentum + Levels + EMA) with optimized parameters. EMA 9/19 from calibration. Expected: 45-55% WR, PF 2.0-3.0"
+    "notes": "V2 Strategy (Momentum + Levels + EMA) with optimized parameters. EMA 9/19 from calibration. Expected: 45-55% WR, PF 2.0-3.0. Session 29.4c: Fixed config validation for riskManagement fields."
   },
 
   "system": {
@@ -52,59 +52,53 @@
   },
 
   "riskManagement": {
-    "_riskManagement_comment": "Risk management and position exit settings",
+    "_riskManagement_comment": "Risk management and position exit settings (Session 29.4c)",
     "stopLossPercent": 2.0,
-    "_stopLossPercent_comment": "Deprecated - use stopLoss.percent instead",
+    "_stopLossPercent_comment": "Stop loss percentage from entry price",
+    "minStopLossPercent": 1.0,
+    "_minStopLossPercent_comment": "Minimum allowed SL distance (percentage)",
+    "breakevenOffsetPercent": 0.3,
+    "_breakevenOffsetPercent_comment": "Offset from entry when moving SL to breakeven after TP hit",
+    "trailingStopEnabled": true,
+    "_trailingStopEnabled_comment": "Enable trailing stop to lock in profits",
+    "trailingStopPercent": 1.0,
+    "_trailingStopPercent_comment": "Trailing stop distance percentage",
+    "trailingStopActivationLevel": 2,
+    "_trailingStopActivationLevel_comment": "Which TP level activates trailing stop (e.g., 2 for TP2)",
     "positionSizeUsdt": 10,
-    "_positionSizeUsdt_comment": "Deprecated - use trading.positionSizeUsdt instead",
-    "stopLoss": {
-      "_stopLoss_comment": "Stop loss configuration",
-      "percent": 2.0,
-      "_percent_comment": "SL as percentage of entry price",
-      "atrMultiplier": 1.5,
-      "_atrMultiplier_comment": "SL distance = ATR × this value (1.5 = 1.5 ATR)",
-      "minDistancePercent": 0.5,
-      "_minDistancePercent_comment": "Minimum SL distance from entry (percentage)"
-    },
+    "_positionSizeUsdt_comment": "Position size in USDT per trade",
+    "timeBasedExitEnabled": false,
+    "_timeBasedExitEnabled_comment": "Close positions after max holding time",
+    "timeBasedExitMinutes": 30,
+    "_timeBasedExitMinutes_comment": "Maximum holding time in minutes (0 = disabled)",
+    "timeBasedExitMinPnl": 0.2,
+    "_timeBasedExitMinPnl_comment": "Minimum PnL % required for time-based exit",
     "takeProfits": [
       {
-        "_comment": "Take profit level 1 (30% of position)",
+        "_comment": "Take profit level 1 (33% of position)",
         "level": 1,
         "percent": 1.5,
-        "_percent_comment": "Close 30% at 1.5% profit",
-        "sizePercent": 50,
-        "_sizePercent_comment": "Close 50% of position at this level"
+        "_percent_comment": "Close 33% at 1.5% profit",
+        "sizePercent": 33,
+        "_sizePercent_comment": "Close 33% of position at this level"
       },
       {
-        "_comment": "Take profit level 2 (40% of position)",
+        "_comment": "Take profit level 2 (33% of position)",
         "level": 2,
         "percent": 3.0,
-        "_percent_comment": "Close another 40% at 3.0% profit",
-        "sizePercent": 50,
-        "_sizePercent_comment": "Close another 50% of remaining position"
+        "_percent_comment": "Close another 33% at 3.0% profit",
+        "sizePercent": 33,
+        "_sizePercent_comment": "Close another 33% of remaining position"
+      },
+      {
+        "_comment": "Take profit level 3 (remaining 34% of position)",
+        "level": 3,
+        "percent": 5.0,
+        "_percent_comment": "Close remaining 34% at 5.0% profit",
+        "sizePercent": 34,
+        "_sizePercent_comment": "Close remaining 34% of position"
       }
-    ],
-    "trailing": {
-      "_trailing_comment": "Trailing stop: lock in profits when price moves favorably",
-      "enabled": true,
-      "_enabled_comment": "Enable trailing stop",
-      "percent": 1.0,
-      "_percent_comment": "Move SL up by 1% when price moves up by activationLevel%",
-      "activationLevel": 2.0,
-      "_activationLevel_comment": "Activate trailing when price is 2% above entry"
-    },
-    "breakeven": {
-      "_breakeven_comment": "Move SL to breakeven (entry price) after hitting TP",
-      "enabled": true,
-      "_enabled_comment": "Enable breakeven stop",
-      "offsetPercent": 0.3,
-      "_offsetPercent_comment": "Offset from entry price for safety (0.3% above entry)"
-    },
-    "timeBasedExit": {
-      "_timeBasedExit_comment": "Close position after X minutes regardless of profit/loss",
-      "enabled": false,
-      "_enabled_comment": "Enable time-based exit"
-    }
+    ]
   },
 
   "timeframes": {
