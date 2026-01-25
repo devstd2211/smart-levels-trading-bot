@@ -41,6 +41,7 @@ import { SwingPointDetectorService } from './swing-point-detector.service';
 import { MultiTimeframeTrendService } from './multi-timeframe-trend.service';
 import { TimeframeWeightingService } from './timeframe-weighting.service';
 import { AnalyzerRegistryService } from './analyzer-registry.service';
+import { AnalyzerEngineService } from './analyzer-engine.service';
 import { FilterOrchestrator } from '../orchestrators/filter.orchestrator';
 import { MTFSnapshotGate } from './mtf-snapshot-gate.service';
 import { IndicatorRegistry } from './indicator-registry.service';
@@ -67,6 +68,7 @@ export class TradingOrchestrator {
   private indicatorRegistry: IndicatorRegistry | null = null;
   private indicatorLoader: IndicatorLoader | null = null;
   private analyzerRegistry: AnalyzerRegistryService | null = null;
+  private analyzerEngine: AnalyzerEngineService | null = null;
   private filterOrchestrator: FilterOrchestrator | null = null;
   private currentContext: TradingContext | null = null;
   private currentOrderbook: OrderBook | null = null;
@@ -112,6 +114,7 @@ export class TradingOrchestrator {
 
     // Initialize new black-box services
     this.analyzerRegistry = new AnalyzerRegistryService(this.logger);
+    this.analyzerEngine = new AnalyzerEngineService(this.analyzerRegistry, this.logger);
     const filterConfig = (this.config as any).filters || {};
     this.filterOrchestrator = new FilterOrchestrator(this.logger, filterConfig);
 
@@ -730,71 +733,37 @@ export class TradingOrchestrator {
    * Uses AnalyzerRegistry to dynamically load and run enabled analyzers
    */
   private async runStrategyAnalysis(entryCandles: Candle[]): Promise<any[]> {
-    const signals: any[] = [];
     const analyzerConfigs = (this.config as any).analyzers as any[] | undefined;
 
     if (!analyzerConfigs || analyzerConfigs.length === 0) {
       this.logger.warn('⚠️ No analyzers configured in strategy - check config.analyzers array');
-      this.logger.debug('Available config keys:', {
-        configKeys: Object.keys(this.config),
-        hasAnalyzers: 'analyzers' in this.config,
-      });
-      return signals;
+      return [];
     }
 
-    this.logger.info('🔍 Strategy analysis - Analyzer configs available:', {
-      totalAnalyzers: analyzerConfigs.length,
-      names: analyzerConfigs.map((a: any) => `${a.name}(${a.enabled ? '✓' : '✗'})`).join(', '),
-    });
-
-    if (!this.analyzerRegistry) {
-      this.logger.error('AnalyzerRegistry not initialized');
-      return signals;
+    if (!this.analyzerEngine) {
+      this.logger.error('AnalyzerEngine not initialized');
+      return [];
     }
 
-    // Get all enabled analyzers from registry
-    const enabledAnalyzers = await this.analyzerRegistry.getEnabledAnalyzers(
-      analyzerConfigs,
+    const currentPrice = entryCandles.length > 0 ? entryCandles[entryCandles.length - 1].close : 0;
+
+    const result = await this.analyzerEngine.executeAnalyzers(
+      entryCandles,
       this.buildAnalyzerConfigForRegistry(),
+      {
+        executionMode: 'parallel',
+        checkReadiness: true,
+        filterHoldSignals: true,         // TradingOrch-specific: remove HOLD
+        enrichSignals: true,             // TradingOrch-specific: add metadata
+        currentPrice,
+        errorHandling: 'lenient',
+      }
     );
 
-    this.logger.info('📊 Enabled analyzers loaded from registry:', {
-      count: enabledAnalyzers.size,
-      names: Array.from(enabledAnalyzers.keys()),
-    });
-
-    // Get current price from last candle
-    const currentPrice = entryCandles.length > 0 ? entryCandles[entryCandles.length - 1].close : undefined;
-
-    // Run each enabled analyzer
-    for (const [analyzerName, { instance }] of enabledAnalyzers) {
-      try {
-        const analyzerCfg = analyzerConfigs.find((cfg) => cfg.name === analyzerName);
-        if (!analyzerCfg) continue;
-
-        this.logger.debug(`🔄 Running analyzer: ${analyzerName}`);
-        const signal = await instance.analyze(entryCandles);
-
-        if (signal && signal.direction !== 'HOLD') {
-          this.logger.info(`✅ ${analyzerName} → ${signal.direction} @ ${signal.confidence}% confidence`);
-          signals.push({
-            ...signal,
-            type: signal.source as any, // Map source to type (e.g., 'EMA_ANALYZER' → type field)
-            weight: analyzerCfg.weight,
-            priority: analyzerCfg.priority,
-            price: currentPrice,
-          });
-        } else {
-          this.logger.debug(`⏭️ ${analyzerName} → HOLD`);
-        }
-      } catch (analyzerError) {
-        this.logger.warn(`❌ Error running analyzer ${analyzerName}`, {
-          error: analyzerError instanceof Error ? analyzerError.message : String(analyzerError),
-        });
-      }
-    }
-
-    return signals;
+    return result.signals.map(signal => ({
+      ...signal,
+      type: signal.source as any, // Map source to type (e.g., 'EMA_ANALYZER' → type field)
+    }));
   }
 
   /**

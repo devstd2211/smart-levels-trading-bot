@@ -15,6 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { LoggerService } from '../services/logger.service';
 import { AnalyzerRegistryService } from '../services/analyzer-registry.service';
+import { AnalyzerEngineService } from '../services/analyzer-engine.service';
 import { aggregateSignalsWeighted, AggregationConfig } from '../decision-engine/signal-aggregation';
 import { EntryOrchestrator } from '../orchestrators/entry.orchestrator';
 import { FilterOrchestrator } from '../orchestrators/filter.orchestrator';
@@ -113,6 +114,7 @@ export class BacktestEngineV5 {
   private logger: LoggerService;
   private strategyConfig: StrategyConfig;
   private analyzerRegistry: AnalyzerRegistryService;
+  private analyzerEngine: AnalyzerEngineService;
   private aggregationConfig: AggregationConfig;
   private entryOrchestrator: EntryOrchestrator;
   private filterOrchestrator: FilterOrchestrator;
@@ -141,6 +143,7 @@ export class BacktestEngineV5 {
 
     // Initialize services
     this.analyzerRegistry = new AnalyzerRegistryService(this.logger);
+    this.analyzerEngine = new AnalyzerEngineService(this.analyzerRegistry, this.logger);
     this.aggregationConfig = this.buildAggregationConfig(this.strategyConfig);
 
     // For BACKTEST: Use dummy RiskManager that always approves (no risk constraints)
@@ -498,36 +501,18 @@ export class BacktestEngineV5 {
    * Generate signals from enabled analyzers
    */
   private async generateSignals(candles: Candle[]): Promise<AnalyzerSignal[]> {
-    const signals: AnalyzerSignal[] = [];
-
-    const enabledAnalyzers = await this.analyzerRegistry.getEnabledAnalyzers(
-      this.strategyConfig.analyzers,
+    const result = await this.analyzerEngine.executeAnalyzers(
+      candles,
       this.strategyConfig,
+      {
+        executionMode: 'parallel',      // 2-3x faster than sequential
+        checkReadiness: true,            // Filter by isReady()
+        filterHoldSignals: false,        // Backtest needs all signals
+        errorHandling: 'lenient',        // Don't crash on analyzer error
+      }
     );
 
-    if (enabledAnalyzers.size === 0) {
-      this.logger.warn('⚠️ No enabled analyzers found!', {
-        configuredAnalyzers: this.strategyConfig.analyzers.map((a) => a.name),
-      });
-      return signals;
-    }
-
-    for (const [analyzerName, analyzerData] of enabledAnalyzers) {
-      try {
-        const signal = analyzerData.instance.analyze(candles);
-        signals.push(signal);
-        this.logger.debug(`✅ ${analyzerName} signal generated`, {
-          direction: signal.direction,
-          confidence: (signal.confidence * 100).toFixed(0) + '%',
-        });
-      } catch (error) {
-        this.logger.warn(`❌ Analyzer error: ${analyzerName}`, {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
-    return signals;
+    return result.signals;
   }
 
   /**
