@@ -34,11 +34,12 @@ function createMockAnalyzer(
   direction: SignalDirection,
   confidence: number = 0.8,
   ready: boolean = true,
+  source: string = 'MOCK',
 ): IAnalyzer {
   return {
     getType: () => 'MOCK_ANALYZER',
     analyze: () => ({
-      source: 'MOCK',
+      source, // Use passed-in source (analyzerName) so weights Map can find it
       direction,
       confidence: confidence * 100, // Convert to 0-100
       weight: 1.0,
@@ -81,13 +82,29 @@ class MockAnalyzerRegistry {
 // TEST SUITE
 // ============================================================================
 
+// Mock logger for testing
+class MockLogger {
+  debug(msg: string, data?: any) {
+    console.log(`[DEBUG] ${msg}`, data);
+  }
+  info(msg: string, data?: any) {
+    console.log(`[INFO] ${msg}`, data);
+  }
+  warn(msg: string, data?: any) {
+    console.log(`[WARN] ${msg}`, data);
+  }
+  error(msg: string, data?: any) {
+    console.log(`[ERROR] ${msg}`, data);
+  }
+}
+
 describe('StrategyCoordinatorService', () => {
   let service: StrategyCoordinatorService;
   let mockRegistry: any;
 
   beforeEach(() => {
     mockRegistry = new MockAnalyzerRegistry();
-    service = new StrategyCoordinatorService(mockRegistry);
+    service = new StrategyCoordinatorService(mockRegistry, new MockLogger() as any);
   });
 
   describe('Configuration Management', () => {
@@ -159,7 +176,7 @@ describe('StrategyCoordinatorService', () => {
           [
             'testAnalyzer',
             {
-              instance: createMockAnalyzer(SignalDirection.LONG),
+              instance: createMockAnalyzer(SignalDirection.LONG, 0.8, true, 'testAnalyzer'),
               weight: 1.0,
               priority: 5,
             },
@@ -184,7 +201,7 @@ describe('StrategyCoordinatorService', () => {
           [
             'testAnalyzer',
             {
-              instance: createMockAnalyzer(SignalDirection.LONG),
+              instance: createMockAnalyzer(SignalDirection.LONG, 0.8, true, 'testAnalyzer'),
               weight: 1.0,
               priority: 5,
             },
@@ -203,8 +220,8 @@ describe('StrategyCoordinatorService', () => {
       const candles = createMockCandles(50);
       const config = createMockStrategyConfig();
 
-      const readyAnalyzer = createMockAnalyzer(SignalDirection.LONG, 0.9, true);
-      const notReadyAnalyzer = createMockAnalyzer(SignalDirection.SHORT, 0.7, false);
+      const readyAnalyzer = createMockAnalyzer(SignalDirection.LONG, 0.9, true, 'ready');
+      const notReadyAnalyzer = createMockAnalyzer(SignalDirection.SHORT, 0.7, false, 'notReady');
 
       mockRegistry.getEnabledAnalyzers = async () =>
         new Map([
@@ -235,7 +252,7 @@ describe('StrategyCoordinatorService', () => {
       const candles = createMockCandles(50);
       const config = createMockStrategyConfig();
 
-      const notReadyAnalyzer = createMockAnalyzer(SignalDirection.LONG, 0.9, false);
+      const notReadyAnalyzer = createMockAnalyzer(SignalDirection.LONG, 0.9, false, 'notReady');
 
       mockRegistry.getEnabledAnalyzers = async () =>
         new Map([['notReady', { instance: notReadyAnalyzer, weight: 1.0, priority: 5 }]]);
@@ -284,12 +301,22 @@ describe('StrategyCoordinatorService', () => {
       const candles = createMockCandles(50);
       const config = createMockStrategyConfig();
 
+      // Disable blind zone to avoid penalty for 2 signals
+      service.setConfig({
+        blindZone: {
+          minSignalsForLong: 1,
+          minSignalsForShort: 1,
+          longPenalty: 1.0,
+          shortPenalty: 1.0,
+        },
+      });
+
       mockRegistry.getEnabledAnalyzers = async () =>
         new Map([
           [
             'analyzer1',
             {
-              instance: createMockAnalyzer(SignalDirection.LONG, 0.9),
+              instance: createMockAnalyzer(SignalDirection.LONG, 0.9, true, 'analyzer1'),
               weight: 0.5,
               priority: 5,
             },
@@ -297,7 +324,7 @@ describe('StrategyCoordinatorService', () => {
           [
             'analyzer2',
             {
-              instance: createMockAnalyzer(SignalDirection.LONG, 0.8),
+              instance: createMockAnalyzer(SignalDirection.LONG, 0.8, true, 'analyzer2'),
               weight: 0.5,
               priority: 5,
             },
@@ -314,12 +341,30 @@ describe('StrategyCoordinatorService', () => {
       const candles = createMockCandles(50);
       const config = createMockStrategyConfig();
 
+      // Disable blind zone to avoid penalty
+      service.setConfig({
+        blindZone: {
+          minSignalsForLong: 1,
+          minSignalsForShort: 1,
+          longPenalty: 1.0,
+          shortPenalty: 1.0,
+        },
+      });
+
       mockRegistry.getEnabledAnalyzers = async () =>
         new Map([
           [
-            'longAnalyzer',
+            'longAnalyzer1',
             {
-              instance: createMockAnalyzer(SignalDirection.LONG, 0.95),
+              instance: createMockAnalyzer(SignalDirection.LONG, 0.95, true, 'longAnalyzer1'),
+              weight: 1.0,
+              priority: 5,
+            },
+          ],
+          [
+            'longAnalyzer2',
+            {
+              instance: createMockAnalyzer(SignalDirection.LONG, 0.85, true, 'longAnalyzer2'),
               weight: 1.0,
               priority: 5,
             },
@@ -327,7 +372,7 @@ describe('StrategyCoordinatorService', () => {
           [
             'shortAnalyzer',
             {
-              instance: createMockAnalyzer(SignalDirection.SHORT, 0.5),
+              instance: createMockAnalyzer(SignalDirection.SHORT, 0.5, true, 'shortAnalyzer'),
               weight: 1.0,
               priority: 5,
             },
@@ -336,7 +381,7 @@ describe('StrategyCoordinatorService', () => {
 
       const result = await service.coordinateStrategy(candles, config);
 
-      // LONG should win due to higher confidence
+      // LONG should win due to higher confidence (2 LONG @ avg 0.9 vs 1 SHORT @ 0.5)
       expect(result.aggregation.direction).toBe(SignalDirection.LONG);
     });
   });
@@ -353,7 +398,7 @@ describe('StrategyCoordinatorService', () => {
           [
             'analyzer',
             {
-              instance: createMockAnalyzer(SignalDirection.LONG, 0.8),
+              instance: createMockAnalyzer(SignalDirection.LONG, 0.8, true, 'analyzer'),
               weight: 1.0,
               priority: 5,
             },
@@ -377,7 +422,7 @@ describe('StrategyCoordinatorService', () => {
           [
             'analyzer',
             {
-              instance: createMockAnalyzer(SignalDirection.LONG, 0.5),
+              instance: createMockAnalyzer(SignalDirection.LONG, 0.5, true, 'analyzer'),
               weight: 0.3, // Low weight
               priority: 5,
             },

@@ -95,7 +95,7 @@ describe('MTFSnapshotGate', () => {
       } as any, signal, candle);
 
       const expirationTime = snapshot.expiresAt - snapshot.timestamp;
-      expect(expirationTime).toBe(60000); // 60 seconds
+      expect(expirationTime).toBe(120000); // 120 seconds (increased from 60s to prevent race conditions)
     });
 
     it('should store and retrieve active snapshot', () => {
@@ -308,8 +308,8 @@ describe('MTFSnapshotGate', () => {
         restrictedDirections: [],
       } as any, signal, candle);
 
-      // Advance time by 61 seconds (past expiration)
-      jest.advanceTimersByTime(61000);
+      // Advance time by 121 seconds (past expiration of 120 seconds)
+      jest.advanceTimersByTime(121000);
 
       const result = gate.validateSnapshot(TrendBias.BULLISH);
 

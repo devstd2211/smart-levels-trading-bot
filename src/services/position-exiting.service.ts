@@ -153,12 +153,21 @@ export class PositionExitingService {
       // Record partial close in TakeProfitManager if available
       const takeProfitManager = this.positionManager?.getTakeProfitManager();
       if (takeProfitManager) {
-        // Find TP level that matches this exit price (within tolerance)
-        const matchedTP = position.takeProfits.find(tp =>
-          Math.abs(tp.price - exitPrice) / exitPrice < 0.01 // 1% tolerance
-        );
-        if (matchedTP) {
-          takeProfitManager.recordPartialClose(matchedTP.level, quantityToClose, exitPrice);
+        // GUARD: Validate quantityToClose is a valid number before recording
+        if (quantityToClose && typeof quantityToClose === 'number' && !isNaN(quantityToClose) && isFinite(quantityToClose)) {
+          // Find TP level that matches this exit price (within tolerance)
+          const matchedTP = position.takeProfits.find(tp =>
+            Math.abs(tp.price - exitPrice) / exitPrice < 0.01 // 1% tolerance
+          );
+          if (matchedTP) {
+            takeProfitManager.recordPartialClose(matchedTP.level, quantityToClose, exitPrice);
+          }
+        } else {
+          this.logger.error('❌ Invalid quantityToClose for recording partial close', {
+            positionId: position.id,
+            quantityToClose,
+            type: typeof quantityToClose,
+          });
         }
       }
 
@@ -560,8 +569,28 @@ export class PositionExitingService {
       // Record partial close in TakeProfitManager
       const takeProfitManager = this.positionManager?.getTakeProfitManager();
       if (takeProfitManager) {
-        const partialQuantity = (position.quantity * tpConfig.sizePercent) / PERCENT_MULTIPLIER;
-        takeProfitManager.recordPartialClose(tpLevel, partialQuantity, currentPrice);
+        // GUARD: Validate position.quantity is a valid number before calculation
+        if (!position.quantity || typeof position.quantity !== 'number' || isNaN(position.quantity)) {
+          this.logger.error('❌ Invalid position.quantity for partial close', {
+            positionId: position.id,
+            quantity: position.quantity,
+            type: typeof position.quantity,
+          });
+        } else {
+          const partialQuantity = (position.quantity * tpConfig.sizePercent) / PERCENT_MULTIPLIER;
+
+          // Validate calculated partialQuantity is valid number
+          if (isNaN(partialQuantity) || !isFinite(partialQuantity)) {
+            this.logger.error('❌ Calculated partialQuantity is NaN', {
+              positionId: position.id,
+              quantity: position.quantity,
+              sizePercent: tpConfig.sizePercent,
+              partialQuantity,
+            });
+          } else {
+            takeProfitManager.recordPartialClose(tpLevel, partialQuantity, currentPrice);
+          }
+        }
       }
 
       // Mark TP as hit
@@ -639,6 +668,39 @@ export class PositionExitingService {
 
         await this.telegram.sendAlert(
           `⚠️ Breakeven activated (with fallback due to data issue)\nSL: ${fallbackBreakevenPrice.toFixed(8)}`,
+        );
+        return;
+      }
+
+      // VALIDATION: Check breakevenOffsetPercent is valid before calculating
+      if (!this.riskConfig.breakevenOffsetPercent ||
+          typeof this.riskConfig.breakevenOffsetPercent !== 'number' ||
+          isNaN(this.riskConfig.breakevenOffsetPercent) ||
+          !isFinite(this.riskConfig.breakevenOffsetPercent)) {
+        this.logger.error('❌ CRITICAL: Invalid breakevenOffsetPercent in riskConfig', {
+          breakevenOffsetPercent: this.riskConfig.breakevenOffsetPercent,
+          type: typeof this.riskConfig.breakevenOffsetPercent,
+          isNaN: isNaN(this.riskConfig.breakevenOffsetPercent),
+        });
+
+        // FALLBACK: Use fallback breakeven SL instead of throwing
+        const fallbackBreakevenPrice = this.calculateFallbackBreakevenPrice(position, currentPrice);
+        this.logger.warn('⚠️ Using fallback breakeven SL (invalid config)', {
+          positionId: position.id,
+          reason: 'Invalid breakevenOffsetPercent in riskConfig',
+          fallbackSL: fallbackBreakevenPrice.toFixed(DECIMAL_PLACES.PRICE),
+        });
+
+        await this.bybitService.updateStopLoss({
+          positionId: position.id,
+          newPrice: fallbackBreakevenPrice,
+        });
+        position.stopLoss.price = fallbackBreakevenPrice;
+        position.stopLoss.isBreakeven = true;
+        position.stopLoss.updatedAt = Date.now();
+
+        await this.telegram.sendAlert(
+          `⚠️ Breakeven activated (with fallback due to config issue)\nSL: ${fallbackBreakevenPrice.toFixed(8)}`,
         );
         return;
       }
@@ -874,6 +936,20 @@ export class PositionExitingService {
    * Calculate breakeven price
    */
   private calculateBreakevenPrice(position: Position, offsetPercent: number): number {
+    // GUARD: Validate offsetPercent is a valid number
+    if (!offsetPercent || typeof offsetPercent !== 'number' || isNaN(offsetPercent) || !isFinite(offsetPercent)) {
+      this.logger.error('❌ Invalid breakevenOffsetPercent', {
+        offsetPercent,
+        type: typeof offsetPercent,
+        isNaN: isNaN(offsetPercent),
+      });
+      // FALLBACK: Use safe default of 0.3%
+      const safeOffsetPercent = 0.3;
+      const offset = (position.entryPrice * safeOffsetPercent) / PERCENT_MULTIPLIER;
+      const isLong = position.side === PositionSide.LONG;
+      return isLong ? position.entryPrice + offset : position.entryPrice - offset;
+    }
+
     const offset = (position.entryPrice * offsetPercent) / PERCENT_MULTIPLIER;
     const isLong = position.side === PositionSide.LONG;
     return isLong ? position.entryPrice + offset : position.entryPrice - offset;
