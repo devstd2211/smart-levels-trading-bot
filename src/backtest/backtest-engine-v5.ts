@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { LoggerService } from '../services/logger.service';
 import { AnalyzerRegistryService } from '../services/analyzer-registry.service';
-import { StrategyCoordinator } from '../services/strategy-coordinator.service';
+import { aggregateSignalsWeighted, AggregationConfig } from '../decision-engine/signal-aggregation';
 import { EntryOrchestrator } from '../orchestrators/entry.orchestrator';
 import { FilterOrchestrator } from '../orchestrators/filter.orchestrator';
 import { ExitOrchestrator } from '../orchestrators/exit.orchestrator';
@@ -113,7 +113,7 @@ export class BacktestEngineV5 {
   private logger: LoggerService;
   private strategyConfig: StrategyConfig;
   private analyzerRegistry: AnalyzerRegistryService;
-  private strategyCoordinator: StrategyCoordinator;
+  private aggregationConfig: AggregationConfig;
   private entryOrchestrator: EntryOrchestrator;
   private filterOrchestrator: FilterOrchestrator;
   private exitOrchestrator: ExitOrchestrator;
@@ -141,7 +141,7 @@ export class BacktestEngineV5 {
 
     // Initialize services
     this.analyzerRegistry = new AnalyzerRegistryService(this.logger);
-    this.strategyCoordinator = new StrategyCoordinator(this.strategyConfig, this.logger);
+    this.aggregationConfig = this.buildAggregationConfig(this.strategyConfig);
 
     // For BACKTEST: Use dummy RiskManager that always approves (no risk constraints)
     // This allows backtest to use its own position sizing logic without restrictions
@@ -195,6 +195,38 @@ export class BacktestEngineV5 {
 
     const content = fs.readFileSync(filePath, 'utf-8');
     return JSON.parse(content);
+  }
+
+  /**
+   * Build aggregation config from strategy configuration
+   * Extracts analyzer weights and thresholds for signal aggregation
+   */
+  private buildAggregationConfig(strategy: StrategyConfig): AggregationConfig {
+    const weights = new Map<string, number>();
+
+    // Extract weights from enabled analyzers
+    for (const analyzer of strategy.analyzers) {
+      if (analyzer.enabled) {
+        weights.set(analyzer.name, analyzer.weight);
+      }
+    }
+
+    // Build blind zone config with defaults
+    const blindZoneOverride = strategy.filters?.blindZone;
+    const blindZone = blindZoneOverride ? {
+      minSignalsForLong: blindZoneOverride.minSignalsForLong ?? 3,
+      minSignalsForShort: blindZoneOverride.minSignalsForShort ?? 3,
+      longPenalty: blindZoneOverride.longPenalty ?? 0.85,
+      shortPenalty: blindZoneOverride.shortPenalty ?? 0.90,
+    } : undefined;
+
+    return {
+      weights,
+      minTotalScore: 0.45,
+      minConfidence: 0.75,
+      conflictThreshold: 0.4,
+      blindZone,
+    };
   }
 
   /**
@@ -316,39 +348,37 @@ export class BacktestEngineV5 {
       await this.checkAndExecuteStopsAndTps(candle5m);
 
       // STEP 2: Generate signals from analyzers
-      const signals = await this.generateSignals(lastCandles15m);
+      const analyzerSignals = await this.generateSignals(lastCandles15m);
 
       // Log signals for debugging (every 100 candles)
       if (i % 100 === 0) {
         this.logger.info(`📊 Candle ${i}/${candles5m.length} signal analysis`, {
           timestamp: new Date(candle5m.timestamp).toISOString(),
           daysSince: Math.floor(i / (288)), // ~288 candles per day on 5m
-          signalCount: signals.length,
-          prices: signals.length > 0 ? signals.map((s) => s.direction) : 'NONE',
+          signalCount: analyzerSignals.length,
+          prices: analyzerSignals.length > 0 ? analyzerSignals.map((s) => s.direction) : 'NONE',
         });
       }
 
       // STEP 3: Evaluate entry via EntryOrchestrator (includes filters)
-      if (this.openPositions.length < this.config.maxOpenPositions && signals.length > 0) {
-        // Convert AnalyzerSignal to Signal format expected by EntryOrchestrator
-        // IMPORTANT: Filter out HOLD signals - only LONG/SHORT can be entries
-        const convertedSignals: any[] = signals
-          .filter((s) => s.direction === SignalDirection.LONG || s.direction === SignalDirection.SHORT)
-          .map((s) => {
-            // Analyzer returns confidence as 0-100, not 0-1
-            const conf = typeof s.confidence === 'number' && s.confidence > 1
-              ? s.confidence // Already 0-100
-              : s.confidence * 100; // Convert 0-1 to 0-100
+      if (this.openPositions.length < this.config.maxOpenPositions && analyzerSignals.length > 0) {
+        // ✨ Phase 3.2: Aggregate signals using weighted average
+        const aggregationResult = aggregateSignalsWeighted(analyzerSignals, this.aggregationConfig);
 
-            return {
-              type: s.source,
-              direction: s.direction === SignalDirection.LONG ? 'LONG' : 'SHORT',
-              confidence: Math.round(conf), // EntryOrchestrator expects 0-100
-              price: candle5m.close,
-              timestamp: candle5m.timestamp,
-              source: s.source,
-            };
-          });
+        // Convert to Signal format expected by EntryOrchestrator
+        // Use aggregated signal if direction is determined
+        const convertedSignals: any[] = aggregationResult.direction
+          ? [
+              {
+                type: 'AGGREGATED',
+                direction: aggregationResult.direction === SignalDirection.LONG ? 'LONG' : 'SHORT',
+                confidence: Math.round(aggregationResult.confidence * 100), // Convert 0-1 to 0-100
+                price: candle5m.close,
+                timestamp: candle5m.timestamp,
+                source: 'AGGREGATED_SIGNALS',
+              },
+            ]
+          : [];
 
         // Convert TrendAnalysisBacktest
         // NOTE: Use NEUTRAL to avoid trend alignment blocks during backtest
@@ -367,15 +397,15 @@ export class BacktestEngineV5 {
             anyTrendAnalysis,
           );
 
-          if (i % 500 === 0 && signals.length > 0) {
+          if (i % 500 === 0 && analyzerSignals.length > 0) {
             this.logger.debug(`🎯 Entry decision at candle ${i}`, {
               decision: entryDecision.decision,
               reason: entryDecision.reason,
             });
           }
 
-          if (entryDecision.decision === EntryDecision.ENTER) {
-            await this.executeEntry(candle5m, signals[0], trendAnalysis);
+          if (entryDecision.decision === EntryDecision.ENTER && analyzerSignals.length > 0) {
+            await this.executeEntry(candle5m, analyzerSignals[0], trendAnalysis);
           }
         } catch (error) {
           this.logger.debug(`Entry evaluation error at candle ${i}`, {
