@@ -25,3 +25,8 @@ export * from './timeframe-weighting.service';
 export * from './console-dashboard.service';
 export * from './market-condition-analyzer.service'; // Adjusts take profits based on market conditions
 export * from './reality-check.service'; // Tracks when bot logic was right but market gave opposite result
+
+// Phase 5: Dependency Injection Enhancement
+export * from './bot-factory.service'; // DI container for creating BotServices
+export * from './bot-services'; // DI container for all services
+export * from './bot-initializer'; // Manages bot lifecycle
