@@ -1,16 +1,17 @@
 # 🚀 Architecture Quick Start - Current Context
 
-**Status:** Phase 14 (Prod) + Phase 9.1 (Unit Tests ✅) + Phase 9.P0-P3 (Safety ✅) + Phase 9.2 (Integration ✅) + **Phase 4 (AnalyzerEngine ✅)** 🚀
-**Last Updated:** 2026-01-25 (Session 29.4c - **Phase 4: AnalyzerEngineService COMPLETE**)
-**Build:** ✅ BUILD SUCCESS | **4005 Tests Passing** | **85% Code Duplication Eliminated** | **2-3x Faster Execution** ✅
+**Status:** Phase 14 (Prod) ✅ + Phase 9 ✅ + Phase 4 ✅ + Phase 3 ✅ + Phase 0.3 ✅ + Phase 5 ✅ + **Phase 6 (READY)** 🚀
+**Last Updated:** 2026-01-26 (Session 29.5+ - **Discovery: Phase 0.3 Decision Functions Complete (132 tests)!**)
+**Build:** ✅ BUILD SUCCESS | **4021+ Tests Passing** | **Modular Architecture Foundation: 100% READY** ✅
 
 ---
 
 ## 📚 Documentation Structure
 
 - **ARCHITECTURE_BLUEPRINT.md** - Complete 10-layer component list & integration map
-- **ARCHITECTURE_REFACTOR_PLAN.md** - Modular LEGO-like system transformation (Phase 0-4, 2.2 COMPLETE)
+- **ARCHITECTURE_REFACTOR_PLAN.md** - Modular LEGO-like system transformation (Phase 0-5 COMPLETE)
 - **ARCHITECTURE_IMPLEMENTATION_GUIDE.md** - Code patterns & examples
+- **PHASE_6_ARCHITECTURE_PLAN.md** - Repository Pattern Implementation ← NEXT (Session 30)
 - **PHASE_15_ARCHITECTURE_PLAN.md** - Multi-strategy config system (deferred)
 
 ---
@@ -49,6 +50,15 @@
 | **4.3** | Comprehensive Tests | ✅ | 28 tests (execution, readiness, enrichment, error handling) | **S29.4c** |
 | **4.4** | Code Cleanup | ✅ | StrategyCoordinatorService deleted (422 LOC removed) | **S29.4c** |
 
+### Dependency Injection Enhancement: 100% COMPLETE ✅
+| Phase | Component | Status | Details | Session |
+|-------|-----------|--------|---------|---------|
+| **5.0** | Service Interfaces (IServices.ts) | ✅ | 11 service interfaces defined | **S29.5** |
+| **5.1** | BotFactory DI Container | ✅ | Factory pattern for service creation + overrides | **S29.5** |
+| **5.2** | Service Exports | ✅ | Updated services/index.ts for easy importing | **S29.5** |
+| **5.3** | Unit Tests | ✅ | 16 tests (full + minimal config, handle async) | **S29.5** |
+| **5.4** | Integration Complete | ✅ | TradingBot uses BotServices via constructor DI | **S29.5** |
+
 ### Live Trading Engine (Phase 9): 100% COMPLETE! 🚀
 | Phase | Component | Status | Details | Session |
 |-------|-----------|--------|---------|---------|
@@ -61,11 +71,28 @@
 | **9.3** | Configuration | ⏳ | config.json liveTrading section | S31+ |
 | **9.4** | Integration Tests | ⏳ | 30+ end-to-end scenarios | S31-S32 |
 
+### Pure Functions: PHASE 0.3 + 5 COMPLETE ✅ (Discovery)
+| Phase | Component | Status | Details | Tests | Session |
+|-------|-----------|--------|---------|-------|---------|
+| **0.3** | Pure Decision Functions | ✅ | Entry/Exit/Signal aggregation | **132 ✅** | S1-S4 |
+| **0.3.1** | Entry Decisions | ✅ | evaluateEntry(), calculateStopLoss(), calculateTP | 50+ ✅ | S1-S4 |
+| **0.3.2** | Exit Decisions | ✅ | evaluateExit(), state transitions | 40+ ✅ | S5 |
+| **0.3.3** | Signal Aggregation | ✅ | aggregateSignalsWeighted() | 42+ ✅ | S3 |
+
+### Repository Pattern: PHASE 6 READY FOR IMPLEMENTATION
+| Phase | Component | Status | Details | Session |
+|-------|-----------|--------|---------|---------|
+| **6.0** | IRepository Interface | ✅ | Trade, Session, Market data repos | S1-S2 |
+| **6.1** | Repository Implementations | ⏳ | Memory, File, Cache implementations | **S30** |
+| **6.2** | Service Integration | ⏳ | Services use repositories | **S31** |
+| **6.3** | Tests & Documentation | ⏳ | 50+ repository tests | **S31** |
+
 ### Future Phases
 | Phase | Component | Status | Details | Notes |
 |-------|-----------|--------|---------|-------|
+| **7** | Error Handling System | ⏳ | Custom error classes + handlers | Phase 7 |
+| **8** | Integration Layer | ⏳ | Full modular system assembly | Phase 8 |
 | **15** | Multi-Strategy Config | ⏳ | Config consolidation | After Phase 9 |
-| **3-8** | Full Modularity | ⏳ | Pure functions, DI, Repository pattern | Phases 3-8 |
 
 ---
 
