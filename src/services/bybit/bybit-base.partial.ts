@@ -11,6 +11,7 @@
 
 import { RestClientV5 } from 'bybit-api';
 import { LoggerService } from '../../types';
+import type { IMarketDataRepository } from '../../repositories/IRepositories';
 
 // ============================================================================
 // CONSTANTS
@@ -48,6 +49,9 @@ export class BybitBase {
 
   // Time synchronization (stored offset: local - server)
   protected timeOffsetMs: number = 0;
+
+  // Phase 6.2: Market data repository for candle caching
+  protected marketDataRepository?: IMarketDataRepository;
 
   constructor(
     restClient: RestClientV5,
@@ -175,6 +179,14 @@ export class BybitBase {
     this.qtyStep = qtyStep;
     this.tickSize = tickSize;
     this.minOrderQty = minOrderQty;
+  }
+
+  /**
+   * Set market data repository for candle caching (Phase 6.2)
+   * Used by BybitService to share repository instance with partial classes
+   */
+  setMarketDataRepository(repository: IMarketDataRepository): void {
+    this.marketDataRepository = repository;
   }
 
   // ==========================================================================

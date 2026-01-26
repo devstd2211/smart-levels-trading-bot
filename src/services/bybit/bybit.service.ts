@@ -24,6 +24,7 @@ import { BybitMarketData } from './bybit-market-data.partial';
 import { BybitPositions } from './bybit-positions.partial';
 import { BybitOrders } from './bybit-orders.partial';
 import { isCriticalApiError } from '../../utils/error-helper';
+import type { IMarketDataRepository } from '../../repositories/IRepositories';
 
 // ============================================================================
 // BYBIT SERVICE (MAIN ORCHESTRATOR)
@@ -39,6 +40,9 @@ export class BybitService {
   // Logger and time sync
   private readonly logger: LoggerService;
 
+  // Phase 6.2: Market data repository for candle caching
+  private readonly marketDataRepository?: IMarketDataRepository;
+
   // Expose symbol and timeframe for backward compatibility
   private readonly symbol: string;
   private readonly timeframe: string;
@@ -46,10 +50,15 @@ export class BybitService {
   private originalDateNow = Date.now;
   private timeOffsetMs: number = 0;
 
-  constructor(config: ExchangeConfig, logger: LoggerService) {
+  constructor(
+    config: ExchangeConfig,
+    logger: LoggerService,
+    marketDataRepository?: IMarketDataRepository
+  ) {
     this.logger = logger;
     this.symbol = config.symbol;
     this.timeframe = config.timeframe;
+    this.marketDataRepository = marketDataRepository;
 
     // Initialize RestClientV5
     const clientConfig: {
@@ -105,6 +114,12 @@ export class BybitService {
     this.orders.setPrecision(limits.qtyStep, limits.tickSize, limits.minOrderQty);
     this.positions.setPrecision(limits.qtyStep, limits.tickSize, limits.minOrderQty);
     this.marketData.setPrecision(limits.qtyStep, limits.tickSize, limits.minOrderQty);
+
+    // Phase 6.2: Share repository with partial instances for candle caching
+    if (this.marketDataRepository) {
+      this.marketData.setMarketDataRepository(this.marketDataRepository);
+      this.logger.debug('✅ Market data repository shared with BybitMarketData');
+    }
 
     // CRITICAL: Apply time offset correction after initialization
     // BybitBase.initialize() calculates timeOffsetMs from server

@@ -50,6 +50,21 @@ export class BybitMarketData extends BybitBase {
       candleLimit = limit || DEFAULT_CANDLE_LIMIT;
     }
 
+    // Phase 6.2: Check repository cache first
+    if (this.marketDataRepository) {
+      const cached = this.marketDataRepository.getCandles(symbol, timeframe, candleLimit);
+      if (cached && cached.length > 0) {
+        this.logger.debug('📦 Cache hit for candles', {
+          symbol,
+          timeframe,
+          count: cached.length,
+          source: 'repository',
+        });
+        return cached;
+      }
+    }
+
+    // Cache miss - fetch from API
     return await this.retry(async () => {
       this.logger.info('🕯️ Requesting candles from Bybit', {
         symbol,
@@ -131,6 +146,26 @@ export class BybitMarketData extends BybitBase {
         open: candles[candles.length - 1].open,
         close: candles[candles.length - 1].close,
       });
+
+      // Phase 6.2: Cache candles in repository for future requests
+      if (this.marketDataRepository && candles.length > 0) {
+        try {
+          // Note: saveCandles is synchronous
+          this.marketDataRepository.saveCandles(symbol, timeframe, candles);
+          this.logger.debug('💾 Candles cached in repository', {
+            symbol,
+            timeframe,
+            count: candles.length,
+          });
+        } catch (error) {
+          // Log but don't fail - repository caching is optional
+          this.logger.warn('⚠️ Failed to cache candles in repository', {
+            error: error instanceof Error ? error.message : String(error),
+            symbol,
+            timeframe,
+          });
+        }
+      }
 
       return candles;
     });

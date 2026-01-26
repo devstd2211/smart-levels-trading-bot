@@ -276,7 +276,8 @@ export class BotServices {
     // initialize traditional Bybit service. Otherwise, use factory.
     if (!config.exchange.name || config.exchange.name === 'bybit') {
       // Traditional Bybit initialization (backward compatible)
-      const rawBybitService = new BybitService(config.exchange, this.logger);
+      // Phase 6.2: Inject marketDataRepository for candle caching
+      const rawBybitService = new BybitService(config.exchange, this.logger, this.marketDataRepository);
       this.bybitService = new BybitServiceAdapter(rawBybitService, this.logger);
     } else {
       // Use factory for other exchanges (Binance, etc.)
