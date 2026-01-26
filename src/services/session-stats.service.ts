@@ -7,6 +7,7 @@ import { TIME_MULTIPLIERS, INTEGER_MULTIPLIERS } from '../constants/technical.co
  * Tracks all trades with full entry context (indicators, patterns, levels, context)
  * and generates comparative analysis across different configurations.
  *
+ * Phase 6.2: Integrated with IJournalRepository for persistent storage
  * Version: v3.4.0
  */
 
@@ -24,6 +25,7 @@ import {
   ExitType,
   Config,
 } from '../types';
+import { IJournalRepository } from '../repositories/IRepositories';
 
 // ============================================================================
 // CONSTANTS
@@ -45,7 +47,11 @@ export class SessionStatsService {
   private database: SessionDatabase = { sessions: [] };
   private currentSession: Session | null = null;
 
-  constructor(logger: LoggerService, dataDir: string = DEFAULT_DATA_DIR) {
+  constructor(
+    logger: LoggerService,
+    private readonly journalRepository?: IJournalRepository, // Phase 6.2: Repository pattern
+    dataDir: string = DEFAULT_DATA_DIR,
+  ) {
     this.logger = logger;
     this.dataDir = dataDir;
     this.filePath = path.join(dataDir, SESSION_STATS_FILE);

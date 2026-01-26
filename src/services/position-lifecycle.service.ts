@@ -47,6 +47,7 @@ import { TakeProfitManagerService } from './take-profit-manager.service';
 import { EntryConfirmationManager } from './entry-confirmation.service';
 import { CompoundInterestCalculatorService } from './compound-interest-calculator.service';
 import { SessionStatsService } from './session-stats.service';
+import { IPositionRepository } from '../repositories/IRepositories';
 
 // ============================================================================
 // CONSTANTS
@@ -81,6 +82,7 @@ export class PositionLifecycleService {
     private readonly compoundInterestCalculator?: CompoundInterestCalculatorService,
     private readonly sessionStats?: SessionStatsService,
     private readonly strategyId?: string,  // Phase 10.3c: Strategy identifier for event tagging
+    private readonly positionRepository?: IPositionRepository, // Phase 6.2: Repository pattern
   ) {
     this.entryConfirmation = new EntryConfirmationManager(entryConfirmationConfig, logger);
   }
@@ -280,7 +282,13 @@ export class PositionLifecycleService {
       };
 
       // Store position IMMEDIATELY to prevent race condition
-      this.currentPosition = position;
+      // Phase 6.2: Use repository if available, fallback to direct storage
+      if (this.positionRepository) {
+        this.positionRepository.setCurrentPosition(position);
+        this.logger.debug('[Phase 6.2] Position stored in repository', { positionId: position.id });
+      } else {
+        this.currentPosition = position;
+      }
 
       // Emit position-opened event
       this.logger.info('📢 Emitting position-opened event', { positionId: position.id });
@@ -376,8 +384,12 @@ export class PositionLifecycleService {
 
   /**
    * Get current position
+   * Phase 6.2: Read from repository if available, fallback to direct storage
    */
   getCurrentPosition(): Position | null {
+    if (this.positionRepository) {
+      return this.positionRepository.getCurrentPosition();
+    }
     return this.currentPosition;
   }
 
@@ -410,9 +422,13 @@ export class PositionLifecycleService {
 
   /**
    * Clear position (called when WebSocket reports position closed)
+   * Phase 6.2: Clear from repository if available
    */
   async clearPosition(): Promise<void> {
-    const closedPosition = this.currentPosition;
+    // Get position before clearing (for event emission)
+    const closedPosition = this.positionRepository
+      ? this.positionRepository.getCurrentPosition()
+      : this.currentPosition;
 
     // Cancel any remaining conditional orders
     this.logger.debug('🧹 Cancelling conditional orders after position close...');
@@ -425,7 +441,13 @@ export class PositionLifecycleService {
     }
 
     // Clear state
-    this.currentPosition = null;
+    // Phase 6.2: Use repository if available
+    if (this.positionRepository && closedPosition) {
+      this.positionRepository.setCurrentPosition(null);
+      this.logger.debug('[Phase 6.2] Position cleared from repository', { positionId: closedPosition.id });
+    } else {
+      this.currentPosition = null;
+    }
     this.takeProfitManager = null;
     this.isOpeningPosition = false;
 

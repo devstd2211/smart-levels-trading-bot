@@ -59,6 +59,12 @@ import { StrategyRegistryService } from './multi-strategy/strategy-registry.serv
 import { StrategyFactoryService } from './multi-strategy/strategy-factory.service';
 import { StrategyStateManagerService } from './multi-strategy/strategy-state-manager.service';
 
+// Phase 6.2: Repository Pattern Integration
+import { IPositionRepository, IJournalRepository, IMarketDataRepository } from '../repositories/IRepositories';
+import { PositionMemoryRepository } from '../repositories/position.memory-repository';
+import { JournalFileRepository } from '../repositories/journal.file-repository';
+import { MarketDataCacheRepository } from '../repositories/market-data.cache-repository';
+
 /**
  * Container for all bot services
  * Initialized in dependency order
@@ -71,6 +77,11 @@ export class BotServices {
   readonly telegram: TelegramService;
   readonly timeService: TimeService;
   readonly bybitService: IExchange;
+
+  // Phase 6.2: Repository Pattern (Data Access Layer)
+  readonly positionRepository: IPositionRepository;
+  readonly journalRepository: IJournalRepository;
+  readonly marketDataRepository: IMarketDataRepository;
 
   // Data & Providers
   readonly timeframeProvider: TimeframeProvider;
@@ -227,6 +238,16 @@ export class BotServices {
     // 1.6 Initialize metrics service (depends on logger)
     this.metrics = new BotMetricsService(this.logger);
 
+    // 1.7 Phase 6.2: Initialize repositories (depends on logger)
+    this.positionRepository = new PositionMemoryRepository();
+    this.journalRepository = new JournalFileRepository(this.logger);
+    this.marketDataRepository = new MarketDataCacheRepository();
+    this.logger.info('📦 Repositories initialized', {
+      position: 'PositionMemoryRepository',
+      journal: 'JournalFileRepository',
+      marketData: 'MarketDataCacheRepository',
+    });
+
     // 2. Initialize core services (no dependencies)
     this.telegram = new TelegramService(
       config.telegram || { enabled: false },
@@ -278,14 +299,20 @@ export class BotServices {
     this.timeService.setBybitService(this.bybitService);
 
     // 4. Initialize journal and stats
+    // Phase 6.2: Pass journalRepository to TradingJournalService (as last parameter)
     this.journal = new TradingJournalService(
       this.logger,
       undefined,
       config.tradeHistory,
       config.compoundInterest?.baseDeposit || INTEGER_MULTIPLIERS.FIFTY,
+      this.journalRepository, // Phase 6.2: Repository parameter (last)
     );
 
-    this.sessionStats = new SessionStatsService(this.logger);
+    // Phase 6.2: Pass journalRepository to SessionStatsService
+    this.sessionStats = new SessionStatsService(
+      this.logger,
+      this.journalRepository, // Phase 6.2: Repository parameter
+    );
 
     // 4.5 Initialize Reality Check Service (tracks broken assumptions in trades)
     this.realityCheck = new RealityCheckService(this.logger);
@@ -293,17 +320,21 @@ export class BotServices {
     // 5. Initialize data providers
     // CandleProvider uses IExchange interface (Phase 2.5 migration complete)
     this.timeframeProvider = new TimeframeProvider(config.timeframes);
+    // Phase 6.2 TIER 2.2: Pass marketDataRepository to CandleProvider for unified caching
     this.candleProvider = new CandleProvider(
       this.timeframeProvider,
       this.bybitService,
       this.logger,
       config.exchange.symbol,
+      this.marketDataRepository, // Phase 6.2: Repository-backed candle storage
     );
 
-    // 5.5 Initialize Indicator Cache System (Phase 0.2 Integration)
-    this.indicatorCache = new IndicatorCacheService();
-    this.logger.info('📊 Indicator cache initialized', {
+    // 5.5 Initialize Indicator Cache System (Phase 6.2: Repository-backed)
+    // Phase 6.2 TIER 2: Pass marketDataRepository for TTL-based caching
+    this.indicatorCache = new IndicatorCacheService(this.marketDataRepository);
+    this.logger.info('📊 Indicator cache initialized (Phase 6.2)', {
       capacity: this.indicatorCache.getStats().capacity,
+      backendRepository: 'MarketDataCacheRepository',
     });
 
     // 5.6 Initialize Pre-calculation Service
@@ -407,6 +438,7 @@ export class BotServices {
 
     // 8. Initialize position management
     // NOTE: Phase 1.2 - Update PositionLifecycleService to use IExchange
+    // Phase 6.2: Add positionRepository parameter (strategyId is optional, used only in Phase 10 multi-strategy)
     this.positionManager = new PositionLifecycleService(
       this.bybitService,
       config.trading,
@@ -419,6 +451,8 @@ export class BotServices {
       this.eventBus,
       this.compoundInterestCalculator,
       this.sessionStats,
+      undefined, // strategyId - optional, only used in Phase 10 multi-strategy mode
+      this.positionRepository, // Phase 6.2: Repository parameter
     );
 
     // 8.5 Initialize position exiting service (depends on bybit, journal, configs, positionManager)

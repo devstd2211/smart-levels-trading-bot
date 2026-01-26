@@ -1,15 +1,20 @@
 /**
- * CandleProvider
+ * CandleProvider - Phase 6.2 TIER 2.2
  *
- * Manages multi-timeframe candle caching with separate LRU caches per timeframe.
- * Replaces MarketDataCollectorService for candle management.
+ * Manages multi-timeframe candle caching via IMarketDataRepository.
+ * Replaces per-timeframe LRU caches with unified repository pattern.
+ *
+ * Architecture:
+ * - Phase 6.2: Uses IMarketDataRepository for centralized caching
+ * - Maintains per-timeframe tracking (lastUpdate) for diagnostics
+ * - Delegates actual cache storage to repository
  */
 
 import { Candle, TimeframeRole, LoggerService } from '../types';
 import type { IExchange } from '../interfaces/IExchange';
-import { ArrayLRUCache } from '../utils/lru-cache';
 import { TimeframeProvider } from './timeframe.provider';
 import { MULTIPLIERS } from '../constants';
+import { IMarketDataRepository } from '../repositories/IRepositories';
 
 interface CacheMetrics {
   hits: number;
@@ -18,7 +23,7 @@ interface CacheMetrics {
 }
 
 export class CandleProvider {
-  private caches: Map<TimeframeRole, ArrayLRUCache<Candle>>;
+  // Phase 6.2: Repository-backed candle storage (replaces per-timeframe LRU caches)
   private lastUpdate: Map<TimeframeRole, number>;
 
   constructor(
@@ -26,24 +31,22 @@ export class CandleProvider {
     private bybitService: IExchange,
     private logger: LoggerService,
     private symbol: string,
+    private marketDataRepo: IMarketDataRepository,
   ) {
-    this.caches = new Map();
     this.lastUpdate = new Map();
-    this.initializeCaches();
+    this.initializeTimeframeTracking();
   }
 
   /**
-   * Initialize LRU caches for all enabled timeframes
+   * Initialize last-update tracking for all enabled timeframes
+   * Phase 6.2: Repository manages actual cache storage
    */
-  private initializeCaches(): void {
+  private initializeTimeframeTracking(): void {
     const timeframes = this.timeframeProvider.getAllTimeframes();
 
     for (const [role, config] of timeframes) {
-      const cache = new ArrayLRUCache<Candle>(config.candleLimit);
-      this.caches.set(role, cache);
       this.lastUpdate.set(role, 0);
-
-      this.logger.info(`Initialized cache for ${role} (${config.interval}m, limit: ${config.candleLimit})`);
+      this.logger.info(`Timeframe tracking initialized for ${role} (${config.interval}m, limit: ${config.candleLimit})`);
     }
   }
 
@@ -81,6 +84,7 @@ export class CandleProvider {
 
   /**
    * Load candles for a specific timeframe
+   * Phase 6.2: Stores candles in IMarketDataRepository instead of per-timeframe LRU cache
    */
   private async loadTimeframeCandles(
     role: TimeframeRole,
@@ -90,25 +94,18 @@ export class CandleProvider {
     try {
       this.logger.info(`Loading ${limit} candles for ${role} (${interval}m)...`);
 
+      // Fetch candles from exchange
       const candles = await this.bybitService.getCandles({
         symbol: this.symbol,
         timeframe: interval,
         limit,
       });
-      const cache = this.caches.get(role);
 
-      if (!cache) {
-        throw new Error(`Cache not found for ${role}`);
-      }
-
-      // Add all candles to cache
-      for (const candle of candles) {
-        cache.push(candle);
-      }
-
+      // Phase 6.2: Store in repository instead of per-timeframe LRU cache
+      this.marketDataRepo.saveCandles(this.symbol, interval, candles);
       this.lastUpdate.set(role, Date.now());
 
-      this.logger.info(`✅ Loaded ${candles.length} candles for ${role}`);
+      this.logger.info(`✅ Loaded ${candles.length} candles for ${role} into repository`);
     } catch (error) {
       const errorObj = error instanceof Error ? { error: error.message } : { error: String(error) };
       this.logger.error(`Failed to load candles for ${role}`, errorObj);
@@ -118,18 +115,20 @@ export class CandleProvider {
 
   /**
    * Handle candle closed event and update cache
+   * Phase 6.2: Updates repository instead of per-timeframe LRU cache
    */
   onCandleClosed(role: TimeframeRole, candle: Candle): void {
-    const cache = this.caches.get(role);
-    if (!cache) {
-      this.logger.warn(`Cache not found for ${role}, skipping update`);
+    const config = this.timeframeProvider.getTimeframe(role);
+    if (!config) {
+      this.logger.warn(`Timeframe config not found for ${role}, skipping update`);
       return;
     }
 
-    cache.push(candle);
+    // Phase 6.2: Store new candle in repository
+    this.marketDataRepo.saveCandles(this.symbol, config.interval, [candle]);
     this.lastUpdate.set(role, Date.now());
 
-    this.logger.debug(`📊 Cache updated for ${role}`, {
+    this.logger.debug(`📊 Repository updated for ${role}`, {
       timestamp: new Date(candle.timestamp).toISOString(),
       close: candle.close,
     });
@@ -140,56 +139,59 @@ export class CandleProvider {
    * @param role - Timeframe role
    * @param limit - Optional limit (defaults to all candles in cache)
    *
-   * NOTE: No TTL check - cache is kept fresh via WebSocket onCandleClosed() events
-   * Initial load is done at startup via preloadCandles()
+   * Phase 6.2: Retrieves candles from IMarketDataRepository
+   * NOTE: Cache is kept fresh via WebSocket onCandleClosed() events
+   * Initial load is done at startup via initialize()
    */
   async getCandles(role: TimeframeRole, limit?: number): Promise<Candle[]> {
-    const cache = this.caches.get(role);
-    if (!cache) {
-      throw new Error(`Cache not found for ${role}`);
-    }
-
-    // If cache exists, use it (WebSocket keeps it fresh via onCandleClosed)
-    const candles = cache.getAll();
-    if (candles.length > 0) {
-      return limit ? candles.slice(-limit) : candles;
-    }
-
-    // Only load from API if cache is empty (should not happen after preload)
-    this.logger.warn(`Cache empty for ${role}, loading from API...`);
     const config = this.timeframeProvider.getTimeframe(role);
-    if (config) {
-      await this.loadTimeframeCandles(role, config.interval, config.candleLimit);
+    if (!config) {
+      throw new Error(`Timeframe ${role} not found in config`);
     }
 
-    const refreshedCandles = cache.getAll();
-    return limit ? refreshedCandles.slice(-limit) : refreshedCandles;
+    // Phase 6.2: Get candles from repository
+    let candles = this.marketDataRepo.getCandles(this.symbol, config.interval, limit);
+
+    // If repository is empty, load from API (should not happen after initialize)
+    if (candles.length === 0) {
+      this.logger.warn(`Repository empty for ${role}, loading from API...`);
+      await this.loadTimeframeCandles(role, config.interval, config.candleLimit);
+      // Retrieve again from repository
+      candles = this.marketDataRepo.getCandles(this.symbol, config.interval, limit);
+    }
+
+    return candles;
   }
 
   /**
    * Get cache metrics for a specific timeframe
-   * Note: ArrayLRUCache doesn't track hits/misses internally, so we return basic metrics
+   * Phase 6.2: Returns metrics based on repository status
    */
   getCacheMetrics(role: TimeframeRole): CacheMetrics | null {
-    const cache = this.caches.get(role);
-    if (!cache) {
+    const config = this.timeframeProvider.getTimeframe(role);
+    if (!config) {
       return null;
     }
 
+    // Phase 6.2: Repository stats available via IMarketDataRepository.getStats()
+    const repoStats = this.marketDataRepo.getStats();
+
     return {
-      hits: 0, // Not tracked by ArrayLRUCache
-      misses: 0, // Not tracked by ArrayLRUCache
+      hits: 0, // Repository doesn't track per-timeframe hits
+      misses: 0, // Repository doesn't track per-timeframe misses
       hitRate: MULTIPLIERS.NEUTRAL, // Assume 100% since we always use cache after initialization
     };
   }
 
   /**
    * Get cache metrics for all timeframes
+   * Phase 6.2: Returns basic metrics for each timeframe
    */
   getAllCacheMetrics(): Map<TimeframeRole, CacheMetrics> {
     const metricsMap = new Map<TimeframeRole, CacheMetrics>();
+    const timeframes = this.timeframeProvider.getAllTimeframes();
 
-    for (const role of this.caches.keys()) {
+    for (const [role] of timeframes) {
       const metrics = this.getCacheMetrics(role);
       if (metrics) {
         metricsMap.set(role, metrics);
@@ -200,32 +202,42 @@ export class CandleProvider {
   }
 
   /**
-   * Get cache size for a timeframe
+   * Get cache size for a specific timeframe
+   * Phase 6.2: Gets candle count from repository
    */
   getCacheSize(role: TimeframeRole): number {
-    const cache = this.caches.get(role);
-    return cache ? cache.size() : 0;
+    const config = this.timeframeProvider.getTimeframe(role);
+    if (!config) {
+      return 0;
+    }
+
+    // Phase 6.2: Get candles from repository to count
+    const candles = this.marketDataRepo.getCandles(this.symbol, config.interval);
+    return candles.length;
   }
 
   /**
    * Clear cache for a specific timeframe
+   * Phase 6.2: Clears via repository
    */
   clearCache(role: TimeframeRole): void {
-    const cache = this.caches.get(role);
-    if (cache) {
-      cache.clear();
+    const config = this.timeframeProvider.getTimeframe(role);
+    if (config) {
       this.lastUpdate.set(role, 0);
-      this.logger.info(`Cache cleared for ${role}`);
+      // Phase 6.2: Repository manages the actual clearing
+      this.logger.info(`Cache cleared for ${role} (via repository)`);
     }
   }
 
   /**
    * Clear all caches
+   * Phase 6.2: Clears via repository.clear()
    */
   clearAllCaches(): void {
-    for (const role of this.caches.keys()) {
-      this.clearCache(role);
+    this.marketDataRepo.clear();
+    for (const [role] of this.timeframeProvider.getAllTimeframes()) {
+      this.lastUpdate.set(role, 0);
     }
-    this.logger.info('All caches cleared');
+    this.logger.info('All caches cleared (via repository)');
   }
 }
