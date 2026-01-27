@@ -34,6 +34,7 @@ import {
   ExecutionMetrics,
   IOrderExecutionPipeline,
 } from '../types/live-trading.types';
+import { ErrorHandler, RecoveryStrategy } from '../errors';
 
 /**
  * OrderExecutionPipeline: Enhanced order execution with retry and verification
@@ -75,11 +76,11 @@ export class OrderExecutionPipeline implements IOrderExecutionPipeline {
 
   /**
    * Place order with retry logic and timeout handling
+   * Phase 8.3: Refactored to use ErrorHandler with exponential backoff
    */
   public async placeOrder(order: OrderRequest, config?: OrderExecutionConfig): Promise<OrderResult> {
     const executionConfig = config || this.config;
     const startTime = Date.now();
-    let lastError: Error | null = null;
     let retryCount = 0;
 
     // Generate order ID if not provided
@@ -95,20 +96,11 @@ export class OrderExecutionPipeline implements IOrderExecutionPipeline {
       maxRetries: executionConfig.maxRetries,
     });
 
-    // Retry loop
-    for (let attempt = 1; attempt <= executionConfig.maxRetries; attempt++) {
-      try {
-        // Apply backoff delay on retries
-        if (attempt > 1) {
-          // Linear backoff: delay * attempt number
-          const delayMs = executionConfig.retryDelayMs * attempt;
-          this.logger.debug(`[OrderExecutionPipeline] Retry attempt ${attempt}, waiting ${delayMs}ms...`);
-          await this.delay(delayMs);
-          retryCount++;
-        }
-
+    // Phase 8.3: Use ErrorHandler.executeAsync for order placement with exponential backoff
+    const placeOrderResult = await ErrorHandler.executeAsync(
+      async () => {
         // Place order via BybitService
-        const result = await this.bybitService.placeOrder({
+        return await this.bybitService.placeOrder({
           symbol: order.symbol,
           side: order.side,
           orderType: order.orderType,
@@ -117,94 +109,126 @@ export class OrderExecutionPipeline implements IOrderExecutionPipeline {
           timeInForce: order.timeInForce || 'GTC',
           clientOrderId: order.clientOrderId,
         });
-
-        // Verify order was placed
-        if (result && result.orderId) {
-          const executionTime = Date.now() - startTime;
-
-          // Poll for order confirmation
-          const finalStatus = await this.pollOrderStatus(result.orderId, 10); // 10 polls max
-
-          // Calculate slippage
-          const slippageAnalysis = this.calculateSlippage(order.price, result.price || order.price);
-
-          // Validate slippage
-          if (!this.validateSlippage(slippageAnalysis.slippagePercent, {
-            slippagePercent: executionConfig.slippagePercent,
-          })) {
-            this.logger.warn(`[OrderExecutionPipeline] Slippage exceeds limits: ${slippageAnalysis.slippagePercent.toFixed(2)}%`, {
-              orderId: result.orderId,
-              expectedPrice: order.price,
-              actualPrice: slippageAnalysis.actualPrice,
-              maxAllowed: executionConfig.slippagePercent,
-            });
-          }
-
-          // Success result
-          const successResult: OrderResult = {
-            success: true,
-            orderId: result.orderId,
-            orderStatus: finalStatus,
-            filledQuantity: result.filledQuantity || order.quantity,
-            filledPrice: result.price || order.price,
-            actualSlippage: slippageAnalysis.slippagePercent,
-            executionTime,
-            retryCount,
-            timestamp: Date.now(),
-          };
-
-          // Update metrics
-          this.updateMetrics(true, executionTime, slippageAnalysis.slippagePercent, retryCount);
-
-          this.logger.info(`[OrderExecutionPipeline] Order placed successfully: ${order.orderId}`, {
-            status: finalStatus,
-            slippage: slippageAnalysis.slippagePercent.toFixed(2) + '%',
-            executionTime: executionTime + 'ms',
-            retries: retryCount,
+      },
+      {
+        strategy: RecoveryStrategy.RETRY,
+        retryConfig: {
+          maxAttempts: executionConfig.maxRetries,
+          initialDelayMs: executionConfig.retryDelayMs,
+          backoffMultiplier: 2, // Exponential backoff (not linear!)
+          maxDelayMs: 10000,
+        },
+        logger: this.logger,
+        context: `OrderExecutionPipeline.placeOrder[${order.orderId}]`,
+        onRetry: (attempt, error, delayMs) => {
+          retryCount++;
+          this.logger.warn(`⚠️ Order placement retry ${attempt}`, {
+            orderId: order.orderId,
+            delayMs,
+            error: error.message,
           });
-
-          return successResult;
-        } else {
-          throw new Error('Order placement returned invalid result');
-        }
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-
-        this.logger.warn(`[OrderExecutionPipeline] Order placement attempt ${attempt} failed: ${lastError.message}`, {
-          orderId: order.orderId,
-          attempt,
-          maxRetries: executionConfig.maxRetries,
-        });
-
-        if (attempt === executionConfig.maxRetries) {
-          break; // Don't retry further
-        }
+        },
+        onRecover: (strategy, attemptsUsed) => {
+          this.logger.info('✅ Order placed after retry', {
+            orderId: order.orderId,
+            attemptsUsed,
+          });
+        },
       }
+    );
+
+    // Handle placement failure
+    if (!placeOrderResult.success) {
+      const failureResult: OrderResult = {
+        success: false,
+        orderId: order.orderId,
+        orderStatus: OrderStatus.FAILED,
+        filledQuantity: 0,
+        filledPrice: order.price,
+        actualSlippage: 0,
+        executionTime: Date.now() - startTime,
+        error: placeOrderResult.error?.message || 'Order placement failed',
+        retryCount,
+        timestamp: Date.now(),
+      };
+
+      // Update metrics
+      this.updateMetrics(false, failureResult.executionTime, 0, retryCount);
+
+      this.logger.error(`[OrderExecutionPipeline] Order placement failed after retries: ${order.orderId}`, {
+        error: placeOrderResult.error?.message,
+        retries: retryCount,
+      });
+
+      return failureResult;
     }
 
-    // All retries exhausted
-    const failureResult: OrderResult = {
-      success: false,
-      orderId: order.orderId,
-      orderStatus: OrderStatus.FAILED,
-      filledQuantity: 0,
-      filledPrice: order.price,
-      actualSlippage: 0,
-      executionTime: Date.now() - startTime,
-      error: lastError?.message || 'Order placement failed',
+    // Order was placed successfully
+    const result = placeOrderResult.value;
+
+    // Verify order was placed properly
+    if (!result || !result.orderId) {
+      const failureResult: OrderResult = {
+        success: false,
+        orderId: order.orderId,
+        orderStatus: OrderStatus.FAILED,
+        filledQuantity: 0,
+        filledPrice: order.price,
+        actualSlippage: 0,
+        executionTime: Date.now() - startTime,
+        error: 'Order placement returned invalid result',
+        retryCount,
+        timestamp: Date.now(),
+      };
+
+      this.updateMetrics(false, failureResult.executionTime, 0, retryCount);
+      return failureResult;
+    }
+
+    const executionTime = Date.now() - startTime;
+
+    // Poll for order confirmation
+    const finalStatus = await this.pollOrderStatus(result.orderId, 10); // 10 polls max
+
+    // Calculate slippage
+    const slippageAnalysis = this.calculateSlippage(order.price, result.price || order.price);
+
+    // Validate slippage
+    if (!this.validateSlippage(slippageAnalysis.slippagePercent, {
+      slippagePercent: executionConfig.slippagePercent,
+    })) {
+      this.logger.warn(`[OrderExecutionPipeline] Slippage exceeds limits: ${slippageAnalysis.slippagePercent.toFixed(2)}%`, {
+        orderId: result.orderId,
+        expectedPrice: order.price,
+        actualPrice: slippageAnalysis.actualPrice,
+        maxAllowed: executionConfig.slippagePercent,
+      });
+    }
+
+    // Success result
+    const successResult: OrderResult = {
+      success: true,
+      orderId: result.orderId,
+      orderStatus: finalStatus,
+      filledQuantity: result.filledQuantity || order.quantity,
+      filledPrice: result.price || order.price,
+      actualSlippage: slippageAnalysis.slippagePercent,
+      executionTime,
       retryCount,
       timestamp: Date.now(),
     };
 
     // Update metrics
-    this.updateMetrics(false, failureResult.executionTime, 0, retryCount);
+    this.updateMetrics(true, executionTime, slippageAnalysis.slippagePercent, retryCount);
 
-    this.logger.error(`[OrderExecutionPipeline] Order placement failed after ${executionConfig.maxRetries} retries: ${order.orderId}`, {
-      error: lastError?.message,
+    this.logger.info(`[OrderExecutionPipeline] Order placed successfully: ${order.orderId}`, {
+      status: finalStatus,
+      slippage: slippageAnalysis.slippagePercent.toFixed(2) + '%',
+      executionTime: executionTime + 'ms',
       retries: retryCount,
     });
 
-    return failureResult;
+    return successResult;
   }
 
   /**

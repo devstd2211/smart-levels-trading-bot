@@ -12,6 +12,14 @@
 import { RestClientV5 } from 'bybit-api';
 import { LoggerService } from '../../types';
 import type { IMarketDataRepository } from '../../repositories/IRepositories';
+import { TradingError } from '../../errors/BaseError';
+import {
+  ExchangeAPIError,
+  ExchangeRateLimitError,
+  OrderRejectedError,
+  PositionNotFoundError,
+  InsufficientBalanceError,
+} from '../../errors/DomainErrors';
 
 // ============================================================================
 // CONSTANTS
@@ -370,5 +378,79 @@ export class BybitBase {
    */
   protected sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * [Phase 8.3] Classify Bybit API error by retCode
+   * Maps Bybit error codes to domain-specific TradingError types
+   * for better error handling and recovery strategies
+   */
+  protected classifyOrderError(retCode: number, retMsg: string): TradingError {
+    switch (retCode) {
+      case 10001: // Zero position / can not set tp/sl/ts for zero position
+        return new PositionNotFoundError('Position closed or not found', {
+          retCode,
+          retMsg,
+          domain: 'POSITION',
+        });
+
+      case 10003: // Insufficient balance
+        return new InsufficientBalanceError('Insufficient balance for order', {
+          available: 0,
+          required: 0,
+          currency: 'USDT',
+          retCode,
+          retMsg,
+          domain: 'ORDER',
+        });
+
+      case 10005: // Order rejected
+      case 10006: // Invalid quantity
+      case 10016: // Invalid price
+        return new OrderRejectedError('Order rejected by exchange', {
+          retCode,
+          retMsg,
+          reason: retMsg,
+          domain: 'ORDER',
+        });
+
+      case 10404: // Rate limit
+        return new ExchangeRateLimitError('API rate limit exceeded', {
+          endpoint: 'submitOrder',
+          retCode,
+          retMsg,
+          retryAfterMs: 1000,
+          domain: 'EXCHANGE',
+        });
+
+      case 34039: // Order not modified - price already at target
+        return new OrderRejectedError('Order price already at target', {
+          retCode,
+          retMsg,
+          reason: 'NOT_MODIFIED',
+          domain: 'ORDER',
+        });
+
+      case 34040: // Order does not exist or status does not support modification
+        return new PositionNotFoundError('Order does not exist or cannot be modified', {
+          retCode,
+          retMsg,
+          domain: 'POSITION',
+        });
+
+      case 110001: // Order not exists or too late to cancel
+        return new PositionNotFoundError('Order not found or already executed', {
+          retCode,
+          retMsg,
+          domain: 'POSITION',
+        });
+
+      default:
+        return new ExchangeAPIError(`Bybit API error: ${retMsg}`, {
+          retCode,
+          retMsg,
+          domain: 'EXCHANGE',
+        });
+    }
   }
 }

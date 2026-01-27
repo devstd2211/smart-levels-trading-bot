@@ -25,6 +25,7 @@ import { BybitPositions } from './bybit-positions.partial';
 import { BybitOrders } from './bybit-orders.partial';
 import { isCriticalApiError } from '../../utils/error-helper';
 import type { IMarketDataRepository } from '../../repositories/IRepositories';
+import { ErrorHandler, RecoveryStrategy } from '../../errors';
 
 // ============================================================================
 // BYBIT SERVICE (MAIN ORCHESTRATOR)
@@ -104,9 +105,42 @@ export class BybitService {
   /**
    * Initialize service - load symbol precision parameters
    * Must be called after construction, before trading
+   *
+   * Phase 8.3: ErrorHandler integration - RETRY strategy for API calls
    */
   async initialize(): Promise<void> {
-    await this.base.initialize();
+    // Phase 8.3: Wrap base.initialize() with ErrorHandler for telemetry
+    const initResult = await ErrorHandler.executeAsync(
+      () => this.base.initialize(),
+      {
+        strategy: RecoveryStrategy.RETRY,
+        retryConfig: {
+          maxAttempts: 3,
+          initialDelayMs: 1000,
+          backoffMultiplier: 2,
+          maxDelayMs: 5000,
+        },
+        logger: this.logger,
+        context: 'BybitService.initialize',
+        onRetry: (attempt, error, delayMs) => {
+          this.logger.warn('⚠️ Initialization retry', {
+            attempt,
+            delayMs,
+            error: error.message,
+          });
+        },
+        onRecover: (strategy, attemptsUsed) => {
+          this.logger.info('✅ Initialization succeeded after retry', {
+            strategy,
+            attemptsUsed,
+          });
+        },
+      }
+    );
+
+    if (!initResult.success) {
+      throw initResult.error;
+    }
 
     // CRITICAL: Share precision data with all partial instances
     // Only base.initialize() makes the API call - other instances reuse the data
@@ -200,8 +234,34 @@ export class BybitService {
   // MARKET DATA (delegate to BybitMarketData partial)
   // ==========================================================================
 
+  /**
+   * Get candles with ErrorHandler integration for telemetry (Phase 8.3)
+   */
   async getCandles(symbolOrLimit?: string | number, interval?: string, limit?: number) {
-    return this.marketData.getCandles(symbolOrLimit, interval, limit);
+    // Phase 8.3: Wrap with ErrorHandler for telemetry (Phase 6.2 caching already handles fallback)
+    const result = await ErrorHandler.executeAsync(
+      () => this.marketData.getCandles(symbolOrLimit, interval, limit),
+      {
+        strategy: RecoveryStrategy.RETRY,
+        retryConfig: {
+          maxAttempts: 3,
+          initialDelayMs: 1000,
+          backoffMultiplier: 2,
+          maxDelayMs: 5000,
+        },
+        logger: this.logger,
+        context: 'BybitService.getCandles',
+        onRetry: (attempt, error, delayMs) => {
+          this.logger.debug('⚠️ Candle fetch retry', { attempt, delayMs, error: error.message });
+        },
+      }
+    );
+
+    if (!result.success) {
+      throw result.error;
+    }
+
+    return result.value;
   }
 
   async getCurrentPrice(): Promise<number> {
@@ -232,6 +292,9 @@ export class BybitService {
     return this.positions.setLeverage(leverage);
   }
 
+  /**
+   * Open new position with ErrorHandler integration (Phase 8.3)
+   */
   async openPosition(params: {
     side: PositionSide;
     quantity: number;
@@ -239,15 +302,98 @@ export class BybitService {
     stopLoss?: number;
     takeProfit?: number;
   }) {
-    return this.positions.openPosition(params);
+    // Phase 8.3: Wrap with ErrorHandler for telemetry and error classification
+    const result = await ErrorHandler.executeAsync(
+      () => this.positions.openPosition(params),
+      {
+        strategy: RecoveryStrategy.RETRY,
+        retryConfig: {
+          maxAttempts: 3,
+          initialDelayMs: 500,
+          backoffMultiplier: 2,
+          maxDelayMs: 5000,
+        },
+        logger: this.logger,
+        context: 'BybitService.openPosition',
+        onRetry: (attempt, error, delayMs) => {
+          this.logger.warn('⚠️ Position open retry', {
+            attempt,
+            delayMs,
+            side: params.side,
+            quantity: params.quantity,
+            error: error.message,
+          });
+        },
+        onRecover: (strategy, attemptsUsed) => {
+          this.logger.info('✅ Position opened after retry', {
+            strategy,
+            attemptsUsed,
+            side: params.side,
+            quantity: params.quantity,
+          });
+        },
+      }
+    );
+
+    if (!result.success) {
+      throw result.error;
+    }
+
+    return result.value;
   }
 
   async getPosition() {
     return this.positions.getPosition();
   }
 
+  /**
+   * Close position with ErrorHandler integration (Phase 8.3)
+   * Idempotent: "position already closed" is treated as success
+   */
   async closePosition(side: PositionSide, quantity: number) {
-    return this.positions.closePosition(side, quantity);
+    // Phase 8.3: Wrap with ErrorHandler with special handling for already-closed positions
+    const result = await ErrorHandler.executeAsync(
+      () => this.positions.closePosition(side, quantity),
+      {
+        strategy: RecoveryStrategy.RETRY,
+        retryConfig: {
+          maxAttempts: 3,
+          initialDelayMs: 500,
+          backoffMultiplier: 2,
+          maxDelayMs: 5000,
+        },
+        logger: this.logger,
+        context: 'BybitService.closePosition',
+        onRetry: (attempt, error, delayMs) => {
+          // Check if position is already closed (expected race condition)
+          if (error.message.includes('not found') || error.message.includes('zero position')) {
+            this.logger.debug('⚠️ Position already closed - skipping retry', { side, quantity });
+            return;
+          }
+
+          this.logger.warn('⚠️ Position close retry', {
+            attempt,
+            delayMs,
+            side,
+            quantity,
+            error: error.message,
+          });
+        },
+      }
+    );
+
+    // [P3] Idempotent behavior: treat already-closed as success
+    if (!result.success) {
+      const errorMsg = result.error?.message || '';
+      if (errorMsg.includes('not found') || errorMsg.includes('zero position')) {
+        this.logger.debug('✅ Position close skipped - already closed', { side, quantity });
+        return; // Treat as success
+      }
+
+      throw result.error;
+    }
+
+    return result.value;
   }
 
   // ==========================================================================
@@ -294,8 +440,43 @@ export class BybitService {
     return this.orders.getOrderHistory(limit);
   }
 
+  /**
+   * Verify protection orders with ErrorHandler integration (Phase 8.3)
+   * Uses GRACEFUL_DEGRADE: returns conservative fallback on API failure
+   */
   async verifyProtectionSet(side: PositionSide) {
-    return this.orders.verifyProtectionSet(side);
+    // Phase 8.3: Wrap with ErrorHandler using GRACEFUL_DEGRADE strategy
+    const result = await ErrorHandler.executeAsync(
+      () => this.orders.verifyProtectionSet(side),
+      {
+        strategy: RecoveryStrategy.GRACEFUL_DEGRADE,
+        logger: this.logger,
+        context: 'BybitService.verifyProtectionSet',
+        onRecover: (strategy, attemptsUsed) => {
+          this.logger.warn('⚠️ Protection verification degraded - assuming no protection', {
+            side,
+            strategy,
+          });
+        },
+      }
+    );
+
+    // [GRACEFUL_DEGRADE] Return conservative assumption if API fails
+    if (!result.success) {
+      this.logger.warn('⚠️ Failed to verify protection - assuming no SL/TP set', {
+        side,
+        error: result.error?.message,
+      });
+
+      return {
+        hasStopLoss: false,
+        hasTakeProfit: false,
+        stopLossPrice: null,
+        takeProfitPrice: null,
+      };
+    }
+
+    return result.value;
   }
 
   async cancelAllConditionalOrders() {

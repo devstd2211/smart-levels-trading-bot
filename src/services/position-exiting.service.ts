@@ -37,12 +37,17 @@ import { SessionStatsService } from './session-stats.service';
 import { PositionLifecycleService } from './position-lifecycle.service';
 import { RealityCheckService } from './reality-check.service';
 import { DECIMAL_PLACES, PERCENT_MULTIPLIER, TIME_UNITS, TIME_MULTIPLIERS } from '../constants';
+import { ErrorHandler, RecoveryStrategy } from '../errors';
 
 // ============================================================================
 // POSITION EXITING SERVICE
 // ============================================================================
 
 export class PositionExitingService {
+  // [P3] Atomic lock pattern: prevent concurrent close attempts on same position
+  // Maps positionId → Promise of close operation in progress
+  private readonly closeOperationLock = new Map<string, Promise<void>>();
+
   constructor(
     private readonly bybitService: IExchange,
     private readonly telegram: TelegramService,
@@ -200,7 +205,8 @@ export class PositionExitingService {
   }
 
   /**
-   * Close full position and record in journal
+   * Close full position and record in journal with ErrorHandler integration
+   * Uses atomic lock pattern to prevent concurrent close race conditions
    *
    * @param position - Current position
    * @param exitPrice - Exit price
@@ -223,6 +229,16 @@ export class PositionExitingService {
         return false;
       }
 
+      // [P3] Atomic lock: prevent concurrent close attempts on same position
+      if (this.closeOperationLock.has(position.id)) {
+        this.logger.warn('⚠️ Close operation already in progress for position', {
+          positionId: position.id,
+        });
+        // Wait for concurrent operation to complete, then return false (already handled)
+        await this.closeOperationLock.get(position.id);
+        return false;
+      }
+
       // Mark as CLOSED BEFORE any async operations (prevent race conditions)
       const wasAlreadyClosed = position.status === 'CLOSED';
       position.status = 'CLOSED';
@@ -241,134 +257,18 @@ export class PositionExitingService {
         exitReason,
       });
 
-      // Try to close on exchange, but don't fail if already closed by SL/TP
-      try {
-        await this.bybitService.closePosition({
-          positionId: position.id,
-          percentage: 100, // Close fully
+      // [P3] Create atomic lock promise for this close operation
+      const closePromise = this.executeAtomicClose(position, exitPrice, exitReason, exitType)
+        .finally(() => {
+          // [P3] Clean up lock after operation completes
+          this.closeOperationLock.delete(position.id);
         });
-      } catch (closeError) {
-        const errorMsg = closeError instanceof Error ? closeError.message : String(closeError);
-        // If position is already zero, this is expected (closed by SL/TP on exchange)
-        if (errorMsg.includes('position is zero') || errorMsg.includes('reduce-only')) {
-          this.logger.info('📝 Position already closed on exchange (SL/TP triggered)', {
-            positionId: position.id,
-          });
-        } else {
-          // Re-throw unexpected errors
-          throw closeError;
-        }
-      }
 
-      // Cancel any remaining SL/TP orders
-      this.logger.debug('🧹 Cancelling conditional orders after close');
-      try {
-        await this.bybitService.cancelAllConditionalOrders();
-      } catch (error) {
-        this.logger.warn('Failed to cancel orders after close', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+      // Store promise in lock map
+      this.closeOperationLock.set(position.id, closePromise);
 
-      // Calculate final PnL
-      const holdingTimeMs = Date.now() - position.openedAt;
-      const holdingTimeMinutes = holdingTimeMs / TIME_UNITS.MINUTE;
-
-      let realizedPnL: number;
-      let tpLevelsHit: number[] = [];
-
-      const takeProfitManager = this.positionManager?.getTakeProfitManager?.();
-      if (takeProfitManager) {
-        const finalPnL = takeProfitManager.calculateFinalPnL(exitPrice);
-        realizedPnL = finalPnL.totalPnL.pnlNet;
-        tpLevelsHit = takeProfitManager.getTpLevelsHit?.() || [];
-
-        this.logger.info('📊 Final PnL calculated (with partial closes)', {
-          totalPnL: realizedPnL.toFixed(DECIMAL_PLACES.PRICE),
-          fees: finalPnL.totalPnL.fees.toFixed(DECIMAL_PLACES.PRICE),
-          tpLevelsHit: tpLevelsHit.length,
-        });
-      } else {
-        // Simple PnL calculation without partial closes
-        const priceDiff = exitPrice - position.entryPrice;
-        const isLong = position.side === PositionSide.LONG;
-        const pnlMultiplier = isLong ? 1 : -1;
-
-        const pnlGross = priceDiff * position.quantity * pnlMultiplier * this.tradingConfig.leverage;
-        const tradingFees = (position.entryPrice * position.quantity + exitPrice * position.quantity) * this.tradingConfig.tradingFeeRate;
-
-        realizedPnL = pnlGross - tradingFees;
-
-        this.logger.info('📊 PnL calculated (simple)', {
-          pnlGross: pnlGross.toFixed(DECIMAL_PLACES.PRICE),
-          fees: tradingFees.toFixed(DECIMAL_PLACES.PRICE),
-          netPnL: realizedPnL.toFixed(DECIMAL_PLACES.PRICE),
-        });
-      }
-
-      // [P1] Record in journal with rollback capability
-      let journalResult: { rollback: () => void } | null = null;
-      try {
-        journalResult = await this.recordPositionCloseInJournal(position, exitPrice, realizedPnL, exitReason, exitType, tpLevelsHit, holdingTimeMs);
-      } catch (journalError) {
-        // [P1] Journal recording failed - log error but don't fail close
-        // Position is already marked CLOSED, journal will be retried later
-        this.logger.error('❌ Journal recording failed', {
-          error: journalError instanceof Error ? journalError.message : String(journalError),
-          positionId: position.id,
-        });
-        // Continue with stats update since position close succeeded on exchange
-      }
-
-      // [P1] Update session stats with error handling (rollback on failure)
-      if (this.sessionStats && position.journalId) {
-        const priceDiff = exitPrice - position.entryPrice;
-        const isLong = position.side === PositionSide.LONG;
-        const pnlMultiplier = isLong ? 1 : -1;
-        const pnlPercent = (priceDiff / position.entryPrice) * PERCENT_MULTIPLIER * pnlMultiplier;
-
-        try {
-          this.sessionStats.updateTradeExit(position.journalId, {
-            exitPrice,
-            pnl: realizedPnL,
-            pnlPercent,
-            exitType,
-            tpHitLevels: tpLevelsHit,
-            holdingTimeMs,
-            stopLoss: {
-              initial: position.stopLoss.initialPrice || position.stopLoss.price,
-              final: position.stopLoss.price,
-              movedToBreakeven: position.stopLoss.isBreakeven,
-              trailingActivated: position.stopLoss.isTrailing,
-            },
-          });
-        } catch (statsError) {
-          // [P1] CRITICAL: Session stats update failed - rollback journal
-          this.logger.error('❌ CRITICAL: Session stats update failed - rolling back journal', {
-            error: statsError instanceof Error ? statsError.message : String(statsError),
-            journalId: position.journalId,
-          });
-
-          // Rollback journal if we have rollback function
-          if (journalResult?.rollback) {
-            journalResult.rollback();
-          }
-
-          position.status = 'OPEN'; // Revert status
-          return false;
-        }
-      }
-
-      // Send exit notification
-      const priceDiff = exitPrice - position.entryPrice;
-      const isLong = position.side === PositionSide.LONG;
-      const pnlMultiplier = isLong ? 1 : -1;
-      const pnlPercent = (priceDiff / position.entryPrice) * PERCENT_MULTIPLIER * pnlMultiplier;
-
-      await this.telegram.sendAlert(
-        `🏁 Position Closed\nExit Type: ${exitType}\nExit: ${exitPrice.toFixed(8)}\nPnL: ${realizedPnL.toFixed(4)} USDT (${pnlPercent.toFixed(2)}%)`,
-      );
-
+      // Wait for operation to complete
+      await closePromise;
       return true;
     } catch (error) {
       this.logger.error('Failed to close full position', {
@@ -377,8 +277,266 @@ export class PositionExitingService {
       });
       if (position) {
         position.status = 'OPEN'; // Revert status on any error
+        this.closeOperationLock.delete(position.id); // Clean up lock
       }
       return false;
+    }
+  }
+
+  /**
+   * [P3] Execute atomic close operation within lock
+   * Called within atomic lock to prevent concurrent modifications
+   */
+  private async executeAtomicClose(
+    position: Position,
+    exitPrice: number,
+    exitReason: string,
+    exitType: ExitType,
+  ): Promise<void> {
+    // Phase 8: ErrorHandler integration - RETRY strategy for exchange operations
+    try {
+      await this.closePositionWithRetry(position, exitPrice);
+    } catch (closeError) {
+      const errorMsg = closeError instanceof Error ? closeError.message : String(closeError);
+      // If position is already zero, this is expected (closed by SL/TP on exchange)
+      if (errorMsg.includes('position is zero') || errorMsg.includes('reduce-only')) {
+        this.logger.info('📝 Position already closed on exchange (SL/TP triggered)', {
+          positionId: position.id,
+        });
+      } else {
+        // Re-throw unexpected errors
+        throw closeError;
+      }
+    }
+
+    // Cancel any remaining SL/TP orders
+    this.logger.debug('🧹 Cancelling conditional orders after close');
+    try {
+      await this.bybitService.cancelAllConditionalOrders();
+    } catch (error) {
+      this.logger.warn('Failed to cancel orders after close', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    // Calculate final PnL
+    const holdingTimeMs = Date.now() - position.openedAt;
+    const holdingTimeMinutes = holdingTimeMs / TIME_UNITS.MINUTE;
+
+    let realizedPnL: number;
+    let tpLevelsHit: number[] = [];
+
+    const takeProfitManager = this.positionManager?.getTakeProfitManager?.();
+    if (takeProfitManager) {
+      const finalPnL = takeProfitManager.calculateFinalPnL(exitPrice);
+      realizedPnL = finalPnL.totalPnL.pnlNet;
+      tpLevelsHit = takeProfitManager.getTpLevelsHit?.() || [];
+
+      this.logger.info('📊 Final PnL calculated (with partial closes)', {
+        totalPnL: realizedPnL.toFixed(DECIMAL_PLACES.PRICE),
+        fees: finalPnL.totalPnL.fees.toFixed(DECIMAL_PLACES.PRICE),
+        tpLevelsHit: tpLevelsHit.length,
+      });
+    } else {
+      // Simple PnL calculation without partial closes
+      const priceDiff = exitPrice - position.entryPrice;
+      const isLong = position.side === PositionSide.LONG;
+      const pnlMultiplier = isLong ? 1 : -1;
+
+      const pnlGross = priceDiff * position.quantity * pnlMultiplier * this.tradingConfig.leverage;
+      const tradingFees = (position.entryPrice * position.quantity + exitPrice * position.quantity) * this.tradingConfig.tradingFeeRate;
+
+      realizedPnL = pnlGross - tradingFees;
+
+      this.logger.info('📊 PnL calculated (simple)', {
+        pnlGross: pnlGross.toFixed(DECIMAL_PLACES.PRICE),
+        fees: tradingFees.toFixed(DECIMAL_PLACES.PRICE),
+        netPnL: realizedPnL.toFixed(DECIMAL_PLACES.PRICE),
+      });
+    }
+
+    // Phase 8: ErrorHandler integration - FALLBACK strategy for journal
+    let journalResult: { rollback: () => void } | null = null;
+    try {
+      journalResult = await this.recordPositionCloseInJournalWithFallback(position, exitPrice, realizedPnL, exitReason, exitType, tpLevelsHit, holdingTimeMs);
+    } catch (journalError) {
+      // [P1] Journal recording failed - log error but don't fail close
+      // Position is already marked CLOSED, journal will be retried later
+      this.logger.error('❌ Journal recording failed', {
+        error: journalError instanceof Error ? journalError.message : String(journalError),
+        positionId: position.id,
+      });
+      // Continue with stats update since position close succeeded on exchange
+    }
+
+    // [P1] Update session stats with error handling (rollback on failure)
+    if (this.sessionStats && position.journalId) {
+      const priceDiff = exitPrice - position.entryPrice;
+      const isLong = position.side === PositionSide.LONG;
+      const pnlMultiplier = isLong ? 1 : -1;
+      const pnlPercent = (priceDiff / position.entryPrice) * PERCENT_MULTIPLIER * pnlMultiplier;
+
+      try {
+        this.sessionStats.updateTradeExit(position.journalId, {
+          exitPrice,
+          pnl: realizedPnL,
+          pnlPercent,
+          exitType,
+          tpHitLevels: tpLevelsHit,
+          holdingTimeMs,
+          stopLoss: {
+            initial: position.stopLoss.initialPrice || position.stopLoss.price,
+            final: position.stopLoss.price,
+            movedToBreakeven: position.stopLoss.isBreakeven,
+            trailingActivated: position.stopLoss.isTrailing,
+          },
+        });
+      } catch (statsError) {
+        // [P1] CRITICAL: Session stats update failed - rollback journal
+        this.logger.error('❌ CRITICAL: Session stats update failed - rolling back journal', {
+          error: statsError instanceof Error ? statsError.message : String(statsError),
+          journalId: position.journalId,
+        });
+
+        // Rollback journal if we have rollback function
+        if (journalResult?.rollback) {
+          journalResult.rollback();
+        }
+
+        position.status = 'OPEN'; // Revert status
+        throw statsError; // Propagate to outer catch
+      }
+    }
+
+    // Phase 8: ErrorHandler integration - SKIP strategy for Telegram notifications
+    const priceDiff = exitPrice - position.entryPrice;
+    const isLong = position.side === PositionSide.LONG;
+    const pnlMultiplier = isLong ? 1 : -1;
+    const pnlPercent = (priceDiff / position.entryPrice) * PERCENT_MULTIPLIER * pnlMultiplier;
+
+    await this.sendExitNotificationWithSkip(position, exitType, exitPrice, realizedPnL, pnlPercent);
+  }
+
+  /**
+   * [P3] Close position on exchange with RETRY strategy
+   * Implements exponential backoff for transient API errors
+   */
+  private async closePositionWithRetry(position: Position, exitPrice: number): Promise<void> {
+    const maxAttempts = 3;
+    const initialDelayMs = 500;
+    const backoffMultiplier = 2;
+    const maxDelayMs = 5000;
+
+    let lastError: Error | undefined;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await this.bybitService.closePosition({
+          positionId: position.id,
+          percentage: 100, // Close fully
+        });
+        return; // Success
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (attempt < maxAttempts) {
+          // Calculate exponential backoff delay
+          const delayMs = Math.min(initialDelayMs * Math.pow(backoffMultiplier, attempt - 1), maxDelayMs);
+
+          this.logger.warn(`🔄 Retrying close position (attempt ${attempt}/${maxAttempts})`, {
+            positionId: position.id,
+            delayMs,
+            error: lastError.message,
+          });
+
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+
+    // All retries exhausted - use ErrorHandler to classify the error
+    const handled = await ErrorHandler.handle(lastError, {
+      strategy: RecoveryStrategy.RETRY,
+      logger: this.logger,
+      context: 'PositionExitingService.closePositionWithRetry',
+      retryConfig: {
+        maxAttempts,
+        initialDelayMs,
+        backoffMultiplier,
+        maxDelayMs,
+      },
+    });
+
+    if (!handled.success) {
+      throw lastError || new Error('Failed to close position after retries');
+    }
+  }
+
+  /**
+   * Phase 8: Record position close with FALLBACK strategy
+   * If journal fails, gracefully degrade to empty rollback function
+   */
+  private async recordPositionCloseInJournalWithFallback(
+    position: Position,
+    exitPrice: number,
+    realizedPnL: number,
+    exitReason: string,
+    exitType: ExitType,
+    tpLevelsHit: number[],
+    holdingTimeMs: number,
+  ): Promise<{ rollback: () => void }> {
+    try {
+      // Try to record in journal
+      return await this.recordPositionCloseInJournal(position, exitPrice, realizedPnL, exitReason, exitType, tpLevelsHit, holdingTimeMs);
+    } catch (error) {
+      // Journal recording failed - use ErrorHandler with FALLBACK strategy
+      const handled = await ErrorHandler.handle(error, {
+        strategy: RecoveryStrategy.FALLBACK,
+        logger: this.logger,
+        context: 'PositionExitingService.recordPositionCloseInJournal',
+        onRecover: () => {
+          this.logger.warn('⚠️ Journal recording failed, using fallback (no-op rollback)', {
+            positionId: position.id,
+          });
+        },
+      });
+
+      // Return empty rollback function - graceful degradation
+      return { rollback: () => {} };
+    }
+  }
+
+  /**
+   * Phase 8: Send exit notification with SKIP strategy
+   * If telegram fails, don't fail the entire close operation
+   */
+  private async sendExitNotificationWithSkip(
+    position: Position,
+    exitType: ExitType,
+    exitPrice: number,
+    realizedPnL: number,
+    pnlPercent: number,
+  ): Promise<void> {
+    try {
+      await this.telegram.sendAlert(
+        `🏁 Position Closed\nExit Type: ${exitType}\nExit: ${exitPrice.toFixed(8)}\nPnL: ${realizedPnL.toFixed(4)} USDT (${pnlPercent.toFixed(2)}%)`,
+      );
+    } catch (error) {
+      // Notification failed - use ErrorHandler with SKIP strategy
+      const handled = await ErrorHandler.handle(error, {
+        strategy: RecoveryStrategy.SKIP,
+        logger: this.logger,
+        context: 'PositionExitingService.sendExitNotification',
+        onRecover: () => {
+          this.logger.warn('⚠️ Exit notification failed, skipping notification', {
+            positionId: position.id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        },
+      });
+
+      // Continue without throwing - SKIP means we log and continue
     }
   }
 

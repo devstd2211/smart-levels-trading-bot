@@ -371,6 +371,112 @@ export class ErrorHandler {
   }
 
   /**
+   * Execute operation with error handling and recovery strategy
+   * Supports actual retry loops for RETRY strategy
+   *
+   * Usage:
+   * ```
+   * const position = await ErrorHandler.executeAsync(
+   *   () => this.bybitService.openPosition(params),
+   *   {
+   *     strategy: RecoveryStrategy.RETRY,
+   *     retryConfig: { maxAttempts: 3, initialDelayMs: 500, backoffMultiplier: 2 },
+   *     logger: this.logger,
+   *     context: 'BybitService.openPosition',
+   *   }
+   * );
+   * ```
+   */
+  static async executeAsync<T>(
+    fn: () => Promise<T>,
+    config: ErrorHandlingConfig,
+  ): Promise<{ success: boolean; value?: T; error?: TradingError }> {
+    if (config.strategy === RecoveryStrategy.RETRY) {
+      return await this.executeWithRetry(fn, config);
+    }
+
+    // For other strategies, try once
+    try {
+      const result = await fn();
+      return { success: true, value: result };
+    } catch (error) {
+      const tradingError = this.normalizeError(error);
+
+      switch (config.strategy) {
+        case RecoveryStrategy.SKIP:
+        case RecoveryStrategy.GRACEFUL_DEGRADE:
+        case RecoveryStrategy.FALLBACK:
+          config.onRecover?.(config.strategy, 1);
+          return { success: true }; // Consider as success but no value
+        default:
+          config.onFailure?.(tradingError, 1);
+          return { success: false, error: tradingError };
+      }
+    }
+  }
+
+  /**
+   * Execute operation with RETRY strategy and exponential backoff
+   */
+  private static async executeWithRetry<T>(
+    fn: () => Promise<T>,
+    config: ErrorHandlingConfig,
+  ): Promise<{ success: boolean; value?: T; error?: TradingError }> {
+    const retryConfig = config.retryConfig || {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      backoffMultiplier: 2,
+      maxDelayMs: 10000,
+    };
+
+    let lastError: TradingError | undefined;
+
+    for (let attempt = 1; attempt <= retryConfig.maxAttempts; attempt++) {
+      try {
+        const result = await fn();
+
+        // Success - invoke callback if this wasn't the first attempt
+        if (attempt > 1) {
+          config.onRecover?.(RecoveryStrategy.RETRY, attempt - 1);
+          config.logger?.info(
+            `[${config.context}] Operation succeeded after ${attempt - 1} retries`,
+            { attemptNumber: attempt, totalAttempts: retryConfig.maxAttempts }
+          );
+        }
+
+        return { success: true, value: result };
+      } catch (error) {
+        lastError = this.normalizeError(error);
+
+        // On last attempt or non-retryable error, return failure
+        if (attempt >= retryConfig.maxAttempts || !lastError.metadata.retryable) {
+          config.onFailure?.(lastError, attempt);
+          config.logger?.error(
+            `[${config.context}] Operation failed after ${attempt} attempts`,
+            { error: lastError.message, code: lastError.metadata.code, retryable: lastError.metadata.retryable }
+          );
+          return { success: false, error: lastError };
+        }
+
+        // Schedule retry
+        const delayMs = this.calculateDelay(attempt, retryConfig, lastError);
+        config.onRetry?.(attempt, lastError, delayMs);
+        config.logger?.warn(
+          `[${config.context}] Retrying after error (attempt ${attempt}/${retryConfig.maxAttempts})`,
+          { delayMs, error: lastError.message, code: lastError.metadata.code }
+        );
+
+        // Wait before retrying
+        await this.delay(delayMs);
+      }
+    }
+
+    // Should not reach here
+    config.onFailure?.(lastError!, retryConfig.maxAttempts);
+    return { success: false, error: lastError };
+  }
+
+  /**
    * Wrap a function with error handling
    */
   static async wrapAsync<T>(

@@ -54,6 +54,7 @@ import { ClosePercentHandler } from '../action-handlers/close-percent.handler';
 import { UpdateStopLossHandler } from '../action-handlers/update-stop-loss.handler';
 import { ActivateTrailingHandler } from '../action-handlers/activate-trailing.handler';
 import { IndicatorPreCalculationService } from './indicator-precalculation.service';
+import { ErrorHandler, RecoveryStrategy } from '../errors';
 
 // ============================================================================
 // TYPES
@@ -486,9 +487,27 @@ export class TradingOrchestrator {
                   this.logger.debug('❌ Entry decision skipped - clearing pending decision');
                 }
               } catch (orchestratorError) {
-                this.logger.error('Error in EntryOrchestrator.evaluateEntry', {
-                  error: orchestratorError instanceof Error ? orchestratorError.message : String(orchestratorError),
+                // Phase 8: ErrorHandler integration - SKIP on entry evaluation failure
+                const handled = await ErrorHandler.handle(orchestratorError, {
+                  strategy: RecoveryStrategy.SKIP,
+                  logger: this.logger,
+                  context: 'TradingOrchestrator.entryOrchestrator.evaluateEntry',
+                  onRecover: () => {
+                    this.pendingEntryDecision = null;
+                    if (this.snapshotGate) {
+                      this.snapshotGate.clearActiveSnapshot();
+                    }
+                    this.logger.warn('⚠️ Entry evaluation failed, skipping entry decision');
+                  }
                 });
+
+                if (!handled.success && handled.error) {
+                  this.logger.error('🔴 Critical entry orchestration failure', {
+                    code: handled.error.metadata?.code,
+                    message: handled.error.message,
+                    diagnostic: handled.error.toDiagnosticString?.()
+                  });
+                }
               }
             }
           } else {
@@ -747,23 +766,45 @@ export class TradingOrchestrator {
 
     const currentPrice = entryCandles.length > 0 ? entryCandles[entryCandles.length - 1].close : 0;
 
-    const result = await this.analyzerEngine.executeAnalyzers(
-      entryCandles,
-      this.buildAnalyzerConfigForRegistry(),
-      {
-        executionMode: 'parallel',
-        checkReadiness: true,
-        filterHoldSignals: true,         // TradingOrch-specific: remove HOLD
-        enrichSignals: true,             // TradingOrch-specific: add metadata
-        currentPrice,
-        errorHandling: 'lenient',
-      }
-    );
+    try {
+      const result = await this.analyzerEngine.executeAnalyzers(
+        entryCandles,
+        this.buildAnalyzerConfigForRegistry(),
+        {
+          executionMode: 'parallel',
+          checkReadiness: true,
+          filterHoldSignals: true,         // TradingOrch-specific: remove HOLD
+          enrichSignals: true,             // TradingOrch-specific: add metadata
+          currentPrice,
+          errorHandling: 'lenient',
+        }
+      );
 
-    return result.signals.map(signal => ({
-      ...signal,
-      type: signal.source as any, // Map source to type (e.g., 'EMA_ANALYZER' → type field)
-    }));
+      return result.signals.map(signal => ({
+        ...signal,
+        type: signal.source as any, // Map source to type (e.g., 'EMA_ANALYZER' → type field)
+      }));
+    } catch (error) {
+      // Phase 8: ErrorHandler integration - SKIP on analyzer failure
+      const handled = await ErrorHandler.handle(error, {
+        strategy: RecoveryStrategy.SKIP,
+        logger: this.logger,
+        context: 'TradingOrchestrator.runStrategyAnalysis',
+        onRecover: () => {
+          this.logger.warn('⚠️ Analyzer execution failed, skipping to next candle');
+        }
+      });
+
+      if (!handled.success && handled.error) {
+        this.logger.error('🔴 Critical analyzer failure', {
+          code: handled.error.metadata?.code,
+          message: handled.error.message
+        });
+      }
+
+      // Return empty signals (SKIP) so entry evaluation doesn't proceed
+      return [];
+    }
   }
 
   /**
