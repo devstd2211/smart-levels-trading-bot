@@ -342,10 +342,11 @@ describe('GracefulShutdownManager', () => {
 
       // Should still try conditional orders
       expect(mockExchange.cancelAllConditionalOrders).toHaveBeenCalled();
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Error cancelling hanging orders')
-      );
-      expect(result).toBe(1);
+      // With ErrorHandler RETRY strategy, we degrade gracefully on failure
+      const warnCalls = mockLogger.warn.mock.calls.map(call => call[0]);
+      const hasWarning = warnCalls.some(msg => msg && msg.includes('Could not cancel hanging orders'));
+      expect(hasWarning).toBe(true);
+      expect(result).toBe(1); // Only conditional orders counted
     });
 
     it('should handle error when cancelling conditional orders', async () => {
@@ -355,10 +356,11 @@ describe('GracefulShutdownManager', () => {
 
       // Should still try hanging orders
       expect(mockExchange.cancelAllOrders).toHaveBeenCalled();
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Error cancelling conditional orders')
-      );
-      expect(result).toBe(1);
+      // With ErrorHandler RETRY strategy, we degrade gracefully on failure
+      const warnCalls = mockLogger.warn.mock.calls.map(call => call[0]);
+      const hasWarning = warnCalls.some(msg => msg && msg.includes('Could not cancel conditional orders'));
+      expect(hasWarning).toBe(true);
+      expect(result).toBe(1); // Only hanging orders counted
     });
 
     it('should always cancel orders on shutdown', async () => {
@@ -548,8 +550,10 @@ describe('GracefulShutdownManager', () => {
       const metadata = await shutdownManager.recoverState();
 
       expect(metadata).toBeNull();
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error recovering state')
+      // With ErrorHandler FALLBACK strategy, we log warn instead of error
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        expect.stringContaining('State recovery failed'),
+        expect.any(Object)
       );
     });
   });
@@ -580,15 +584,22 @@ describe('GracefulShutdownManager', () => {
         throw new Error('Disk write failed');
       });
 
+      let errorThrown = false;
       try {
         await shutdownManager.persistState();
       } catch (error) {
-        expect(error).toBeDefined();
+        errorThrown = true;
       }
 
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        expect.stringContaining('Error persisting state')
-      );
+      // With ErrorHandler GRACEFUL_DEGRADE strategy, should NOT throw
+      expect(errorThrown).toBe(false);
+      // Should log the error but continue shutdown
+      const allLogs = [
+        ...mockLogger.error.mock.calls.map(call => call[0]),
+        ...mockLogger.warn.mock.calls.map(call => call[0])
+      ];
+      const hasLog = allLogs.some(msg => msg && msg.includes('persist'));
+      expect(hasLog).toBe(true);
     });
 
     it('should handle action queue timeout gracefully', async () => {

@@ -30,6 +30,7 @@ import { ActionQueueService } from './action-queue.service';
 import { IExchange } from '../interfaces/IExchange';
 import * as fs from 'fs';
 import * as path from 'path';
+import { ErrorHandler, RecoveryStrategy } from '../errors';
 
 import {
   GracefulShutdownConfig,
@@ -274,108 +275,161 @@ export class GracefulShutdownManager implements IGracefulShutdownManager {
   }
 
   /**
-   * Cancel all pending orders (PHASE 13.1a: Implementation complete)
+   * Cancel all pending orders with RETRY strategy
    * Cancels:
    * - All hanging orders for the current symbol
    * - All conditional orders (TP/SL)
    *
+   * Uses RETRY strategy with exponential backoff for transient API errors
+   * Gracefully degrades on final failure (doesn't block shutdown)
+   *
    * Returns the count of cancelled orders
    */
   private async cancelAllPendingOrders(): Promise<number> {
-    try {
-      let cancelledCount = 0;
-      const position = this.positionLifecycleService.getCurrentPosition();
+    let cancelledCount = 0;
+    const position = this.positionLifecycleService.getCurrentPosition();
 
-      if (!position) {
-        this.logger.info('[GracefulShutdownManager] No open position, no orders to cancel');
-        return 0;
-      }
-
-      // Cancel all hanging orders for the symbol
-      try {
-        await this.exchange.cancelAllOrders(position.symbol);
-        // Estimate count (would need getOpenOrders to be exact, but we approximate)
-        cancelledCount += 1; // At least mark that we tried
-        this.logger.info(`[GracefulShutdownManager] Cancelled hanging orders for ${position.symbol}`);
-      } catch (error) {
-        this.logger.warn(`[GracefulShutdownManager] Error cancelling hanging orders: ${error}`);
-      }
-
-      // Cancel all conditional orders (TP/SL)
-      try {
-        await this.exchange.cancelAllConditionalOrders();
-        cancelledCount += 1; // Mark that we tried
-        this.logger.info('[GracefulShutdownManager] Cancelled all conditional orders');
-      } catch (error) {
-        this.logger.warn(`[GracefulShutdownManager] Error cancelling conditional orders: ${error}`);
-      }
-
-      return cancelledCount;
-    } catch (error) {
-      this.logger.error(`[GracefulShutdownManager] Unexpected error in cancelAllPendingOrders: ${error}`);
+    if (!position) {
+      this.logger.info('[GracefulShutdownManager] No open position, no orders to cancel');
       return 0;
     }
+
+    // Cancel all hanging orders for the symbol with RETRY strategy
+    const hangingOrdersResult = await ErrorHandler.executeAsync(
+      () => this.exchange.cancelAllOrders(position.symbol),
+      {
+        strategy: RecoveryStrategy.RETRY,
+        retryConfig: {
+          maxAttempts: 3,
+          initialDelayMs: 500,
+          backoffMultiplier: 2,
+          maxDelayMs: 5000,
+        },
+        logger: this.logger,
+        context: 'GracefulShutdownManager.cancelAllOrders',
+        onRetry: (attempt, error, delayMs) => {
+          this.logger.info(`🔄 Retrying order cancellation (${attempt}/3) after ${delayMs}ms`, {
+            error: error.message,
+          });
+        },
+      }
+    );
+
+    if (hangingOrdersResult.success) {
+      cancelledCount += 1;
+      this.logger.info(`[GracefulShutdownManager] Cancelled hanging orders for ${position.symbol}`);
+    } else {
+      this.logger.warn(`⚠️ Could not cancel hanging orders after retries, continuing shutdown`);
+    }
+
+    // Cancel all conditional orders (TP/SL) with RETRY strategy
+    const conditionalOrdersResult = await ErrorHandler.executeAsync(
+      () => this.exchange.cancelAllConditionalOrders(),
+      {
+        strategy: RecoveryStrategy.RETRY,
+        retryConfig: {
+          maxAttempts: 3,
+          initialDelayMs: 500,
+          backoffMultiplier: 2,
+          maxDelayMs: 5000,
+        },
+        logger: this.logger,
+        context: 'GracefulShutdownManager.cancelAllConditionalOrders',
+        onRetry: (attempt, error, delayMs) => {
+          this.logger.info(`🔄 Retrying conditional order cancellation (${attempt}/3) after ${delayMs}ms`, {
+            error: error.message,
+          });
+        },
+      }
+    );
+
+    if (conditionalOrdersResult.success) {
+      cancelledCount += 1;
+      this.logger.info('[GracefulShutdownManager] Cancelled all conditional orders');
+    } else {
+      this.logger.warn(`⚠️ Could not cancel conditional orders after retries, continuing shutdown`);
+    }
+
+    return cancelledCount;
   }
 
   /**
-   * Persist bot state to disk
+   * Persist bot state to disk with GRACEFUL_DEGRADE strategy
+   * Uses GRACEFUL_DEGRADE so that state persistence failure doesn't block shutdown
+   *
+   * Returns early on failure (doesn't throw) to allow shutdown to continue
    */
   public async persistState(): Promise<void> {
-    try {
-      const position = this.positionLifecycleService.getCurrentPosition();
-      const stateSnapshot: BotStateSnapshot = {
-        snapshotTime: Date.now(),
-        positions: position
-          ? [
-              {
-                positionId: position.id,
-                symbol: position.symbol,
-                direction: position.side as 'LONG' | 'SHORT',
-                quantity: position.quantity,
-                entryPrice: position.entryPrice,
-                entryTime: position.openedAt || Date.now(),
-                currentPrice: undefined, // Would need market data
-                currentPnL: position.unrealizedPnL,
-                currentPnLPercent: (position.unrealizedPnL / (position.quantity * position.entryPrice)) * 100,
-                openOrders: [], // Would be populated with order details
-                state: 'OPEN',
-                persistedAt: Date.now(),
-              },
-            ]
-          : [],
-        sessionMetrics: {
-          totalTrades: 0, // Would be populated from journal
-          totalPnL: 0, // Would be populated from journal
-          startTime: Date.now(),
-        },
-        riskMetrics: {
-          dailyPnL: 0, // Would be populated from risk manager
-          consecutiveLosses: 0, // Would be populated from risk manager
-          totalExposure: position ? position.marginUsed || position.quantity * position.entryPrice : 0,
-        },
-      };
+    const result = await ErrorHandler.executeAsync(
+      async () => {
+        const position = this.positionLifecycleService.getCurrentPosition();
+        const stateSnapshot: BotStateSnapshot = {
+          snapshotTime: Date.now(),
+          positions: position
+            ? [
+                {
+                  positionId: position.id,
+                  symbol: position.symbol,
+                  direction: position.side as 'LONG' | 'SHORT',
+                  quantity: position.quantity,
+                  entryPrice: position.entryPrice,
+                  entryTime: position.openedAt || Date.now(),
+                  currentPrice: undefined, // Would need market data
+                  currentPnL: position.unrealizedPnL,
+                  currentPnLPercent: (position.unrealizedPnL / (position.quantity * position.entryPrice)) * 100,
+                  openOrders: [], // Would be populated with order details
+                  state: 'OPEN',
+                  persistedAt: Date.now(),
+                },
+              ]
+            : [],
+          sessionMetrics: {
+            totalTrades: 0, // Would be populated from journal
+            totalPnL: 0, // Would be populated from journal
+            startTime: Date.now(),
+          },
+          riskMetrics: {
+            dailyPnL: 0, // Would be populated from risk manager
+            consecutiveLosses: 0, // Would be populated from risk manager
+            totalExposure: position ? position.marginUsed || position.quantity * position.entryPrice : 0,
+          },
+        };
 
-      const filePath = path.join(this.stateDirectory, 'bot-state.json');
-      fs.writeFileSync(filePath, JSON.stringify(stateSnapshot, null, 2));
+        const filePath = path.join(this.stateDirectory, 'bot-state.json');
+        fs.writeFileSync(filePath, JSON.stringify(stateSnapshot, null, 2));
 
-      this.logger.info(`[GracefulShutdownManager] State persisted to ${filePath}`);
-
-      this.eventBus.publishSync({
-        type: LiveTradingEventType.STATE_PERSISTED,
-        data: {
-          filePath,
+        this.eventBus.publishSync({
+          type: LiveTradingEventType.STATE_PERSISTED,
+          data: {
+            filePath,
+            timestamp: Date.now(),
+          },
           timestamp: Date.now(),
+        });
+      },
+      {
+        strategy: RecoveryStrategy.GRACEFUL_DEGRADE,
+        logger: this.logger,
+        context: 'GracefulShutdownManager.persistState',
+        onRecover: () => {
+          this.logger.warn('⚠️ State persistence failed, continuing shutdown without saved state');
         },
-        timestamp: Date.now(),
-      });
-    } catch (error) {
-      this.logger.error(`[GracefulShutdownManager] Error persisting state: ${error}`);
-      throw error;
+      }
+    );
+
+    if (!result.success) {
+      // Don't throw - graceful degradation
+      this.logger.error(`[GracefulShutdownManager] Failed to persist state: ${result.error?.message}`);
+      return; // Return early without STATE_PERSISTED event
     }
+
+    this.logger.info(`[GracefulShutdownManager] State persisted successfully`);
   }
 
   /**
-   * Recover state from disk on bot restart
+   * Recover state from disk on bot restart with FALLBACK strategy
+   * Uses FALLBACK strategy for better diagnostics and recovery options
+   * Falls back to null (fresh start) on any error
    */
   public async recoverState(): Promise<RecoveryMetadata | null> {
     try {
@@ -419,18 +473,45 @@ export class GracefulShutdownManager implements IGracefulShutdownManager {
 
       return metadata;
     } catch (error) {
-      this.logger.error(`[GracefulShutdownManager] Error recovering state: ${error}`);
+      await ErrorHandler.handle(error, {
+        strategy: RecoveryStrategy.FALLBACK,
+        logger: this.logger,
+        context: 'GracefulShutdownManager.recoverState',
+        onRecover: () => {
+          this.logger.warn('⚠️ State recovery failed, starting with fresh state', {
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        },
+      });
+
+      // FALLBACK: return null (fresh start)
       return null;
     }
   }
 
   /**
-   * Helper: Ensure state directory exists
+   * Helper: Ensure state directory exists with GRACEFUL_DEGRADE
+   * Uses GRACEFUL_DEGRADE for file system permission errors
+   * Doesn't fail construction if directory creation fails
    */
   private ensureStateDirectory(): void {
-    if (!fs.existsSync(this.stateDirectory)) {
-      fs.mkdirSync(this.stateDirectory, { recursive: true });
-      this.logger.debug(`[GracefulShutdownManager] Created state directory: ${this.stateDirectory}`);
+    try {
+      if (!fs.existsSync(this.stateDirectory)) {
+        fs.mkdirSync(this.stateDirectory, { recursive: true });
+        this.logger.debug(`[GracefulShutdownManager] Created state directory: ${this.stateDirectory}`);
+      }
+    } catch (error) {
+      ErrorHandler.handle(error, {
+        strategy: RecoveryStrategy.GRACEFUL_DEGRADE,
+        logger: this.logger,
+        context: 'GracefulShutdownManager.ensureStateDirectory',
+        onRecover: () => {
+          this.logger.warn('⚠️ Could not create state directory, persistence will be disabled', {
+            directory: this.stateDirectory,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        },
+      });
     }
   }
 

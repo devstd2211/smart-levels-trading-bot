@@ -147,21 +147,23 @@ describe('RealTimeRiskMonitor Service Tests', () => {
       expect(score.status).toBe(DangerLevel.SAFE);
     });
 
-    it('should throw error if position not found', async () => {
+    it('should return safe default if position not found', async () => {
       mockPositionService.getCurrentPosition.mockReturnValue(null);
 
-      await expect(
-        monitor.calculatePositionHealth('NONEXISTENT', 45000)
-      ).rejects.toThrow('Position not found');
+      const score = await monitor.calculatePositionHealth('NONEXISTENT', 45000);
+      // Phase 8.5: GRACEFUL_DEGRADE returns safe default (70) instead of throwing
+      expect(score.overallScore).toBe(70);
+      expect(score.status).toBe(DangerLevel.SAFE);
     });
 
-    it('should throw error if position ID mismatch', async () => {
+    it('should return safe default if position ID mismatch', async () => {
       const position = createMockPosition({ id: 'POS-111' });
       mockPositionService.getCurrentPosition.mockReturnValue(position);
 
-      await expect(
-        monitor.calculatePositionHealth('POS-999', 45000)
-      ).rejects.toThrow('Position not found');
+      const score = await monitor.calculatePositionHealth('POS-999', 45000);
+      // Phase 8.5: GRACEFUL_DEGRADE returns safe default (70) instead of throwing
+      expect(score.overallScore).toBe(70);
+      expect(score.status).toBe(DangerLevel.SAFE);
     });
   });
 
