@@ -634,3 +634,89 @@ export class WebSocketSubscriptionError extends TradingError {
     Object.setPrototypeOf(this, WebSocketSubscriptionError.prototype);
   }
 }
+
+// ============================================================================
+// RISK MANAGEMENT DOMAIN ERRORS
+// ============================================================================
+
+/**
+ * Risk validation error
+ * Indicates that a trade was rejected due to risk validation failures
+ */
+export class RiskValidationError extends TradingError {
+  constructor(
+    message: string,
+    context?: {
+      signal?: Signal;
+      reason?: string;
+      signalPrice?: number;
+      confidence?: number;
+      [key: string]: unknown;
+    },
+    originalError?: Error,
+  ) {
+    super(
+      message,
+      'RISK_VALIDATION_ERROR',
+      ErrorDomain.TRADING,
+      ErrorSeverity.MEDIUM,
+      originalError,
+      context,
+    );
+    Object.setPrototypeOf(this, RiskValidationError.prototype);
+  }
+}
+
+/**
+ * Risk calculation error
+ * Indicates that risk calculations failed (NaN, Infinity, etc.)
+ */
+export class RiskCalculationError extends TradingError {
+  constructor(
+    message: string,
+    context?: {
+      operation?: string;
+      inputValues?: Record<string, unknown>;
+      result?: number | string;
+      [key: string]: unknown;
+    },
+    originalError?: Error,
+  ) {
+    super(
+      message,
+      'RISK_CALCULATION_ERROR',
+      ErrorDomain.TRADING,
+      ErrorSeverity.MEDIUM,
+      originalError,
+      context,
+    );
+    Object.setPrototypeOf(this, RiskCalculationError.prototype);
+  }
+}
+
+/**
+ * Insufficient account balance error
+ * Indicates that account balance is insufficient or invalid for trading
+ */
+export class InsufficientAccountBalanceError extends TradingError {
+  constructor(
+    message: string,
+    context?: {
+      currentBalance?: number;
+      requiredBalance?: number;
+      reason?: string;
+      [key: string]: unknown;
+    },
+    originalError?: Error,
+  ) {
+    super(
+      message,
+      'INSUFFICIENT_ACCOUNT_BALANCE_ERROR',
+      ErrorDomain.TRADING,
+      ErrorSeverity.HIGH,
+      originalError,
+      context,
+    );
+    Object.setPrototypeOf(this, InsufficientAccountBalanceError.prototype);
+  }
+}

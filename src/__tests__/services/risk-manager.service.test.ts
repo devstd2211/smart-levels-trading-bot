@@ -8,6 +8,8 @@
  */
 
 import { RiskManager } from '../../services/risk-manager.service';
+import { ErrorHandler } from '../../errors/ErrorHandler';
+import { RiskValidationError } from '../../errors/DomainErrors';
 import {
   Signal,
   Position,
@@ -149,12 +151,14 @@ function createMockTradeRecord(realizedPnL: number = 10, quantity: number = 1): 
 describe('RiskManager', () => {
   let riskManager: RiskManager;
   let mockLogger: MockLogger;
+  let errorHandler: ErrorHandler;
   let defaultConfig: RiskManagerConfig;
 
   beforeEach(() => {
     mockLogger = new MockLogger();
+    errorHandler = new ErrorHandler(mockLogger);
     defaultConfig = createDefaultConfig();
-    riskManager = new RiskManager(defaultConfig, mockLogger);
+    riskManager = new RiskManager(defaultConfig, mockLogger, errorHandler);
     // Set account balance for accurate daily PnL % calculation in tests
     // PHASE 4 RULE: Explicit initialization instead of fallback calculations
     riskManager.setAccountBalance(1000);
@@ -162,13 +166,13 @@ describe('RiskManager', () => {
 
   describe('Constructor', () => {
     it('should initialize with valid config', () => {
-      const manager = new RiskManager(defaultConfig, mockLogger);
+      const manager = new RiskManager(defaultConfig, mockLogger, errorHandler);
       expect(manager).toBeDefined();
     });
 
     it('should throw error if config is missing', () => {
       expect(() => {
-        new RiskManager(null as any, mockLogger);
+        new RiskManager(null as any, mockLogger, errorHandler);
       }).toThrow('RiskManagerConfig is required');
     });
 
@@ -177,7 +181,7 @@ describe('RiskManager', () => {
       customConfig.positionSizing.riskPerTradePercent = 2.0;
       customConfig.dailyLimits.maxDailyLossPercent = 10.0;
 
-      const manager = new RiskManager(customConfig, mockLogger);
+      const manager = new RiskManager(customConfig, mockLogger, errorHandler);
       expect(manager).toBeDefined();
     });
   });
@@ -188,7 +192,7 @@ describe('RiskManager', () => {
       signal.price = 0;
 
       await expect(riskManager.canTrade(signal, 1000, [])).rejects.toThrow(
-        '[RiskManager] REQUIRED: Signal.price must be positive number'
+        RiskValidationError
       );
     });
 
@@ -196,7 +200,7 @@ describe('RiskManager', () => {
       const signal = createMockSignal(SignalDirection.LONG, 60, -100);
 
       await expect(riskManager.canTrade(signal, 1000, [])).rejects.toThrow(
-        '[RiskManager] REQUIRED: Signal.price must be positive number'
+        RiskValidationError
       );
     });
 
@@ -205,7 +209,7 @@ describe('RiskManager', () => {
       signal.confidence = undefined as any;
 
       await expect(riskManager.canTrade(signal, 1000, [])).rejects.toThrow(
-        '[RiskManager] REQUIRED: Signal.confidence must be 0-100'
+        RiskValidationError
       );
     });
 
@@ -213,7 +217,7 @@ describe('RiskManager', () => {
       const signal = createMockSignal(SignalDirection.LONG, -10);
 
       await expect(riskManager.canTrade(signal, 1000, [])).rejects.toThrow(
-        '[RiskManager] REQUIRED: Signal.confidence must be 0-100'
+        RiskValidationError
       );
     });
 
@@ -221,7 +225,7 @@ describe('RiskManager', () => {
       const signal = createMockSignal(SignalDirection.LONG, 150);
 
       await expect(riskManager.canTrade(signal, 1000, [])).rejects.toThrow(
-        '[RiskManager] REQUIRED: Signal.confidence must be 0-100'
+        RiskValidationError
       );
     });
 
@@ -376,7 +380,7 @@ describe('RiskManager', () => {
     it('should check total exposure limit', async () => {
       const config = createDefaultConfig();
       config.concurrentRisk.maxTotalExposurePercent = 10.0; // 100 USDT on 1000
-      const manager = new RiskManager(config, mockLogger);
+      const manager = new RiskManager(config, mockLogger, errorHandler);
 
       // Create positions that total 80% exposure
       const positions = [
@@ -394,7 +398,7 @@ describe('RiskManager', () => {
     it('should disable concurrent risk check if disabled', async () => {
       const config = createDefaultConfig();
       config.concurrentRisk.enabled = false;
-      const manager = new RiskManager(config, mockLogger);
+      const manager = new RiskManager(config, mockLogger, errorHandler);
 
       const positions = [
         createMockPosition(1.0, 100),
@@ -423,7 +427,7 @@ describe('RiskManager', () => {
 
     it('should apply loss streak multiplier', async () => {
       const config = createDefaultConfig();
-      const manager = new RiskManager(config, mockLogger);
+      const manager = new RiskManager(config, mockLogger, errorHandler);
       manager.setAccountBalance(1000);
 
       // Record 2 consecutive losses
@@ -439,7 +443,7 @@ describe('RiskManager', () => {
 
     it('should apply different multiplier for 3 losses', async () => {
       const config = createDefaultConfig();
-      const manager = new RiskManager(config, mockLogger);
+      const manager = new RiskManager(config, mockLogger, errorHandler);
       manager.setAccountBalance(1000);
 
       // Record 3 consecutive losses
@@ -458,7 +462,7 @@ describe('RiskManager', () => {
       const config = createDefaultConfig();
       config.positionSizing.minPositionSizeUsdt = 50;
       config.positionSizing.maxPositionSizeUsdt = 200;
-      const manager = new RiskManager(config, mockLogger);
+      const manager = new RiskManager(config, mockLogger, errorHandler);
       manager.setAccountBalance(1000);
 
       const signal = createMockSignal(SignalDirection.LONG, 1, 100); // Very low confidence
@@ -530,7 +534,7 @@ describe('RiskManager', () => {
 
     it('should mark risk as unhealthy when consecutive loss limit exceeded', async () => {
       const config = createDefaultConfig();
-      const manager = new RiskManager(config, mockLogger);
+      const manager = new RiskManager(config, mockLogger, errorHandler);
       manager.setAccountBalance(1000);
 
       // Record 5 consecutive losses (at limit)
@@ -560,7 +564,7 @@ describe('RiskManager', () => {
     });
 
     it('should use EXPLICIT constants for multipliers', async () => {
-      const manager = new RiskManager(createDefaultConfig(), mockLogger);
+      const manager = new RiskManager(createDefaultConfig(), mockLogger, errorHandler);
       manager.setAccountBalance(1000);
 
       // Record 2 losses - should use EXPLICIT constant
@@ -579,18 +583,16 @@ describe('RiskManager', () => {
         {
           signal: createMockSignal(SignalDirection.LONG, 60, -100),
           balance: 1000,
-          expectedError: '[RiskManager] REQUIRED: Signal.price must be positive',
         },
         {
           signal: createMockSignal(SignalDirection.LONG, -5),
           balance: 1000,
-          expectedError: '[RiskManager] REQUIRED: Signal.confidence must be 0-100',
         },
       ];
 
       for (const test of invalidTests) {
         await expect(riskManager.canTrade(test.signal, test.balance, [])).rejects.toThrow(
-          test.expectedError
+          RiskValidationError
         );
       }
     });
@@ -677,7 +679,7 @@ describe('RiskManager', () => {
     it('should apply ALL risk checks in single canTrade call', async () => {
       const config = createDefaultConfig();
       config.dailyLimits.maxDailyLossPercent = 2.0; // Low limit
-      const manager = new RiskManager(config, mockLogger);
+      const manager = new RiskManager(config, mockLogger, errorHandler);
       manager.setAccountBalance(1000);
 
       // Get near the daily loss limit

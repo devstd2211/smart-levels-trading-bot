@@ -23,6 +23,12 @@
 
 import { Signal, Position, RiskManagerConfig, RiskDecision, RiskStatus, TradeRecord } from '../types';
 import { LoggerService } from '../types';
+import { ErrorHandler, RecoveryStrategy } from '../errors/ErrorHandler';
+import {
+  RiskValidationError,
+  RiskCalculationError,
+  InsufficientAccountBalanceError
+} from '../errors/DomainErrors';
 import {
   MULTIPLIER_VALUES,
   RATIO_MULTIPLIERS,
@@ -67,7 +73,11 @@ export class RiskManager {
   private totalExposure: number = 0;
   private accountBalanceForPnLCalc: number = 0; // Track account balance for accurate PnL %
 
-  constructor(config: RiskManagerConfig, private logger: LoggerService) {
+  constructor(
+    config: RiskManagerConfig,
+    private logger: LoggerService,
+    private errorHandler: ErrorHandler,
+  ) {
     // Validate config
     if (!config) {
       throw new Error('RiskManagerConfig is required');
@@ -139,23 +149,56 @@ export class RiskManager {
     accountBalance: number,
     openPositions: Position[]
   ): Promise<RiskDecision> {
-    // ========================================================================
-    // PHASE 4 RULE: FAST FAIL - Validate inputs FIRST before any checks
-    // ========================================================================
+    try {
+      // ========================================================================
+      // PHASE 4 RULE: FAST FAIL - Validate inputs FIRST before any checks
+      // ========================================================================
 
-    // REQUIRED: signal.price must be provided - NO FALLBACKS
-    if (!signal.price || signal.price <= 0) {
-      throw new Error(
-        `[RiskManager] REQUIRED: Signal.price must be positive number. Got: ${signal.price}`
-      );
-    }
+      // REQUIRED: signal.price must be provided - NO FALLBACKS (THROW strategy)
+      if (!signal.price || signal.price <= 0) {
+        throw new RiskValidationError(
+          `Signal.price must be positive number. Got: ${signal.price}`,
+          {
+            signal,
+            reason: 'Invalid signal price',
+            signalPrice: signal.price,
+          }
+        );
+      }
 
-    // REQUIRED: signal.confidence must be provided - NO FALLBACKS
-    if (signal.confidence === undefined || signal.confidence < 0 || signal.confidence > 100) {
-      throw new Error(
-        `[RiskManager] REQUIRED: Signal.confidence must be 0-100. Got: ${signal.confidence}`
-      );
-    }
+      // REQUIRED: signal.confidence must be provided - NO FALLBACKS (THROW strategy)
+      if (signal.confidence === undefined || signal.confidence < 0 || signal.confidence > 100) {
+        throw new RiskValidationError(
+          `Signal.confidence must be 0-100. Got: ${signal.confidence}`,
+          {
+            signal,
+            reason: 'Invalid signal confidence',
+            confidence: signal.confidence,
+          }
+        );
+      }
+
+      // Account balance validation with GRACEFUL_DEGRADE
+      if (!accountBalance || accountBalance <= 0) {
+        // On invalid account balance, graceful degrade = deny trade for safety
+        const handled = await this.errorHandler.handle(
+          new InsufficientAccountBalanceError(
+            `Invalid account balance: ${accountBalance}`,
+            { currentBalance: accountBalance, reason: 'Zero or negative balance' }
+          ),
+          {
+            strategy: RecoveryStrategy.GRACEFUL_DEGRADE,
+            context: 'RiskManager.canTrade[accountBalance]',
+          }
+        );
+
+        // Graceful degrade for balance = deny trade (safe fallback)
+        return {
+          allowed: false,
+          reason: 'Account balance validation failed - trade denied for safety',
+          riskDetails: this.buildRiskDetails(openPositions),
+        };
+      }
 
     // Store account balance for accurate daily PnL % calculation
     this.accountBalanceForPnLCalc = accountBalance;
@@ -282,11 +325,24 @@ export class RiskManager {
       dailyPnL: this.dailyPnLPercent.toFixed(2) + '%',
     });
 
-    return {
-      allowed: true,
-      adjustedPositionSize: finalSize,
-      riskDetails: this.buildRiskDetails(openPositions),
-    };
+      return {
+        allowed: true,
+        adjustedPositionSize: finalSize,
+        riskDetails: this.buildRiskDetails(openPositions),
+      };
+    } catch (error) {
+      // Handle validation errors
+      if (error instanceof RiskValidationError) {
+        const handled = await this.errorHandler.handle(error, {
+          strategy: RecoveryStrategy.THROW,
+          context: 'RiskManager.canTrade[validation]',
+        });
+        if (!handled.success) {
+          throw handled.error;
+        }
+      }
+      throw error;
+    }
   }
 
   /**
@@ -366,69 +422,197 @@ export class RiskManager {
   /**
    * Calculate total exposure if we add a new position
    * PHASE 4 RULE: Use EXPLICIT calculation instead of magic numbers
+   * PHASE 8.9: ErrorHandler integration with GRACEFUL_DEGRADE on calculation failures
    */
   private calculateTotalExposure(openPositions: Position[], newSignal: Signal): number {
-    let totalExposure = 0;
+    try {
+      let totalExposure = 0;
 
-    // Sum existing positions (notional value = quantity * price)
-    for (const pos of openPositions) {
-      totalExposure += Math.abs(pos.quantity * pos.entryPrice);
-    }
+      // Sum existing positions (notional value = quantity * price)
+      for (const pos of openPositions) {
+        try {
+          const posExposure = Math.abs(pos.quantity * pos.entryPrice);
+          if (!isFinite(posExposure)) {
+            throw new RiskCalculationError(
+              `Invalid position exposure: ${posExposure}`,
+              {
+                operation: 'positionExposureCalculation',
+                inputValues: { quantity: pos.quantity, entryPrice: pos.entryPrice },
+                result: posExposure,
+              }
+            );
+          }
+          totalExposure += posExposure;
+        } catch (error) {
+          // Skip invalid position exposure, continue with others
+          this.logger.warn('[RiskManager] Invalid position exposure, skipping', {
+            position: pos,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
 
-    // Estimate new position size using the same formula as calculateBasePositionSize
-    // This ensures consistency between exposure check and actual sizing
-    if (newSignal && newSignal.price && newSignal.price > 0 && newSignal.confidence >= 0 && this.accountBalanceForPnLCalc > 0) {
-      const riskAmount = this.accountBalanceForPnLCalc * (this.positionSizingConfig.riskPerTradePercent / 100);
-      const slDistancePercent = Math.max(
-        RISK_MANAGER_MIN_SL_DISTANCE_PERCENT,
-        MULTIPLIER_VALUES.TWO - newSignal.confidence / 100
+      // Estimate new position size using the same formula as calculateBasePositionSize
+      // This ensures consistency between exposure check and actual sizing
+      if (newSignal && newSignal.price && newSignal.price > 0 && newSignal.confidence >= 0 && this.accountBalanceForPnLCalc > 0) {
+        try {
+          const riskAmount = this.accountBalanceForPnLCalc * (this.positionSizingConfig.riskPerTradePercent / 100);
+          const slDistancePercent = Math.max(
+            RISK_MANAGER_MIN_SL_DISTANCE_PERCENT,
+            MULTIPLIER_VALUES.TWO - newSignal.confidence / 100
+          );
+          const slDistance = (newSignal.price * slDistancePercent) / 100;
+          const estimatedSize = riskAmount / Math.max(slDistance, 0.01); // Prevent division by zero
+
+          if (!isFinite(estimatedSize)) {
+            throw new RiskCalculationError(
+              `Invalid estimated size: ${estimatedSize}`,
+              {
+                operation: 'estimatedSizeCalculation',
+                inputValues: { riskAmount, slDistance, slDistancePercent },
+                result: estimatedSize,
+              }
+            );
+          }
+
+          const maxSizeByLeverage = (this.accountBalanceForPnLCalc * this.positionSizingConfig.maxLeverageMultiplier) / newSignal.price;
+          const constrainedSize = Math.min(estimatedSize, maxSizeByLeverage);
+          const newExposure = constrainedSize * newSignal.price;
+
+          if (!isFinite(newExposure)) {
+            throw new RiskCalculationError(
+              `Invalid new exposure: ${newExposure}`,
+              {
+                operation: 'newExposureCalculation',
+                inputValues: { constrainedSize, price: newSignal.price },
+                result: newExposure,
+              }
+            );
+          }
+
+          totalExposure += newExposure;
+        } catch (error) {
+          // Graceful degrade: assume no new exposure on calculation error
+          const handled = this.errorHandler.wrapSync(
+            () => { throw error; },
+            {
+              strategy: RecoveryStrategy.GRACEFUL_DEGRADE,
+              context: 'RiskManager.calculateTotalExposure[newSignal]',
+            }
+          );
+          this.logger.warn('[RiskManager] New signal exposure calculation failed, assuming zero exposure', {
+            signal: newSignal,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      return totalExposure;
+    } catch (error) {
+      // Final fallback - return zero exposure on critical failure
+      const handled = this.errorHandler.wrapSync(
+        () => { throw error; },
+        {
+          strategy: RecoveryStrategy.GRACEFUL_DEGRADE,
+          context: 'RiskManager.calculateTotalExposure[critical]',
+        }
       );
-      const slDistance = (newSignal.price * slDistancePercent) / 100;
-      const estimatedSize = riskAmount / Math.max(slDistance, 0.01); // Prevent division by zero
-      const maxSizeByLeverage = (this.accountBalanceForPnLCalc * this.positionSizingConfig.maxLeverageMultiplier) / newSignal.price;
-      const constrainedSize = Math.min(estimatedSize, maxSizeByLeverage);
-      totalExposure += constrainedSize * newSignal.price;
+      this.logger.error('[RiskManager] Critical error calculating total exposure, returning zero', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return 0;
     }
-
-    return totalExposure;
   }
 
   /**
    * Record trade result and update internal state
    * PHASE 4: EXPLICIT calculation of daily PnL % using account balance
+   * PHASE 8.9: ErrorHandler integration with GRACEFUL_DEGRADE on calculation failures
    */
   recordTradeResult(trade: TradeRecord): void {
-    if (!trade) {
-      this.logger.warn('[RiskManager] Trade record is required');
-      return;
+    try {
+      if (!trade) {
+        this.logger.warn('[RiskManager] Trade record is required');
+        return;
+      }
+
+      const pnl = trade.realizedPnL || 0;
+      const tradeValue = (trade.quantity * trade.entryPrice) || 1; // Avoid division by zero
+
+      // Calculate PnL % with error handling
+      let pnlPercent: number;
+      try {
+        pnlPercent = (pnl / tradeValue) * 100;
+        if (!isFinite(pnlPercent)) {
+          throw new RiskCalculationError(
+            `Invalid PnL percent: ${pnlPercent}`,
+            {
+              operation: 'pnlPercentCalculation',
+              inputValues: { pnl, tradeValue },
+              result: pnlPercent,
+            }
+          );
+        }
+      } catch (error) {
+        // Graceful degrade on calculation error
+        const handled = this.errorHandler.wrapSync(
+          () => { throw error; },
+          {
+            strategy: RecoveryStrategy.GRACEFUL_DEGRADE,
+            context: 'RiskManager.recordTradeResult[pnlCalculation]',
+          }
+        );
+        pnlPercent = 0;
+        this.logger.warn('[RiskManager] PnL calculation degraded, using zero', {
+          pnl,
+          tradeValue,
+          originalPercent: isFinite((pnl / tradeValue) * 100) ? (pnl / tradeValue) * 100 : 'NaN',
+        });
+      }
+
+      // Update daily PnL with safe calculation
+      this.dailyPnL += pnl;
+
+      // Calculate daily PnL % based on account balance with error handling
+      const baseBalance = this.accountBalanceForPnLCalc || tradeValue;
+      const dailyPnLPercent = (this.dailyPnL / baseBalance) * 100;
+
+      if (isFinite(dailyPnLPercent)) {
+        this.dailyPnLPercent = dailyPnLPercent;
+      } else {
+        this.logger.warn('[RiskManager] Daily PnL % calculation failed, keeping previous value', {
+          calculatedPercent: dailyPnLPercent,
+          currentPercent: this.dailyPnLPercent,
+        });
+      }
+
+      // Update loss streak safely
+      if (pnl < 0) {
+        this.consecutiveLosses++;
+      } else {
+        this.consecutiveLosses = 0;
+      }
+
+      this.logger.debug('📊 RiskManager trade result recorded', {
+        pnl: pnl.toFixed(2),
+        pnlPercent: pnlPercent.toFixed(2) + '%',
+        consecutiveLosses: this.consecutiveLosses,
+        dailyPnL: this.dailyPnL.toFixed(2),
+        dailyPnLPercent: this.dailyPnLPercent.toFixed(2) + '%',
+      });
+    } catch (error) {
+      // Log error but don't throw - recordTradeResult should never crash trading
+      const handled = this.errorHandler.wrapSync(
+        () => { throw error; },
+        {
+          strategy: RecoveryStrategy.SKIP,
+          context: 'RiskManager.recordTradeResult[critical]',
+        }
+      );
+      this.logger.error('[RiskManager] Critical error recording trade, operation skipped', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
-
-    const pnl = trade.realizedPnL || 0;
-    const tradeValue = (trade.quantity * trade.entryPrice) || 1; // Avoid division by zero
-    const pnlPercent = (pnl / tradeValue) * 100;
-
-    // Update daily PnL
-    this.dailyPnL += pnl;
-
-    // Calculate daily PnL % based on account balance
-    // If accountBalanceForPnLCalc not set, use trade value as estimate
-    const baseBalance = this.accountBalanceForPnLCalc || tradeValue;
-    this.dailyPnLPercent = (this.dailyPnL / baseBalance) * 100;
-
-    // Update loss streak
-    if (pnl < 0) {
-      this.consecutiveLosses++;
-    } else {
-      this.consecutiveLosses = 0;
-    }
-
-    this.logger.debug('📊 RiskManager trade result recorded', {
-      pnl: pnl.toFixed(2),
-      pnlPercent: pnlPercent.toFixed(2) + '%',
-      consecutiveLosses: this.consecutiveLosses,
-      dailyPnL: this.dailyPnL.toFixed(2),
-      dailyPnLPercent: this.dailyPnLPercent.toFixed(2) + '%',
-    });
   }
 
   /**

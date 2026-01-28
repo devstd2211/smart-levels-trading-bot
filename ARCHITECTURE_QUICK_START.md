@@ -1,8 +1,8 @@
 # 🚀 Architecture Quick Start - Current Context
 
-**Status:** Phase 14 (Prod) ✅ + Phase 9 ✅ + Phase 4 ✅ + Phase 3 ✅ + Phase 0.3 ✅ + Phase 5 ✅ + Phase 6.1-6.3 ✅ + Phase 7 ✅ + **Phase 8 Stages 1-8 ✅**
-**Last Updated:** 2026-01-28 (Session 40 - **Phase 8 Stage 8: WebSocketManagerService ErrorHandler Integration + Singleton Architecture COMPLETE**)
-**Build:** ✅ BUILD SUCCESS | **4377 Tests Passing (+25 in Phase 8 Stage 8, +162 total Phase 8)** | **ZERO regressions** ✅
+**Status:** Phase 14 (Prod) ✅ + Phase 9 ✅ + Phase 4 ✅ + Phase 3 ✅ + Phase 0.3 ✅ + Phase 5 ✅ + Phase 6.1-6.3 ✅ + Phase 7 ✅ + **Phase 8 Stages 1-8 ✅** + **Phase 8.9.1 ✅ COMPLETE**
+**Last Updated:** 2026-01-28 (Session 42 - **Phase 8.9.1: RiskManager ErrorHandler Integration COMPLETE**)
+**Build:** ✅ SUCCESS | **25/25 New Tests Passing** | **74/74 RiskManager Tests** | **0 Regressions**
 
 ---
 
@@ -138,13 +138,25 @@
 |  | - Architecture | ✅ | **ErrorHandler singleton injected via DI (no logger duplication)** | - | S40 |
 |  | - End-to-End scenarios | ✅ | Connection resilience + recovery | 2 ✅ | S40 |
 |  | - New error types | ✅ | WebSocketConnectionError, WebSocketAuthenticationError, WebSocketSubscriptionError | - | S40 |
-| **TOTAL S1-8** | **Current Progress** | ✅ COMPLETE | **162 tests passing** | **162 ✅** | **S40** |
+| **8.9.1** | **RiskManager** | ✅ | **THROW + GRACEFUL_DEGRADE + SKIP strategies** | **49 ✅** | **S42** |
+|  | - canTrade() validation | ✅ | THROW on signal.price/confidence; GRACEFUL_DEGRADE on account balance | 8 ✅ | S42 |
+|  | - recordTradeResult() | ✅ | GRACEFUL_DEGRADE on PnL calc; SKIP on critical failure | 8 ✅ | S42 |
+|  | - calculateTotalExposure() | ✅ | GRACEFUL_DEGRADE on position/signal calc failures | 4 ✅ | S42 |
+|  | - Error Classes (NEW) | ✅ | RiskValidationError, RiskCalculationError, InsufficientAccountBalanceError | - | S42 |
+|  | - DI Integration | ✅ | ErrorHandler injected via constructor in BotServices | - | S42 |
+|  | - Error Handling Tests | ✅ | 25 tests (validation, balance, calculation, recording, exposure) | 25 ✅ | S42 |
+|  | - Legacy Tests Updated | ✅ | Old tests refactored + ErrorHandler injection | 24 ✅ | S42 |
+|  | - Backward Compatibility | ✅ | Existing behavior unchanged; 74/74 tests passing | 74 ✅ | S42 |
+| **TOTAL S1-9.1** | **Current Progress** | ✅ COMPLETE | **Phase 8.9.1 fully integrated** | **49 new ✅** | **S42** |
 
 ### Future Phases
 | Phase | Component | Status | Details | Notes |
 |-------|-----------|--------|---------|-------|
-| **8.9+** | ErrorHandler Remaining Services | ⏳ | risk-manager, trading-journal, position-monitor, analyzer-engine, etc (~60+ tests) | Phase 8 (continuation) |
-| **9.2-9.4** | Live Trading Integration | ⏳ | Configuration + E2E tests + chaos | After Phase 8 |
+| **8.9.2** | TradingJournalService | ⏳ | RETRY + FALLBACK + GRACEFUL_DEGRADE for file I/O | ~20 tests |
+| **8.9.3** | PositionMonitorService | ⏳ | RETRY + GRACEFUL_DEGRADE + FALLBACK for monitoring | ~18 tests |
+| **8.9.4** | Position Handlers | ⏳ | RETRY + SKIP + FALLBACK for event handlers | ~15 tests |
+| **8.9.5+** | Remaining Services (10+) | ⏳ | AnalyzerEngine, TelegramService, StrategyLoader, etc | ~60+ tests total |
+| **9.2-9.4** | Live Trading Integration | ⏳ | Configuration + E2E tests + chaos | After Phase 8.9 |
 | **15** | Multi-Strategy Config | ⏳ | Config consolidation | After Phase 9 |
 
 ### Phase 8.8 Architecture Improvements (Session 40)

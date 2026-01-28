@@ -442,7 +442,7 @@ export class BotServices {
         maxLeverageMultiplier: 2.0,
       },
     };
-    const riskManager = new RiskManager(riskManagerConfig, this.logger);
+    const riskManager = new RiskManager(riskManagerConfig, this.logger, this.errorHandler);
 
     // 8. Initialize position management
     // NOTE: Phase 1.2 - Update PositionLifecycleService to use IExchange
