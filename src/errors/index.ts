@@ -40,6 +40,10 @@ export {
   ConfigurationError,
   // Performance domain
   PerformanceError,
+  // WebSocket domain (Phase 8.8)
+  WebSocketConnectionError,
+  WebSocketAuthenticationError,
+  WebSocketSubscriptionError,
 } from './DomainErrors';
 
 // Result type for type-safe error handling

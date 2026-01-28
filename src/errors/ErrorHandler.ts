@@ -86,9 +86,6 @@ export interface ErrorHandlingConfig {
   /** Configuration for RETRY strategy */
   retryConfig?: RetryConfig;
 
-  /** Logger for recording error handling */
-  logger?: ErrorLogger;
-
   /** Context string for logging (e.g., service.method) */
   context?: string;
 
@@ -127,8 +124,19 @@ export interface ErrorHandlingResult {
 
 /**
  * Centralized error handler for consistent error handling across services
+ * Logger is injected once in constructor to avoid passing through every layer
  */
 export class ErrorHandler {
+  constructor(private readonly logger: ErrorLogger) {}
+
+  /**
+   * Get logger instance (for general logging, not just errors)
+   * Allows services to use ErrorHandler as single logger interface
+   */
+  getLogger(): ErrorLogger {
+    return this.logger;
+  }
+
   /**
    * Handle error with configured strategy
    *
@@ -136,7 +144,7 @@ export class ErrorHandler {
    * @param config - Error handling configuration
    * @returns Error handling result
    */
-  static async handle(
+  async handle(
     error: unknown,
     config: ErrorHandlingConfig,
   ): Promise<ErrorHandlingResult> {
@@ -166,12 +174,12 @@ export class ErrorHandler {
    * Note: This method handles the retry logic structure; the caller must implement
    * the actual operation retry with a loop or similar pattern
    */
-  private static async retryStrategy(
+  private async retryStrategy(
     error: TradingError,
     config: ErrorHandlingConfig,
   ): Promise<ErrorHandlingResult> {
     if (!error.metadata.retryable) {
-      config.logger?.warn(
+      this.logger.warn(
         `[${config.context}] Error not retryable, will throw`,
         { code: error.metadata.code, message: error.message },
       );
@@ -192,7 +200,7 @@ export class ErrorHandler {
       maxDelayMs: 10000,
     };
 
-    config.logger?.info(`[${config.context}] Setting up retry logic`, {
+    this.logger.info(`[${config.context}] Setting up retry logic`, {
       code: error.metadata.code,
       maxAttempts: retryConfig.maxAttempts,
       initialDelayMs: retryConfig.initialDelayMs,
@@ -202,7 +210,7 @@ export class ErrorHandler {
       const delayMs = this.calculateDelay(attempt, retryConfig, error);
 
       if (attempt > 1) {
-        config.logger?.info(
+        this.logger.info(
           `[${config.context}] Retry ${attempt}/${retryConfig.maxAttempts}`,
           { delayMs, code: error.metadata.code },
         );
@@ -226,11 +234,11 @@ export class ErrorHandler {
   /**
    * Fallback strategy - use alternate implementation
    */
-  private static async fallbackStrategy(
+  private async fallbackStrategy(
     error: TradingError,
     config: ErrorHandlingConfig,
   ): Promise<ErrorHandlingResult> {
-    config.logger?.info(
+    this.logger.info(
       `[${config.context}] Activating fallback strategy`,
       { code: error.metadata.code },
     );
@@ -249,11 +257,11 @@ export class ErrorHandler {
   /**
    * Graceful degradation strategy - continue with reduced functionality
    */
-  private static degradeStrategy(
+  private degradeStrategy(
     error: TradingError,
     config: ErrorHandlingConfig,
   ): ErrorHandlingResult {
-    config.logger?.warn(
+    this.logger.warn(
       `[${config.context}] Degrading to reduced functionality`,
       { code: error.metadata.code, severity: error.metadata.severity },
     );
@@ -272,11 +280,11 @@ export class ErrorHandler {
   /**
    * Skip strategy - log and continue
    */
-  private static skipStrategy(
+  private skipStrategy(
     error: TradingError,
     config: ErrorHandlingConfig,
   ): ErrorHandlingResult {
-    config.logger?.warn(`[${config.context}] Skipping operation due to error`, {
+    this.logger.warn(`[${config.context}] Skipping operation due to error`, {
       code: error.metadata.code,
       message: error.message,
     });
@@ -295,11 +303,11 @@ export class ErrorHandler {
   /**
    * Throw strategy - fail fast
    */
-  private static throwStrategy(
+  private throwStrategy(
     error: TradingError,
     config: ErrorHandlingConfig,
   ): ErrorHandlingResult {
-    config.logger?.error(`[${config.context}] Error will be thrown`, {
+    this.logger.error(`[${config.context}] Error will be thrown`, {
       code: error.metadata.code,
       message: error.message,
       diagnostic: error.toDiagnosticString(),
@@ -320,7 +328,7 @@ export class ErrorHandler {
   /**
    * Normalize any error type to TradingError
    */
-  static normalizeError(error: unknown): TradingError {
+  private normalizeError(error: unknown): TradingError {
     if (error instanceof TradingError) {
       return error;
     }
@@ -339,7 +347,7 @@ export class ErrorHandler {
   /**
    * Calculate delay for exponential backoff
    */
-  private static calculateDelay(
+  private calculateDelay(
     attempt: number,
     config: RetryConfig,
     error?: TradingError,
@@ -366,7 +374,7 @@ export class ErrorHandler {
   /**
    * Sleep for specified milliseconds
    */
-  private static delay(ms: number): Promise<void> {
+  private delay(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
@@ -376,18 +384,18 @@ export class ErrorHandler {
    *
    * Usage:
    * ```
-   * const position = await ErrorHandler.executeAsync(
+   * const errorHandler = new ErrorHandler(logger);
+   * const position = await errorHandler.executeAsync(
    *   () => this.bybitService.openPosition(params),
    *   {
    *     strategy: RecoveryStrategy.RETRY,
    *     retryConfig: { maxAttempts: 3, initialDelayMs: 500, backoffMultiplier: 2 },
-   *     logger: this.logger,
    *     context: 'BybitService.openPosition',
    *   }
    * );
    * ```
    */
-  static async executeAsync<T>(
+  async executeAsync<T>(
     fn: () => Promise<T>,
     config: ErrorHandlingConfig,
   ): Promise<{ success: boolean; value?: T; error?: TradingError }> {
@@ -418,7 +426,7 @@ export class ErrorHandler {
   /**
    * Execute operation with RETRY strategy and exponential backoff
    */
-  private static async executeWithRetry<T>(
+  private async executeWithRetry<T>(
     fn: () => Promise<T>,
     config: ErrorHandlingConfig,
   ): Promise<{ success: boolean; value?: T; error?: TradingError }> {
@@ -438,7 +446,7 @@ export class ErrorHandler {
         // Success - invoke callback if this wasn't the first attempt
         if (attempt > 1) {
           config.onRecover?.(RecoveryStrategy.RETRY, attempt - 1);
-          config.logger?.info(
+          this.logger.info(
             `[${config.context}] Operation succeeded after ${attempt - 1} retries`,
             { attemptNumber: attempt, totalAttempts: retryConfig.maxAttempts }
           );
@@ -451,7 +459,7 @@ export class ErrorHandler {
         // On last attempt or non-retryable error, return failure
         if (attempt >= retryConfig.maxAttempts || !lastError.metadata.retryable) {
           config.onFailure?.(lastError, attempt);
-          config.logger?.error(
+          this.logger.error(
             `[${config.context}] Operation failed after ${attempt} attempts`,
             { error: lastError.message, code: lastError.metadata.code, retryable: lastError.metadata.retryable }
           );
@@ -461,7 +469,7 @@ export class ErrorHandler {
         // Schedule retry
         const delayMs = this.calculateDelay(attempt, retryConfig, lastError);
         config.onRetry?.(attempt, lastError, delayMs);
-        config.logger?.warn(
+        this.logger.warn(
           `[${config.context}] Retrying after error (attempt ${attempt}/${retryConfig.maxAttempts})`,
           { delayMs, error: lastError.message, code: lastError.metadata.code }
         );
@@ -479,7 +487,7 @@ export class ErrorHandler {
   /**
    * Wrap a function with error handling
    */
-  static async wrapAsync<T>(
+  async wrapAsync<T>(
     fn: () => Promise<T>,
     config: ErrorHandlingConfig,
   ): Promise<T> {
@@ -497,7 +505,7 @@ export class ErrorHandler {
   /**
    * Wrap a synchronous function with error handling
    */
-  static wrapSync<T>(fn: () => T, config: ErrorHandlingConfig): T {
+  wrapSync<T>(fn: () => T, config: ErrorHandlingConfig): T {
     try {
       return fn();
     } catch (error) {

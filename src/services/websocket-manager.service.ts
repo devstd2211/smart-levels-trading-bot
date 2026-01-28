@@ -29,6 +29,7 @@ import { OrderExecutionDetectorService } from './order-execution-detector.servic
 import { WebSocketAuthenticationService } from './websocket-authentication.service';
 import { EventDeduplicationService } from './event-deduplication.service';
 import { WebSocketKeepAliveService } from './websocket-keep-alive.service';
+import { ErrorHandler, RecoveryStrategy, WebSocketConnectionError, WebSocketAuthenticationError, WebSocketSubscriptionError, ErrorLogger } from '../errors';
 
 // ============================================================================
 // CONSTANTS
@@ -82,17 +83,20 @@ export class WebSocketManagerService extends EventEmitter {
   private reconnectAttempts: number = 0;
   private isConnecting: boolean = false;
   private shouldReconnect: boolean = true;
+  private readonly logger: ErrorLogger; // Get from errorHandler
 
   constructor(
     private readonly config: ExchangeConfig,
     private readonly symbol: string,
-    private readonly logger: LoggerService,
+    private readonly errorHandler: ErrorHandler, // Phase 8.8: Singleton - handles BOTH errors and logging
     private readonly orderExecutionDetector: OrderExecutionDetectorService,
     private readonly authService: WebSocketAuthenticationService,
     private readonly deduplicationService: EventDeduplicationService,
     private readonly keepAliveService: WebSocketKeepAliveService,
   ) {
     super();
+    // Get logger from errorHandler (single source of truth)
+    this.logger = this.errorHandler.getLogger();
   }
 
   // ==========================================================================
@@ -101,8 +105,9 @@ export class WebSocketManagerService extends EventEmitter {
 
   /**
    * Connect to WebSocket and subscribe to updates
+   * Uses exponential backoff for connection retries with ErrorHandler
    */
-  connect(): void {
+  async connect(): Promise<void> {
     if (this.isConnecting || (this.ws !== null && this.ws.readyState === WebSocket.OPEN)) {
       return;
     }
@@ -121,59 +126,155 @@ export class WebSocketManagerService extends EventEmitter {
 
     this.logger.info('Connecting to WebSocket', { url: wsUrl, mode: this.config.demo ? 'DEMO' : this.config.testnet ? 'TESTNET' : 'MAINNET' });
 
-    this.ws = new WebSocket(wsUrl);
+    // RETRY strategy with exponential backoff (500ms → 1000ms → 2000ms)
+    let lastError: Error | null = null;
+    const maxAttempts = 3;
+    const baseDelay = 500;
+    const backoffMultiplier = 2;
 
-    this.ws.on('open', () => {
-      this.isConnecting = false;
-      this.reconnectAttempts = 0;
-      this.authenticate();
-      this.startPing();
-      this.emit('connected');
-    });
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await this.connectOnce(wsUrl);
+        return; // Success
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
 
-    this.ws.on('message', (data: WebSocket.Data) => {
-      let message: string;
-      if (typeof data === 'string') {
-        message = data;
-      } else if (Buffer.isBuffer(data)) {
-        message = data.toString('utf-8');
-      } else if (Array.isArray(data)) {
-        message = Buffer.concat(data).toString('utf-8');
-      } else {
-        return; // Ignore unknown data types
+        if (attempt < maxAttempts) {
+          // Calculate delay with exponential backoff
+          const delayMs = Math.min(baseDelay * Math.pow(backoffMultiplier, attempt - 1), 5000);
+
+          // Log retry attempt
+          const tradingError = lastError instanceof WebSocketConnectionError
+            ? lastError
+            : new WebSocketConnectionError(lastError.message);
+
+          const retryResult = await this.errorHandler.handle(tradingError, {
+            strategy: RecoveryStrategy.RETRY,
+            context: 'WebSocketManager.connect',
+            onRetry: (attemptNum) => {
+              this.logger.warn(`[WS] Retry attempt ${attemptNum} after ${delayMs}ms`, {
+                url: wsUrl,
+                error: lastError?.message,
+              });
+            },
+          });
+
+          if (!retryResult.recovered) {
+            // Wait before retry
+            await new Promise(resolve => setTimeout(resolve, delayMs));
+          }
+        }
       }
-      this.handleMessage(message);
+    }
+
+    // All attempts failed
+    this.isConnecting = false;
+    const finalError = new WebSocketConnectionError(
+      `Failed to connect after ${maxAttempts} attempts: ${lastError?.message}`,
+      { url: wsUrl, attemptNumber: maxAttempts }
+    );
+
+    const result = await this.errorHandler.handle(finalError, {
+      strategy: RecoveryStrategy.THROW,
+      context: 'WebSocketManager.connect',
     });
 
-    this.ws.on('error', (error: Error) => {
-      this.emit('error', error);
-    });
+    if (!result.success) {
+      this.emit('error', result.error || finalError);
+      throw result.error || finalError;
+    }
+  }
 
-    this.ws.on('close', () => {
-      this.isConnecting = false;
-      this.stopPing();
-      this.emit('disconnected');
+  /**
+   * Establish a single WebSocket connection (internal helper)
+   */
+  private async connectOnce(wsUrl: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        this.ws = new WebSocket(wsUrl);
 
-      if (this.shouldReconnect && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-        this.reconnectAttempts++;
-        setTimeout(() => {
-          void this.connect();
-        }, RECONNECT_DELAY_MS);
+        // Set timeout for connection
+        const connectionTimeout = setTimeout(() => {
+          if (this.ws) {
+            this.ws.terminate();
+          }
+          reject(new WebSocketConnectionError('WebSocket connection timeout after 10s', { url: wsUrl }));
+        }, 10000);
+
+        this.ws.on('open', () => {
+          clearTimeout(connectionTimeout);
+          this.isConnecting = false;
+          this.reconnectAttempts = 0;
+          void this.authenticate();
+          this.startPing();
+          this.emit('connected');
+          resolve();
+        });
+
+        this.ws.on('message', (data: WebSocket.Data) => {
+          let message: string;
+          if (typeof data === 'string') {
+            message = data;
+          } else if (Buffer.isBuffer(data)) {
+            message = data.toString('utf-8');
+          } else if (Array.isArray(data)) {
+            message = Buffer.concat(data).toString('utf-8');
+          } else {
+            return; // Ignore unknown data types
+          }
+          this.handleMessage(message);
+        });
+
+        this.ws.on('error', (error: Error) => {
+          clearTimeout(connectionTimeout);
+          this.emit('error', error);
+          reject(new WebSocketConnectionError(`WebSocket error: ${error.message}`, { url: wsUrl }));
+        });
+
+        this.ws.on('close', () => {
+          clearTimeout(connectionTimeout);
+          this.isConnecting = false;
+          this.stopPing();
+          this.emit('disconnected');
+
+          if (this.shouldReconnect && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+            this.reconnectAttempts++;
+            setTimeout(() => {
+              void this.connect();
+            }, RECONNECT_DELAY_MS);
+          }
+        });
+      } catch (error) {
+        reject(new WebSocketConnectionError(`Failed to create WebSocket: ${String(error)}`, { url: wsUrl }));
       }
     });
   }
 
   /**
    * Disconnect from WebSocket
+   * Uses SKIP strategy - non-blocking, logs errors but doesn't throw
    */
-  disconnect(): void {
+  async disconnect(): Promise<void> {
     this.shouldReconnect = false;
     this.stopPing();
     this.deduplicationService.clear();
 
-    if (this.ws !== null) {
-      this.ws.close();
-      this.ws = null;
+    // SKIP strategy: attempt disconnect, but don't fail if it errors
+    try {
+      if (this.ws !== null) {
+        this.ws.close();
+        this.ws = null;
+      }
+    } catch (error) {
+      const disconnectError = error instanceof Error ? error : new Error(String(error));
+      const tradingError = new WebSocketConnectionError(
+        `Disconnect error: ${disconnectError.message}`
+      );
+
+      await this.errorHandler.handle(tradingError, {
+        strategy: RecoveryStrategy.SKIP,
+        context: 'WebSocketManager.disconnect',
+      });
     }
   }
 
@@ -212,47 +313,114 @@ export class WebSocketManagerService extends EventEmitter {
 
   /**
    * Authenticate WebSocket connection
+   * Uses RETRY strategy for auth failures with exponential backoff
    * Delegates HMAC signature generation to WebSocketAuthenticationService
    */
-  private authenticate(): void {
+  private async authenticate(): Promise<void> {
     if (this.ws === null || this.ws.readyState !== WebSocket.OPEN) {
       return;
     }
 
-    const authPayload = this.authService.generateAuthPayload(
-      this.config.apiKey,
-      this.config.apiSecret
+    // RETRY strategy with exponential backoff (200ms → 400ms → 800ms)
+    let lastError: Error | null = null;
+    const maxAttempts = 3;
+    const baseDelay = 200;
+    const backoffMultiplier = 2;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const authPayload = this.authService.generateAuthPayload(
+          this.config.apiKey,
+          this.config.apiSecret
+        );
+
+        this.ws!.send(JSON.stringify(authPayload));
+
+        // Wait for auth confirmation
+        await new Promise<void>((resolve) => {
+          setTimeout(() => resolve(), 100); // Brief wait for auth
+        });
+
+        return; // Success
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (attempt < maxAttempts) {
+          const delayMs = Math.min(baseDelay * Math.pow(backoffMultiplier, attempt - 1), 2000);
+
+          const tradingError = new WebSocketAuthenticationError(lastError.message);
+          await this.errorHandler.handle(tradingError, {
+            strategy: RecoveryStrategy.RETRY,
+            context: 'WebSocketManager.authenticate',
+            onRetry: (attemptNum) => {
+              this.logger.warn(`[WS] Auth retry attempt ${attemptNum} after ${delayMs}ms`, {
+                error: lastError?.message,
+              });
+            },
+          });
+
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+    }
+
+    // Auth failed - log but don't block (GRACEFUL_DEGRADE)
+    const finalError = new WebSocketAuthenticationError(
+      `Failed to authenticate after ${maxAttempts} attempts: ${lastError?.message}`
     );
 
-    this.ws.send(JSON.stringify(authPayload));
+    await this.errorHandler.handle(finalError, {
+      strategy: RecoveryStrategy.GRACEFUL_DEGRADE,
+      context: 'WebSocketManager.authenticate',
+    });
+
+    // Continue to subscribe anyway
+    void this.subscribe();
   }
 
   /**
    * Subscribe to topics after authentication
+   * Uses GRACEFUL_DEGRADE strategy - continue even if subscription fails
+   * This allows partial operation if some topics can't subscribe
    */
-  private subscribe(): void {
+  private async subscribe(): Promise<void> {
     if (this.ws === null || this.ws.readyState !== WebSocket.OPEN) {
       return;
     }
 
-    // Subscribe to position updates
-    const positionTopic = 'position';
+    try {
+      // Subscribe to position updates
+      const positionTopic = 'position';
 
-    // Subscribe to order execution (market orders)
-    const executionTopic = 'execution';
+      // Subscribe to order execution (market orders)
+      const executionTopic = 'execution';
 
-    // Subscribe to order updates (conditional orders: TP/SL)
-    const orderTopic = 'order';
+      // Subscribe to order updates (conditional orders: TP/SL)
+      const orderTopic = 'order';
 
-    const subscribeMessage = {
-      op: 'subscribe',
-      args: [positionTopic, executionTopic, orderTopic],
-    };
+      const subscribeMessage = {
+        op: 'subscribe',
+        args: [positionTopic, executionTopic, orderTopic],
+      };
 
-    this.ws.send(JSON.stringify(subscribeMessage));
-    this.logger.info('Private WebSocket subscribed to topics', {
-      topics: [positionTopic, executionTopic, orderTopic],
-    });
+      this.ws.send(JSON.stringify(subscribeMessage));
+
+      this.logger.info('Private WebSocket subscribed to topics', {
+        topics: [positionTopic, executionTopic, orderTopic],
+      });
+    } catch (error) {
+      // GRACEFUL_DEGRADE: log error but continue operation
+      const subscriptionError = error instanceof Error ? error : new Error(String(error));
+      const tradingError = new WebSocketSubscriptionError(
+        `Subscription failed: ${subscriptionError.message}`
+      );
+
+      await this.errorHandler.handle(tradingError, {
+        strategy: RecoveryStrategy.GRACEFUL_DEGRADE,
+        context: 'WebSocketManager.subscribe',
+      });
+    }
   }
 
   /**

@@ -58,6 +58,7 @@ import { StrategyOrchestratorService } from './multi-strategy/strategy-orchestra
 import { StrategyRegistryService } from './multi-strategy/strategy-registry.service';
 import { StrategyFactoryService } from './multi-strategy/strategy-factory.service';
 import { StrategyStateManagerService } from './multi-strategy/strategy-state-manager.service';
+import { ErrorHandler } from '../errors';
 
 // Phase 6.2: Repository Pattern Integration
 import { IPositionRepository, IJournalRepository, IMarketDataRepository } from '../repositories/IRepositories';
@@ -72,6 +73,7 @@ import { MarketDataCacheRepository } from '../repositories/market-data.cache-rep
 export class BotServices {
   // Core services
   readonly logger: LoggerService;
+  readonly errorHandler: ErrorHandler; // Phase 8.8: Singleton ErrorHandler injected to all services
   readonly eventBus: BotEventBus;
   readonly metrics: BotMetricsService;
   readonly telegram: TelegramService;
@@ -232,13 +234,18 @@ export class BotServices {
       });
     }
 
-    // 1.5 Initialize event bus (depends on logger)
+    // 1.5 Initialize ErrorHandler (Phase 8.8) - Singleton for all services
+    // Injected once at startup, passed to all services via DI
+    this.errorHandler = new ErrorHandler(this.logger);
+    this.logger.info('⚡ ErrorHandler initialized (singleton instance)');
+
+    // 1.6 Initialize event bus (depends on logger)
     this.eventBus = new BotEventBus(this.logger);
 
-    // 1.6 Initialize metrics service (depends on logger)
+    // 1.7 Initialize metrics service (depends on logger)
     this.metrics = new BotMetricsService(this.logger);
 
-    // 1.7 Phase 6.2: Initialize repositories (depends on logger)
+    // 1.8 Phase 6.2: Initialize repositories (depends on logger)
     this.positionRepository = new PositionMemoryRepository();
     this.journalRepository = new JournalFileRepository(this.logger);
     this.marketDataRepository = new MarketDataCacheRepository();
@@ -506,7 +513,7 @@ export class BotServices {
     this.webSocketManager = new WebSocketManagerService(
       config.exchange,
       config.exchange.symbol,
-      this.logger,
+      this.errorHandler, // Phase 8.8: Singleton ErrorHandler (contains logger)
       orderExecutionDetector,
       authService,
       deduplicationService,

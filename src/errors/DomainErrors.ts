@@ -550,3 +550,87 @@ export class PerformanceError extends TradingError {
     Object.setPrototypeOf(this, PerformanceError.prototype);
   }
 }
+
+// ============================================================================
+// WEBSOCKET DOMAIN ERRORS (Phase 8.8)
+// ============================================================================
+
+/**
+ * WebSocket connection error
+ * Indicates failure to establish or maintain WebSocket connection
+ */
+export class WebSocketConnectionError extends TradingError {
+  constructor(
+    message: string,
+    context?: {
+      url?: string;
+      attemptNumber?: number;
+      lastError?: string;
+      [key: string]: unknown;
+    },
+    originalError?: Error,
+  ) {
+    super(
+      message,
+      'WEBSOCKET_CONNECTION_ERROR',
+      ErrorDomain.EXCHANGE,
+      ErrorSeverity.HIGH,
+      originalError,
+      context,
+    );
+    Object.setPrototypeOf(this, WebSocketConnectionError.prototype);
+  }
+}
+
+/**
+ * WebSocket authentication error
+ * Indicates failure to authenticate WebSocket connection
+ */
+export class WebSocketAuthenticationError extends TradingError {
+  constructor(
+    message: string,
+    context?: {
+      reason?: string;
+      apiKeyMissing?: boolean;
+      [key: string]: unknown;
+    },
+    originalError?: Error,
+  ) {
+    super(
+      message,
+      'WEBSOCKET_AUTH_ERROR',
+      ErrorDomain.EXCHANGE,
+      ErrorSeverity.HIGH,
+      originalError,
+      context,
+    );
+    Object.setPrototypeOf(this, WebSocketAuthenticationError.prototype);
+  }
+}
+
+/**
+ * WebSocket subscription error
+ * Indicates failure to subscribe to required topics
+ */
+export class WebSocketSubscriptionError extends TradingError {
+  constructor(
+    message: string,
+    context?: {
+      topic?: string;
+      failedTopics?: string[];
+      successfulTopics?: string[];
+      [key: string]: unknown;
+    },
+    originalError?: Error,
+  ) {
+    super(
+      message,
+      'WEBSOCKET_SUBSCRIPTION_ERROR',
+      ErrorDomain.EXCHANGE,
+      ErrorSeverity.MEDIUM,
+      originalError,
+      context,
+    );
+    Object.setPrototypeOf(this, WebSocketSubscriptionError.prototype);
+  }
+}

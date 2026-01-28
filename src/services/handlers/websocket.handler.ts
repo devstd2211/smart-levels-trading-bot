@@ -20,6 +20,8 @@ import { WebSocketManagerService } from '../websocket-manager.service';
 import { TradingJournalService } from '../trading-journal.service';
 import { TelegramService } from '../telegram.service';
 import { INTEGER_MULTIPLIERS } from '../../constants';
+import { ErrorHandler, RecoveryStrategy } from '../../errors/ErrorHandler';
+import { PositionNotFoundError, OrderValidationError } from '../../errors/DomainErrors';
 
 const DECIMAL_PLACES = {
   PERCENT: 2,
@@ -52,11 +54,97 @@ export class WebSocketEventHandler {
   ) {}
 
   /**
+   * Validate position data for required fields and valid values
+   * @private
+   */
+  private validatePositionData(position: any): boolean {
+    if (!position) return false;
+    if (!position.symbol || typeof position.symbol !== 'string') return false;
+    if (!position.id || typeof position.id !== 'string') return false;
+    if (typeof position.entryPrice !== 'number' || isNaN(position.entryPrice) || position.entryPrice <= 0) return false;
+    if (typeof position.quantity !== 'number' || isNaN(position.quantity) || position.quantity <= 0) return false;
+    return true;
+  }
+
+  /**
+   * Validate Take Profit event data
+   * @private
+   */
+  private validateTakeProfitEvent(event: TakeProfitFilledEvent): boolean {
+    if (!event || !event.orderId) return false;
+    if (event.avgPrice !== undefined) {
+      const price = parseFloat(String(event.avgPrice));
+      if (isNaN(price) || price < 0) return false;
+    }
+    if (event.cumExecQty !== undefined) {
+      const qty = parseFloat(String(event.cumExecQty));
+      if (isNaN(qty) || qty < 0) return false;
+    }
+    return true;
+  }
+
+  /**
+   * Get current price with fallback to entry price on failure
+   * @private
+   */
+  private async getCurrentPriceWithFallback(fallbackPrice: number): Promise<number> {
+    try {
+      const price = await this.bybitService.getCurrentPrice();
+      if (isNaN(price) || price <= 0) {
+        throw new OrderValidationError('Invalid price from API', {
+          field: 'currentPrice',
+          value: price,
+          reason: 'Price validation failed',
+        });
+      }
+      return price;
+    } catch (error) {
+      await ErrorHandler.handle(error, {
+        strategy: RecoveryStrategy.FALLBACK,
+        logger: this.logger,
+        context: 'WebSocketEventHandler.getCurrentPrice',
+        onRecover: () => {
+          this.logger.warn('⚠️ getCurrentPrice failed, using fallback entry price', {
+            fallback: fallbackPrice,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        },
+      });
+      return fallbackPrice;
+    }
+  }
+
+  /**
    * Handle position update from WebSocket
    *
    * @param position - Updated position
    */
   async handlePositionUpdate(position: Position): Promise<void> {
+    // Validate position data
+    if (!this.validatePositionData(position)) {
+      await ErrorHandler.handle(
+        new PositionNotFoundError('Invalid position data from WebSocket', {
+          positionId: position?.id || 'unknown',
+          symbol: position?.symbol || 'unknown',
+          hasSymbol: !!position?.symbol,
+          hasEntryPrice: typeof position?.entryPrice === 'number',
+        }),
+        {
+          strategy: RecoveryStrategy.GRACEFUL_DEGRADE,
+          logger: this.logger,
+          context: 'WebSocketEventHandler.handlePositionUpdate',
+          onRecover: () => {
+            this.logger.warn('⚠️ Invalid position data, skipping update', {
+              positionId: position?.id,
+              hasSymbol: !!position?.symbol,
+              hasEntryPrice: typeof position?.entryPrice === 'number',
+            });
+          },
+        }
+      );
+      return; // SKIP invalid update
+    }
+
     this.logger.debug('WebSocket: Position update received');
     this.positionManager.syncWithWebSocket(position);
   }
@@ -112,7 +200,7 @@ export class WebSocketEventHandler {
     }
 
     // Position closed by exchange (SL/TP/Trailing) - record it
-    const currentPrice = await this.bybitService.getCurrentPrice();
+    const currentPrice = await this.getCurrentPriceWithFallback(position.entryPrice);
     const pnl = position.unrealizedPnL || 0;
     const pnlPercent = ((currentPrice - position.entryPrice) / position.entryPrice) * INTEGER_MULTIPLIERS.ONE_HUNDRED;
 
@@ -191,6 +279,28 @@ export class WebSocketEventHandler {
    * @param event - Take profit filled event
    */
   async handleTakeProfitFilled(event: TakeProfitFilledEvent): Promise<void> {
+    // Validate event data
+    if (!this.validateTakeProfitEvent(event)) {
+      await ErrorHandler.handle(
+        new OrderValidationError('Invalid TakeProfitFilled event data', {
+          field: 'takeProfitEvent',
+          value: event?.orderId || 'missing',
+          reason: 'Missing or invalid event fields',
+          hasAvgPrice: event?.avgPrice !== undefined,
+          hasCumExecQty: event?.cumExecQty !== undefined,
+        }),
+        {
+          strategy: RecoveryStrategy.SKIP,
+          logger: this.logger,
+          context: 'WebSocketEventHandler.handleTakeProfitFilled',
+          onRecover: () => {
+            this.logger.warn('⚠️ Invalid TP event, skipping processing', { orderId: event?.orderId });
+          },
+        }
+      );
+      return; // SKIP invalid event
+    }
+
     this.logger.info('WebSocket: Take Profit filled', {
       orderId: event.orderId,
       price: event.avgPrice,

@@ -357,7 +357,7 @@ export class LimitOrderExecutorService {
       });
 
       return {
-        orderId,
+        orderId: orderId || 'unknown',
         filled: true as const, // Market orders are always filled
         fillPrice,
         feePaid,

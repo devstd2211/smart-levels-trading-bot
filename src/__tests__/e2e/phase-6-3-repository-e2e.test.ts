@@ -78,7 +78,8 @@ describe('Phase 6.3: Full Repository Integration E2E', () => {
       // ASSERT: Retrieve candles from repository
       const cachedCandles = repository.getCandles('XRPUSDT', '5');
       expect(cachedCandles).toHaveLength(100);
-      expect(cachedCandles[0].close).toBeCloseTo(apiCandles[0].close, 5);
+      expect(apiCandles).toBeDefined();
+      expect(cachedCandles[0].close).toBeCloseTo(apiCandles![0].close, 5);
     });
 
     it('should integrate with IndicatorCacheService via repository', () => {
@@ -113,7 +114,9 @@ describe('Phase 6.3: Full Repository Integration E2E', () => {
       const fromAPI = await mockBybit.getCandles('XRPUSDT', '5');
 
       // 2. Store in repository
-      repository.saveCandles('XRPUSDT', '5', fromAPI);
+      if (fromAPI) {
+        repository.saveCandles('XRPUSDT', '5', fromAPI);
+      }
 
       // 3. Retrieve from repository
       const fromRepo = repository.getCandles('XRPUSDT', '5');
@@ -125,7 +128,7 @@ describe('Phase 6.3: Full Repository Integration E2E', () => {
       expect(fromAPI).toHaveLength(50);
       expect(fromRepo).toHaveLength(50);
       expect(latest).toBeDefined();
-      expect(latest?.close).toBe(fromAPI[0].close);
+      expect(latest?.close).toBe(fromAPI![0].close);
     });
   });
 
@@ -152,14 +155,18 @@ describe('Phase 6.3: Full Repository Integration E2E', () => {
       expect(apiCallCount).toBe(1);
 
       // Store in repository
-      repository.saveCandles('XRPUSDT', '5', call1);
+      if (call1) {
+        repository.saveCandles('XRPUSDT', '5', call1);
+      }
 
       // Second call (should hit cache if service is updated)
       const call2 = await mockBybit.getCandles('XRPUSDT', '5');
 
       // ASSERT: Data consistency
+      expect(call1).toBeDefined();
+      expect(call2).toBeDefined();
       expect(call1).toEqual(call2);
-      expect(call1[0].close).toBe(call2[0].close);
+      expect(call1![0].close).toBe(call2![0].close);
     });
 
     it('should monitor memory efficiency with repository limits', () => {

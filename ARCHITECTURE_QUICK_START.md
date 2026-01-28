@@ -1,8 +1,8 @@
 # 🚀 Architecture Quick Start - Current Context
 
-**Status:** Phase 14 (Prod) ✅ + Phase 9 ✅ + Phase 4 ✅ + Phase 3 ✅ + Phase 0.3 ✅ + Phase 5 ✅ + Phase 6.1-6.3 ✅ + Phase 7 ✅ + **Phase 8 Stages 1-7 ✅**
-**Last Updated:** 2026-01-28 (Session 39 - **Phase 8 Stage 7: PositionLifecycleService ErrorHandler Integration COMPLETE**)
-**Build:** ✅ BUILD SUCCESS | **4352 Tests Passing (+20 in Phase 8 Stage 7, +137 total Phase 8)** | **ZERO regressions** ✅
+**Status:** Phase 14 (Prod) ✅ + Phase 9 ✅ + Phase 4 ✅ + Phase 3 ✅ + Phase 0.3 ✅ + Phase 5 ✅ + Phase 6.1-6.3 ✅ + Phase 7 ✅ + **Phase 8 Stages 1-8 ✅**
+**Last Updated:** 2026-01-28 (Session 40 - **Phase 8 Stage 8: WebSocketManagerService ErrorHandler Integration + Singleton Architecture COMPLETE**)
+**Build:** ✅ BUILD SUCCESS | **4377 Tests Passing (+25 in Phase 8 Stage 8, +162 total Phase 8)** | **ZERO regressions** ✅
 
 ---
 
@@ -100,7 +100,7 @@
 | **7.4** | ErrorRegistry Telemetry | ✅ | Error tracking + statistics + diagnostics | **6 ✅** | **S35** |
 | **TOTAL** | **Error Handling System** | ✅ COMPLETE | Full production-grade system | **49 ✅** | **S35** |
 
-### ErrorHandler Integration: PHASE 8 STAGES 1-4 ✅ (Session 35+ - COMPLETE)
+### ErrorHandler Integration: PHASE 8 STAGES 1-8 ✅ (Session 35+ - COMPLETE)
 | Phase | Component | Status | Details | Tests | Session |
 |-------|-----------|--------|---------|-------|---------|
 | **8.1** | TradingOrchestrator | ✅ | SKIP strategy for analyzer + entry failures | **12 ✅** | **S35** |
@@ -130,14 +130,31 @@
 |  | - Atomic lock preservation | ✅ | Prevent duplicate opens + maintain Phase 9 safety | 2 ✅ | S39 |
 |  | - End-to-End scenarios | ✅ | Cascading failures, state consistency | 3 ✅ | S39 |
 |  | - Phase 9 integration | ✅ | closePositionWithAtomicLock, getPositionSnapshot | 2 ✅ | S39 |
-| **TOTAL S1-7** | **Current Progress** | ✅ COMPLETE | **137 tests passing** | **137 ✅** | **S39** |
+| **8.8** | **WebSocketManagerService** | ✅ | **RETRY + GRACEFUL_DEGRADE + SKIP strategies** | **25 ✅** | **S40** |
+|  | - connect() | ✅ | RETRY for connection + exponential backoff (500ms → 1s → 2s) | 3 ✅ | S40 |
+|  | - authenticate() | ✅ | RETRY for auth + GRACEFUL_DEGRADE fallback | 3 ✅ | S40 |
+|  | - subscribe() | ✅ | GRACEFUL_DEGRADE for partial subscriptions | 4 ✅ | S40 |
+|  | - disconnect() | ✅ | SKIP for safe cleanup (non-blocking) | 3 ✅ | S40 |
+|  | - Architecture | ✅ | **ErrorHandler singleton injected via DI (no logger duplication)** | - | S40 |
+|  | - End-to-End scenarios | ✅ | Connection resilience + recovery | 2 ✅ | S40 |
+|  | - New error types | ✅ | WebSocketConnectionError, WebSocketAuthenticationError, WebSocketSubscriptionError | - | S40 |
+| **TOTAL S1-8** | **Current Progress** | ✅ COMPLETE | **162 tests passing** | **162 ✅** | **S40** |
 
 ### Future Phases
 | Phase | Component | Status | Details | Notes |
 |-------|-----------|--------|---------|-------|
-| **8.8+** | ErrorHandler Remaining Services | ⏳ | websocket-manager, risk-manager, trading-journal (~60+ tests) | Phase 8 (continuation) |
+| **8.9+** | ErrorHandler Remaining Services | ⏳ | risk-manager, trading-journal, position-monitor, analyzer-engine, etc (~60+ tests) | Phase 8 (continuation) |
 | **9.2-9.4** | Live Trading Integration | ⏳ | Configuration + E2E tests + chaos | After Phase 8 |
 | **15** | Multi-Strategy Config | ⏳ | Config consolidation | After Phase 9 |
+
+### Phase 8.8 Architecture Improvements (Session 40)
+**ErrorHandler Singleton Pattern - Clean DI Architecture:**
+- ✅ ErrorHandler created ONCE in BotServices (singleton)
+- ✅ Injected to all services via constructor (no duplication)
+- ✅ Logger contained within ErrorHandler (no separate logger parameter)
+- ✅ Services access logger via `errorHandler.getLogger()` if needed
+- ✅ Result: Clean separation of concerns, single responsibility
+- ✅ Benefit: One place to manage error handling + logging config
 
 ---
 

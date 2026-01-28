@@ -346,7 +346,7 @@ export class BybitServiceAdapter implements IExchange {
       }));
 
       const position: Position = {
-        id: orderId,
+        id: orderId || 'unknown',
         symbol: internalSymbol,
         side: positionSide,
         quantity: params.quantity,
@@ -363,7 +363,7 @@ export class BybitServiceAdapter implements IExchange {
         takeProfits: takeProfitObjects,
         openedAt: Date.now(),
         unrealizedPnL: 0,
-        orderId,
+        orderId: orderId || 'unknown',
         reason: 'IExchange.openPosition()',
         confidence: 0.5,
         status: 'OPEN',

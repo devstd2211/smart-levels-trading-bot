@@ -4,6 +4,8 @@ import { OrderbookUpdateEvent, TradeTickEvent } from '../types/events.types';
 import { BotServices } from './bot-services';
 import { RealTimeWhaleDetector } from './realtime-whale-detector';
 import { type OrderbookUpdate } from './orderbook-manager.service';
+import { ErrorHandler, RecoveryStrategy } from '../errors/ErrorHandler';
+import { OrderValidationError } from '../errors/DomainErrors';
 
 /**
  * WebSocket Event Handler Manager
@@ -27,6 +29,49 @@ export class WebSocketEventHandlerManager {
   constructor(private services: BotServices, private config: any) {
     this.logger = services.logger;
     this.whaleDetector = new RealTimeWhaleDetector(services, config);
+  }
+
+  /**
+   * Validate candle data for required fields and valid values
+   * @private
+   */
+  private validateCandleData(candle: any): boolean {
+    if (!candle) return false;
+    if (typeof candle.close !== 'number' || isNaN(candle.close) || candle.close <= 0) return false;
+    if (typeof candle.timestamp !== 'number' || candle.timestamp <= 0) return false;
+    return true;
+  }
+
+  /**
+   * Validate orderbook data for required structure and valid values
+   * @private
+   */
+  private validateOrderbookData(update: any): boolean {
+    if (!update) return false;
+    if (!Array.isArray(update.bids) || update.bids.length === 0) return false;
+    if (!Array.isArray(update.asks) || update.asks.length === 0) return false;
+    const firstBid = update.bids[0];
+    const firstAsk = update.asks[0];
+    if (!Array.isArray(firstBid) || firstBid.length < 2) return false;
+    if (!Array.isArray(firstAsk) || firstAsk.length < 2) return false;
+    const bidPrice = parseFloat(String(firstBid[0]));
+    const askPrice = parseFloat(String(firstAsk[0]));
+    if (isNaN(bidPrice) || bidPrice <= 0) return false;
+    if (isNaN(askPrice) || askPrice <= 0) return false;
+    return true;
+  }
+
+  /**
+   * Validate trade data for required fields and valid values
+   * @private
+   */
+  private validateTradeData(trade: any): boolean {
+    if (!trade) return false;
+    if (typeof trade.price !== 'number' || isNaN(trade.price) || trade.price <= 0) return false;
+    if (typeof trade.quantity !== 'number' || isNaN(trade.quantity) || trade.quantity <= 0) return false;
+    if (!trade.side || (trade.side !== 'Buy' && trade.side !== 'Sell' && trade.side !== 'BUY' && trade.side !== 'SELL')) return false;
+    if (typeof trade.timestamp !== 'number' || trade.timestamp <= 0) return false;
+    return true;
   }
 
   /**
@@ -135,6 +180,29 @@ export class WebSocketEventHandlerManager {
       publicWebSocket,
       'candleClosed',
       async ({ role, candle }: { role: TimeframeRole; candle: Candle }) => {
+        // Validate candle data
+        if (!this.validateCandleData(candle)) {
+          await ErrorHandler.handle(
+            new OrderValidationError('Invalid candle data from WebSocket', {
+              field: 'candle',
+              value: candle?.close || 0,
+              reason: 'Missing close price or timestamp',
+              role,
+              hasClose: candle?.close !== undefined,
+              hasTimestamp: candle?.timestamp !== undefined,
+            }),
+            {
+              strategy: RecoveryStrategy.SKIP,
+              logger: this.logger,
+              context: 'WebSocketEventHandlerManager.handleCandleClosed',
+              onRecover: () => {
+                this.logger.warn('⚠️ Invalid candle data, skipping update', { role });
+              },
+            }
+          );
+          return; // SKIP
+        }
+
         this.logger.info('🕯️ Candle closed', {
           role,
           timestamp: new Date(candle.timestamp).toISOString(),
@@ -165,11 +233,13 @@ export class WebSocketEventHandlerManager {
             await tradingOrchestrator.onCandleClosed(role, candle);
           }
         } catch (error) {
-          this.logger.error('Error handling candle close event', {
-            role,
-            error,
-            errorMessage: error instanceof Error ? error.message : String(error),
-            errorStack: error instanceof Error ? error.stack : undefined,
+          await ErrorHandler.handle(error, {
+            strategy: RecoveryStrategy.SKIP,
+            logger: this.logger,
+            context: 'WebSocketEventHandlerManager.handleCandleClosed',
+            onRecover: () => {
+              this.logger.warn('⚠️ Candle processing failed, skipping', { role });
+            },
           });
         }
       },
@@ -207,6 +277,28 @@ export class WebSocketEventHandlerManager {
    * Private: Handle orderbook update event
    */
   private handleOrderbookUpdate(update: OrderbookUpdateEvent, bot: any): void {
+    // Validate orderbook data
+    if (!this.validateOrderbookData(update)) {
+      void ErrorHandler.handle(
+        new OrderValidationError('Invalid orderbook data from WebSocket', {
+          field: 'orderbook',
+          value: 0,
+          reason: 'Invalid bids/asks structure',
+          hasBids: Array.isArray(update?.bids),
+          hasAsks: Array.isArray(update?.asks),
+        }),
+        {
+          strategy: RecoveryStrategy.SKIP,
+          logger: this.logger,
+          context: 'WebSocketEventHandlerManager.handleOrderbookUpdate',
+          onRecover: () => {
+            this.logger.warn('⚠️ Invalid orderbook data, skipping update');
+          },
+        }
+      );
+      return; // SKIP
+    }
+
     try {
       // Convert OrderbookUpdateEvent to OrderbookUpdate for processing
       const orderbookUpdate: OrderbookUpdate = {
@@ -266,6 +358,28 @@ export class WebSocketEventHandlerManager {
    * Private: Handle trade update event
    */
   private handleTradeUpdate(trade: TradeTickEvent, bot: any): void {
+    // Validate trade data
+    if (!this.validateTradeData(trade)) {
+      void ErrorHandler.handle(
+        new OrderValidationError('Invalid trade tick data from WebSocket', {
+          field: 'trade',
+          value: 0,
+          reason: 'Invalid price, quantity, or side',
+          hasPrice: typeof trade?.price === 'number',
+          hasQuantity: typeof trade?.quantity === 'number',
+        }),
+        {
+          strategy: RecoveryStrategy.SKIP,
+          logger: this.logger,
+          context: 'WebSocketEventHandlerManager.handleTradeUpdate',
+          onRecover: () => {
+            this.logger.warn('⚠️ Invalid trade data, skipping update');
+          },
+        }
+      );
+      return; // SKIP
+    }
+
     try {
       if (this.services.deltaAnalyzerService) {
         // Normalize side

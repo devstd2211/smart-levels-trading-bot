@@ -84,15 +84,20 @@ async function main(): Promise<void> {
     // Test 4: Get candles
     logger.info('\n📋 Test 4: Getting candles...');
     const candles = await bybitService.getCandles(10); // Get only 10 candles for test
-    logger.info('✅ Candles retrieved', {
-      count: candles.length,
-      firstCandle: candles[0],
-      lastCandle: candles[candles.length - 1],
-    });
+    if (candles) {
+      logger.info('✅ Candles retrieved', {
+        count: candles.length,
+        firstCandle: candles[0],
+        lastCandle: candles[candles.length - 1],
+      });
 
-    console.log(`🕯️ Candles retrieved: ${candles.length}`);
-    console.log(`   First: ${new Date(candles[0].timestamp).toISOString()} - Close: ${candles[0].close}`);
-    console.log(`   Last: ${new Date(candles[candles.length - 1].timestamp).toISOString()} - Close: ${candles[candles.length - 1].close}\n`);
+      console.log(`🕯️ Candles retrieved: ${candles.length}`);
+      console.log(`   First: ${new Date(candles[0].timestamp).toISOString()} - Close: ${candles[0].close}`);
+      console.log(`   Last: ${new Date(candles[candles.length - 1].timestamp).toISOString()} - Close: ${candles[candles.length - 1].close}\n`);
+    } else {
+      logger.warn('No candles retrieved');
+      console.log('🕯️ No candles retrieved\n');
+    }
 
     // Test 5: Get position (should be null for new account)
     logger.info('\n📋 Test 5: Checking open positions...');
