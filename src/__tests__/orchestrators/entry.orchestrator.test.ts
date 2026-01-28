@@ -23,6 +23,7 @@ import {
   TrendAnalysis,
 } from '../../types';
 import { LoggerService } from '../../services/logger.service';
+import { ErrorHandler } from '../../errors/ErrorHandler';
 
 // Test utilities
 class TestLogger extends LoggerService {
@@ -90,7 +91,8 @@ function createRiskManager(logger: LoggerService): RiskManager {
       maxLeverageMultiplier: 2.0,
     },
   };
-  return new RiskManager(config, logger);
+  const errorHandler = new ErrorHandler(logger);
+  return new RiskManager(config, logger, errorHandler);
 }
 
 describe('EntryOrchestrator', () => {

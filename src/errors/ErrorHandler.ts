@@ -97,6 +97,9 @@ export interface ErrorHandlingConfig {
 
   /** Callback called on final failure */
   onFailure?: (error: TradingError, attemptsUsed: number) => void;
+
+  /** Optional logger for backward compatibility with static method calls */
+  logger?: ErrorLogger;
 }
 
 /**
@@ -127,6 +130,22 @@ export interface ErrorHandlingResult {
  * Logger is injected once in constructor to avoid passing through every layer
  */
 export class ErrorHandler {
+  /** Static default logger instance for backward compatibility */
+  private static readonly defaultLogger: ErrorLogger = {
+    info: (msg: string, ctx?: Record<string, unknown>) => {
+      console.log(`[INFO] ${msg}`, ctx ? JSON.stringify(ctx, null, 2) : '');
+    },
+    warn: (msg: string, ctx?: Record<string, unknown>) => {
+      console.warn(`[WARN] ${msg}`, ctx ? JSON.stringify(ctx, null, 2) : '');
+    },
+    error: (msg: string, ctx?: Record<string, unknown>) => {
+      console.error(`[ERROR] ${msg}`, ctx ? JSON.stringify(ctx, null, 2) : '');
+    },
+    debug: (msg: string, ctx?: Record<string, unknown>) => {
+      console.debug(`[DEBUG] ${msg}`, ctx ? JSON.stringify(ctx, null, 2) : '');
+    },
+  };
+
   constructor(private readonly logger: ErrorLogger) {}
 
   /**
@@ -517,5 +536,31 @@ export class ErrorHandler {
       }
       return undefined as unknown as T;
     }
+  }
+
+  /**
+   * Static method for backward compatibility with existing code that calls ErrorHandler.handle() directly
+   * Creates a temporary instance with the provided or default logger
+   */
+  static async handle(
+    error: unknown,
+    config: ErrorHandlingConfig,
+  ): Promise<ErrorHandlingResult> {
+    const logger = config.logger || this.defaultLogger;
+    const handler = new ErrorHandler(logger);
+    return handler.handle(error, config);
+  }
+
+  /**
+   * Static method for backward compatibility with existing code that calls ErrorHandler.executeAsync() directly
+   * Creates a temporary instance with the provided or default logger
+   */
+  static async executeAsync<T>(
+    fn: () => Promise<T>,
+    config: ErrorHandlingConfig,
+  ): Promise<{ success: boolean; value?: T; error?: TradingError }> {
+    const logger = config.logger || this.defaultLogger;
+    const handler = new ErrorHandler(logger);
+    return handler.executeAsync(fn, config);
   }
 }

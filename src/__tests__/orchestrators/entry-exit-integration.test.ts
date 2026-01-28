@@ -32,6 +32,7 @@ import {
 } from '../../types';
 import { LoggerService } from '../../services/logger.service';
 import { RiskManager } from '../../services/risk-manager.service';
+import { ErrorHandler } from '../../errors/ErrorHandler';
 
 // ============================================================================
 // TEST UTILITIES
@@ -41,6 +42,14 @@ import { RiskManager } from '../../services/risk-manager.service';
  * Mock RiskManager that always approves trades (for testing Entry/Exit orchestrators)
  */
 class MockRiskManager extends RiskManager {
+  constructor(
+    config: RiskManagerConfig,
+    logger: LoggerService,
+    errorHandler?: ErrorHandler,
+  ) {
+    super(config, logger, errorHandler!);
+  }
+
   async canTrade(): Promise<RiskDecision> {
     return {
       allowed: true,

@@ -150,7 +150,7 @@ describe('Phase 8: TradingOrchestrator - Error Handling Integration', () => {
       expect(handled.error?.originalError).toBe(unknownError);
     });
 
-    it('test-2.4: Should allow recovery callbacks on entry evaluation failure', () => {
+    it('test-2.4: Should allow recovery callbacks on entry evaluation failure', async () => {
       const error = new EntryValidationError('Entry orchestrator error', {
         reason: 'Critical validation failure',
         confidence: 0
@@ -158,7 +158,7 @@ describe('Phase 8: TradingOrchestrator - Error Handling Integration', () => {
 
       const onRecoverCallback = jest.fn();
 
-      const result = ErrorHandler['skipStrategy'](error, {
+      const result = await ErrorHandler.handle(error, {
         strategy: RecoveryStrategy.SKIP,
         logger: mockLogger,
         context: 'TradingOrchestrator.entryOrchestrator.evaluateEntry',
@@ -179,8 +179,12 @@ describe('Phase 8: TradingOrchestrator - Error Handling Integration', () => {
         }
       })();
 
-      const normalized = ErrorHandler['normalizeError'](error);
-      expect(normalized.message).toContain('Order timeout');
+      // Test through public API - handle throws strategy
+      const result = await ErrorHandler.handle(error, {
+        strategy: RecoveryStrategy.THROW,
+        logger: mockLogger,
+      });
+      expect(result.error?.message).toContain('Order timeout');
     });
 
     it('test-3.2: Should set up retry configuration for exit operations', () => {
@@ -195,11 +199,15 @@ describe('Phase 8: TradingOrchestrator - Error Handling Integration', () => {
       expect(config.backoffMultiplier).toBe(2);
     });
 
-    it('test-3.3: Should handle position not found errors as non-recoverable', () => {
+    it('test-3.3: Should handle position not found errors as non-recoverable', async () => {
       const error = new Error('Position XRPUSDT_Buy not found');
 
-      const normalized = ErrorHandler['normalizeError'](error);
-      expect(normalized.message).toContain('not found');
+      // Test through public API
+      const result = await ErrorHandler.handle(error, {
+        strategy: RecoveryStrategy.THROW,
+        logger: mockLogger,
+      });
+      expect(result.error?.message).toContain('not found');
     });
 
     it('test-3.4: Should track concurrent close attempts with atomic lock pattern', () => {
