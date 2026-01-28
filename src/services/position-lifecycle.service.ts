@@ -48,6 +48,7 @@ import { EntryConfirmationManager } from './entry-confirmation.service';
 import { CompoundInterestCalculatorService } from './compound-interest-calculator.service';
 import { SessionStatsService } from './session-stats.service';
 import { IPositionRepository } from '../repositories/IRepositories';
+import { ErrorHandler, RecoveryStrategy } from '../errors';
 
 // ============================================================================
 // CONSTANTS
@@ -157,6 +158,7 @@ export class PositionLifecycleService {
       // ===================================================================
       // STEP 4: ATOMIC POSITION OPENING - SL+TP in ONE call (CRITICAL)
       // This prevents race condition liquidations by setting SL atomically
+      // Phase 8.7: ErrorHandler integration with RETRY strategy
       // ===================================================================
       this.logger.info('🚀 Opening position on exchange with atomic SL/TP protection', {
         side: side === PositionSide.LONG ? 'LONG' : 'SHORT',
@@ -169,77 +171,96 @@ export class PositionLifecycleService {
       let orderId: string | undefined;
       let tpOrderIds: (string | undefined)[] = [];
 
-      try {
-        // Convert PositionSide to IExchange side format
-        const exchangeSide: 'Buy' | 'Sell' = side === PositionSide.LONG ? 'Buy' : 'Sell';
+      // Convert PositionSide to IExchange side format
+      const exchangeSide: 'Buy' | 'Sell' = side === PositionSide.LONG ? 'Buy' : 'Sell';
 
-        // Get all TP levels for IExchange interface
-        const tpPrices = signal.takeProfits && signal.takeProfits.length > 0
-          ? signal.takeProfits.map(tp => tp.price)
-          : [];
+      // Get all TP levels for IExchange interface
+      const tpPrices = signal.takeProfits && signal.takeProfits.length > 0
+        ? signal.takeProfits.map(tp => tp.price)
+        : [];
 
-        // Open position WITH atomic SL and TP protection
-        const openedPosition = await this.bybitService.openPosition({
+      // Phase 8.7: Retry exchange operation with exponential backoff
+      const openResult = await ErrorHandler.executeAsync(
+        () => this.bybitService.openPosition({
           symbol: this.bybitService.getSymbol?.() || 'UNKNOWN',
           side: exchangeSide,
           quantity: sizingResult.quantity,
           leverage: this.tradingConfig.leverage,
-          stopLoss: actualStopLoss, // CRITICAL: SL set atomically with position
-          takeProfits: tpPrices, // All TPs set atomically (IExchange expects array)
-        });
-
-        // Extract orderId from the returned Position object
-        orderId = openedPosition.id;
-
-        this.logger.info('✅ Position opened WITH atomic SL/TP protection', {
-          orderId,
-          side: side === PositionSide.LONG ? 'LONG' : 'SHORT',
-          quantity: sizingResult.quantity,
-          slSet: true,
-          tpSet: tpPrices.length > 0,
-        });
-
-        // Store first TP order ID if TPs were set
-        if (tpPrices.length > 0) {
-          tpOrderIds.push(orderId);
+          stopLoss: actualStopLoss,
+          takeProfits: tpPrices,
+        }),
+        {
+          strategy: RecoveryStrategy.RETRY,
+          retryConfig: {
+            maxAttempts: 3,
+            initialDelayMs: 500,
+            backoffMultiplier: 2,
+            maxDelayMs: 5000,
+          },
+          logger: this.logger,
+          context: 'PositionLifecycleService.openPosition',
+          onRetry: (attempt, error, delayMs) => {
+            this.logger.warn(`🔄 Retrying position open (attempt ${attempt}/3)`, {
+              delayMs,
+              error: error.message,
+            });
+          },
         }
+      );
 
-        // Set additional TP levels (if more than 1)
-        if (signal.takeProfits && signal.takeProfits.length > 1) {
-          this.logger.info('📋 Setting additional TP levels', {
-            additionalLevels: signal.takeProfits.length - 1,
-          });
+      if (!openResult.success || !openResult.value) {
+        throw openResult.error || new Error('Failed to open position on exchange');
+      }
 
-          for (let i = 1; i < signal.takeProfits.length; i++) {
-            const tp = signal.takeProfits[i];
-            const tpSize = sizingResult.quantity / signal.takeProfits.length;
+      const openedPosition = openResult.value;
 
-            try {
-              if (this.bybitService.updateTakeProfitPartial) {
-                await this.bybitService.updateTakeProfitPartial({
-                  price: tp.price,
-                  size: tpSize,
-                  index: i,
-                });
-              }
+      // Extract orderId from the returned Position object
+      orderId = openedPosition.id;
 
-              this.logger.debug(`✅ TP${i + 1} set`, {
+      this.logger.info('✅ Position opened WITH atomic SL/TP protection', {
+        orderId,
+        side: side === PositionSide.LONG ? 'LONG' : 'SHORT',
+        quantity: sizingResult.quantity,
+        slSet: true,
+        tpSet: tpPrices.length > 0,
+      });
+
+      // Store first TP order ID if TPs were set
+      if (tpPrices.length > 0) {
+        tpOrderIds.push(orderId);
+      }
+
+      // Phase 8.7: SKIP strategy for additional TP levels (non-critical)
+      // Set additional TP levels (if more than 1)
+      if (signal.takeProfits && signal.takeProfits.length > 1) {
+        this.logger.info('📋 Setting additional TP levels', {
+          additionalLevels: signal.takeProfits.length - 1,
+        });
+
+        for (let i = 1; i < signal.takeProfits.length; i++) {
+          const tp = signal.takeProfits[i];
+          const tpSize = sizingResult.quantity / signal.takeProfits.length;
+
+          try {
+            if (this.bybitService.updateTakeProfitPartial) {
+              await this.bybitService.updateTakeProfitPartial({
                 price: tp.price,
                 size: tpSize,
+                index: i,
               });
-            } catch (error) {
-              this.logger.warn(`Failed to set TP${i + 1} level`, {
-                error: error instanceof Error ? error.message : String(error),
-              });
-              // Continue with other TPs - don't fail entire position
             }
+
+            this.logger.debug(`✅ TP${i + 1} set`, {
+              price: tp.price,
+              size: tpSize,
+            });
+          } catch (error) {
+            this.logger.warn(`Failed to set TP${i + 1} level`, {
+              error: error instanceof Error ? error.message : String(error),
+            });
+            // Continue with other TPs - SKIP strategy for non-critical operation
           }
         }
-      } catch (error) {
-        this.logger.error('❌ Failed to open position with protection', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        throw error;
       }
 
       // ===================================================================
@@ -313,14 +334,19 @@ export class PositionLifecycleService {
 
       // ===================================================================
       // STEP 6: Send notifications and record
+      // Phase 8.7: SKIP strategy for Telegram (non-critical)
       // ===================================================================
-      try {
-        await this.telegram.notifyPositionOpened(position);
-      } catch (error) {
-        this.logger.warn('Failed to send Telegram notification', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+      await ErrorHandler.executeAsync(
+        () => this.telegram.notifyPositionOpened(position),
+        {
+          strategy: RecoveryStrategy.SKIP,
+          logger: this.logger,
+          context: 'PositionLifecycleService.notifyPositionOpened',
+          onRecover: () => {
+            this.logger.info('Telegram notification skipped due to error');
+          },
+        }
+      );
 
       // Record trade opening in journal
       this.journal.recordTradeOpen({
@@ -409,11 +435,24 @@ export class PositionLifecycleService {
   /**
    * Sync position from WebSocket update
    * Handles both position restoration (after bot restart) and state updates
+   * Phase 8.7: GRACEFUL_DEGRADE if journal lookup fails
    */
   syncWithWebSocket(wsPosition: Position): void {
     if (this.currentPosition === null) {
       // Restore position after bot restart
-      this.currentPosition = this.restorePositionFromWebSocket(wsPosition);
+      // Phase 8.7: GRACEFUL_DEGRADE - continue without journalId if journal unavailable
+      try {
+        this.currentPosition = this.restorePositionFromWebSocket(wsPosition);
+      } catch (error) {
+        this.logger.warn('Position restoration encountered error, degrading gracefully', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Degrade: use wsPosition directly without journal lookup
+        this.currentPosition = wsPosition;
+        this.logger.warn('Using WebSocket position directly without journal verification', {
+          positionId: wsPosition.id,
+        });
+      }
     } else {
       // Update existing position state
       this.currentPosition = this.updatePositionState(this.currentPosition, wsPosition);
@@ -423,6 +462,7 @@ export class PositionLifecycleService {
   /**
    * Clear position (called when WebSocket reports position closed)
    * Phase 6.2: Clear from repository if available
+   * Phase 8.7: ErrorHandler integration for order cancellation
    */
   async clearPosition(): Promise<void> {
     // Get position before clearing (for event emission)
@@ -430,15 +470,31 @@ export class PositionLifecycleService {
       ? this.positionRepository.getCurrentPosition()
       : this.currentPosition;
 
-    // Cancel any remaining conditional orders
+    // Phase 8.7: Cancel with RETRY strategy, then SKIP if exhausted
     this.logger.debug('🧹 Cancelling conditional orders after position close...');
-    try {
-      await this.bybitService.cancelAllConditionalOrders();
-    } catch (error) {
-      this.logger.warn('Failed to cancel orders', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+    await ErrorHandler.executeAsync(
+      () => this.bybitService.cancelAllConditionalOrders(),
+      {
+        strategy: RecoveryStrategy.RETRY,
+        retryConfig: {
+          maxAttempts: 3,
+          initialDelayMs: 200,
+          backoffMultiplier: 2,
+          maxDelayMs: 2000,
+        },
+        logger: this.logger,
+        context: 'PositionLifecycleService.cancelAllConditionalOrders',
+        onRetry: (attempt, error, delayMs) => {
+          this.logger.warn(`🔄 Retrying order cancellation (attempt ${attempt}/3)`, {
+            delayMs,
+            error: error.message,
+          });
+        },
+        onFailure: () => {
+          this.logger.warn('Failed to cancel orders - proceeding with position clear');
+        },
+      }
+    );
 
     // Clear state
     // Phase 6.2: Use repository if available
@@ -555,6 +611,7 @@ export class PositionLifecycleService {
 
   /**
    * Calculate final position size with compound interest support
+   * Phase 8.7: FALLBACK strategy if compound calculation fails
    */
   private async calculatePositionSize(signal: Signal): Promise<{
     quantity: number;
@@ -567,15 +624,25 @@ export class PositionLifecycleService {
 
     // Priority 1: Compound Interest (highest priority if enabled)
     if (this.compoundInterestCalculator?.isEnabled?.()) {
-      const compoundResult = await this.compoundInterestCalculator.calculatePositionSize();
-      positionSizeUsdt = compoundResult.positionSize;
-      sizingChain.push('COMPOUND_INTEREST');
+      try {
+        const compoundResult = await this.compoundInterestCalculator.calculatePositionSize();
+        positionSizeUsdt = compoundResult.positionSize;
+        sizingChain.push('COMPOUND_INTEREST');
 
-      this.logger.info('💰 Position sizing: Compound interest', {
-        currentBalance: compoundResult.currentBalance,
-        totalProfit: compoundResult.totalProfit,
-        positionSize: positionSizeUsdt,
-      });
+        this.logger.info('💰 Position sizing: Compound interest', {
+          currentBalance: compoundResult.currentBalance,
+          totalProfit: compoundResult.totalProfit,
+          positionSize: positionSizeUsdt,
+        });
+      } catch (error) {
+        // Phase 8.7: FALLBACK to fixed size if compound fails
+        this.logger.warn('Compound interest calculation failed, falling back to fixed size', {
+          error: error instanceof Error ? error.message : String(error),
+        });
+        positionSizeUsdt = this.riskConfig.positionSizeUsdt;
+        sizingChain.push('COMPOUND_INTEREST_FAILED');
+        sizingChain.push('FALLBACK_FIXED');
+      }
     } else {
       // Priority 2: Fixed position size from config
       positionSizeUsdt = this.riskConfig.positionSizeUsdt;
@@ -620,29 +687,39 @@ export class PositionLifecycleService {
 
   /**
    * Restore position from WebSocket after bot restart
+   * Phase 8.7: GRACEFUL_DEGRADE - continue without journalId if journal unavailable
    */
   private restorePositionFromWebSocket(position: Position): Position {
-    // Try to find matching open trade in journal by symbol
-    const openTrade = this.journal.getOpenPositionBySymbol(position.symbol);
+    // Phase 8.7: Try to find matching open trade in journal with graceful degradation
+    try {
+      const openTrade = this.journal.getOpenPositionBySymbol(position.symbol);
 
-    if (openTrade) {
-      // Restore journalId from open trade
-      position.journalId = openTrade.id;
-      this.logger.info('✅ Position restored from WebSocket with journal ID', {
-        exchangeId: position.id,
-        journalId: position.journalId,
-        symbol: position.symbol,
-      });
-    } else {
-      // No open trade in journal - DO NOT create journal entry
-      this.logger.warn('⚠️ Position restored from WebSocket but not found in journal - IGNORING from statistics', {
-        exchangeId: position.id,
-        symbol: position.symbol,
-        entryPrice: position.entryPrice,
-        quantity: position.quantity,
-        note: 'This position will be managed (TP/SL) but NOT recorded in journal.',
-      });
+      if (openTrade) {
+        // Restore journalId from open trade
+        position.journalId = openTrade.id;
+        this.logger.info('✅ Position restored from WebSocket with journal ID', {
+          exchangeId: position.id,
+          journalId: position.journalId,
+          symbol: position.symbol,
+        });
+      } else {
+        // No open trade in journal - DO NOT create journal entry (graceful degrade)
+        this.logger.warn('⚠️ Position restored from WebSocket but not found in journal - IGNORING from statistics', {
+          exchangeId: position.id,
+          symbol: position.symbol,
+          entryPrice: position.entryPrice,
+          quantity: position.quantity,
+          note: 'This position will be managed (TP/SL) but NOT recorded in journal.',
+        });
 
+        position.journalId = undefined;
+      }
+    } catch (error) {
+      // Journal lookup failed - graceful degrade (continue without journalId)
+      this.logger.warn('Journal lookup failed during position restoration - proceeding without journalId', {
+        error: error instanceof Error ? error.message : String(error),
+        positionId: position.id,
+      });
       position.journalId = undefined;
     }
 
