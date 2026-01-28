@@ -16,6 +16,13 @@ import { TradeRecord, EntryCondition, ExitCondition, PositionSide, LoggerService
 import { TradeHistoryService, TradeRecord as CSVTradeRecord } from './trade-history.service';
 import { VirtualBalanceService } from './virtual-balance.service';
 import { IJournalRepository } from '../repositories/IRepositories';
+import { ErrorHandler, RecoveryStrategy } from '../errors/ErrorHandler';
+import {
+  JournalReadError,
+  JournalWriteError,
+  TradeRecordValidationError,
+  CSVExportError,
+} from '../errors/DomainErrors';
 const DATA_DIR = 'data';
 const JOURNAL_FILE = 'trade-journal.json';
 const CSV_FILE = 'trade-journal.csv';
@@ -36,6 +43,7 @@ export class TradingJournalService {
     private tradeHistoryConfig?: TradeHistoryConfig,
     private baseDeposit?: number,
     private readonly journalRepository?: IJournalRepository, // Phase 6.2: Repository pattern
+    private readonly errorHandler?: ErrorHandler, // Phase 8.9.2: ErrorHandler integration
   ) {
     this.dataDir = dataPath || path.join(process.cwd(), DATA_DIR);
     this.journalPath = path.join(this.dataDir, JOURNAL_FILE);
@@ -81,45 +89,117 @@ export class TradingJournalService {
   }
 
   /**
-   * Load journal from file
+   * Load journal from file with ErrorHandler integration
+   * Strategy: GRACEFUL_DEGRADE for file read/parse errors
    */
   private loadJournal(): void {
     try {
-      if (fs.existsSync(this.journalPath)) {
-        const data = fs.readFileSync(this.journalPath, 'utf-8');
-        const entries: TradeRecord[] = JSON.parse(data) as TradeRecord[];
-
-        for (const entry of entries) {
-          this.trades.set(entry.id, entry);
-        }
-
-        this.logger.info('📖 Trade journal loaded', {
-          entriesCount: this.trades.size,
-          path: this.journalPath,
-        });
-      } else {
+      if (!fs.existsSync(this.journalPath)) {
         this.logger.info('📖 Trade journal file not found, creating new', {
           path: this.journalPath,
         });
+        return;
       }
+
+      const data = fs.readFileSync(this.journalPath, 'utf-8');
+
+      // Try parsing JSON
+      let entries: TradeRecord[];
+      try {
+        entries = JSON.parse(data) as TradeRecord[];
+      } catch (parseError) {
+        // JSON parse error - gracefully degrade with backup
+        this.logger.warn('⚠️ Corrupted journal file, starting with empty journal', {
+          path: this.journalPath,
+          backupPath: this.journalPath + '.corrupted',
+          reason: parseError instanceof Error ? parseError.message : 'JSON parse error',
+        });
+
+        // Backup corrupted file for manual recovery
+        try {
+          fs.copyFileSync(this.journalPath, this.journalPath + '.corrupted');
+        } catch (backupError) {
+          this.logger.error('Failed to backup corrupted journal', {
+            error: backupError instanceof Error ? backupError.message : String(backupError),
+          });
+        }
+
+        return;
+      }
+
+      // Load entries into trades map
+      for (const entry of entries) {
+        this.trades.set(entry.id, entry);
+      }
+
+      this.logger.info('📖 Trade journal loaded', {
+        entriesCount: this.trades.size,
+        path: this.journalPath,
+      });
     } catch (error) {
+      // File read error - degrade gracefully
       const errorMsg = error instanceof Error ? error.message : String(error);
-      this.logger.error('❌ Failed to load trade journal', { error: errorMsg });
+      this.logger.error('❌ Failed to load trade journal', {
+        error: errorMsg,
+        path: this.journalPath,
+      });
+      // Service continues with empty journal
     }
   }
 
   /**
-   * Save journal to file
+   * Save journal to file with ErrorHandler integration
+   * Strategy: RETRY for transient file I/O errors, then GRACEFUL_DEGRADE
    */
   private saveJournal(): void {
-    try {
-      const entries = Array.from(this.trades.values());
-      const data = JSON.stringify(entries, null, JSON_INDENT);
-      fs.writeFileSync(this.journalPath, data, 'utf-8');
+    const entries = Array.from(this.trades.values());
+    const data = JSON.stringify(entries, null, JSON_INDENT);
 
-      this.logger.debug('💾 Trade journal saved', {
-        entriesCount: entries.length,
-      });
+    if (this.errorHandler) {
+      // Use ErrorHandler with RETRY → GRACEFUL_DEGRADE
+      const retryConfig = {
+        maxAttempts: 3,
+        initialDelayMs: 100,
+        backoffMultiplier: 2,
+        maxDelayMs: 500,
+      };
+
+      this.errorHandler.wrapSync(
+        () => {
+          fs.writeFileSync(this.journalPath, data, 'utf-8');
+        },
+        {
+          strategy: RecoveryStrategy.RETRY,
+          context: 'TradingJournalService.saveJournal',
+          retryConfig,
+          onRetry: (attempt: number, error: Error) => {
+            this.logger.warn(`⚠️ Journal save retry ${attempt}/${retryConfig.maxAttempts}`, {
+              error: error.message,
+              path: this.journalPath,
+            });
+          },
+          onRecover: () => {
+            this.logger.debug('💾 Trade journal saved after retry', {
+              entriesCount: entries.length,
+            });
+          },
+          onFailure: (error: Error) => {
+            // Graceful degrade: Log error but don't crash
+            this.logger.error('❌ CRITICAL: Failed to save journal after retries', {
+              error: error.message,
+              entries: entries.length,
+              path: this.journalPath,
+            });
+          },
+        },
+      );
+      return;
+    }
+
+    // No error handler - use old behavior
+    try {
+      fs.writeFileSync(this.journalPath, data, 'utf-8');
+      this.logger.debug('💾 Trade journal saved', { entriesCount: entries.length });
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       this.logger.error('❌ Failed to save trade journal', { error: errorMsg });
@@ -128,6 +208,7 @@ export class TradingJournalService {
 
   /**
    * Record trade opening - simplified to serialize entire objects
+   * Strategy: THROW for validation errors (fail fast on duplicates)
    */
   recordTradeOpen(params: {
     id: string;
@@ -138,12 +219,26 @@ export class TradingJournalService {
     leverage: number;
     entryCondition: EntryCondition;
   }): void {
+    // Validation: Empty trade ID
     if (!params.id || params.id.length === 0) {
-      throw new Error('Trade ID is required');
+      throw new TradeRecordValidationError('Trade ID is required', {
+        field: 'id',
+        value: params.id,
+        reason: 'Empty or missing trade ID',
+      });
     }
 
+    // Validation: Duplicate trade ID
     if (this.trades.has(params.id)) {
-      throw new Error(`Trade ${params.id} already exists`);
+      throw new TradeRecordValidationError(
+        `Trade ${params.id} already exists in journal`,
+        {
+          field: 'id',
+          value: params.id,
+          reason: 'Duplicate trade ID',
+          tradeId: params.id,
+        },
+      );
     }
 
     const trade: TradeRecord = {
@@ -235,7 +330,7 @@ export class TradingJournalService {
 
     const balanceAfter = this.virtualBalance?.getCurrentBalance() || balanceBefore;
 
-    // Append to permanent CSV history
+    // Append to permanent CSV history with SKIP strategy
     if (this.tradeHistory && this.tradeHistoryConfig?.enabled) {
       const md = (trade.entryCondition.signal.marketData || {}) as Record<string, unknown>;
       const duration = this.formatDuration(trade.closedAt - trade.openedAt);
@@ -303,6 +398,17 @@ export class TradingJournalService {
       };
 
       this.tradeHistory.appendTrade(csvRecord).catch((error: unknown) => {
+        if (this.errorHandler) {
+          this.errorHandler.wrapSync(
+            () => {
+              throw error;
+            },
+            {
+              strategy: RecoveryStrategy.SKIP,
+              context: 'TradingJournalService.recordTradeClose[tradeHistory]',
+            },
+          );
+        }
         this.logger.error('❌ Failed to append to CSV history', {
           error: error instanceof Error ? error.message : String(error),
           tradeId: params.id,
@@ -466,6 +572,7 @@ export class TradingJournalService {
 
   /**
    * Export to CSV for ML analysis
+   * Strategy: GRACEFUL_DEGRADE for CSV export (non-critical operation)
    */
   exportToCSV(outputPath?: string): void {
     const csvPath = outputPath || path.join(this.dataDir, CSV_FILE);
@@ -576,9 +683,26 @@ export class TradingJournalService {
         entries: entries.length,
       });
     } catch (error) {
+      if (this.errorHandler) {
+        this.errorHandler.wrapSync(
+          () => {
+            throw new CSVExportError('Failed to export journal to CSV', {
+              filePath: csvPath,
+              reason: error instanceof Error ? error.message : 'Unknown error',
+              recordsCount: this.trades.size,
+            });
+          },
+          {
+            strategy: RecoveryStrategy.GRACEFUL_DEGRADE,
+            context: 'TradingJournalService.exportToCSV',
+          },
+        );
+      }
+
       const errorMsg = error instanceof Error ? error.message : String(error);
       this.logger.error('❌ Failed to export trade journal to CSV', {
         error: errorMsg,
+        path: csvPath,
       });
     }
   }

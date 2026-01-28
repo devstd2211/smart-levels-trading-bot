@@ -307,13 +307,15 @@ export class BotServices {
     this.timeService.setBybitService(this.bybitService);
 
     // 4. Initialize journal and stats
-    // Phase 6.2: Pass journalRepository to TradingJournalService (as last parameter)
+    // Phase 6.2: Pass journalRepository to TradingJournalService
+    // Phase 8.9.2: Inject ErrorHandler for error handling
     this.journal = new TradingJournalService(
       this.logger,
       undefined,
       config.tradeHistory,
       config.compoundInterest?.baseDeposit || INTEGER_MULTIPLIERS.FIFTY,
-      this.journalRepository, // Phase 6.2: Repository parameter (last)
+      this.journalRepository, // Phase 6.2: Repository parameter
+      this.errorHandler, // Phase 8.9.2: ErrorHandler injection
     );
 
     // Phase 6.2: Pass journalRepository to SessionStatsService

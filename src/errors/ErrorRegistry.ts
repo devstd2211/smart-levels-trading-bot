@@ -339,6 +339,7 @@ export class ErrorRegistry {
       [ErrorDomain.CONFIGURATION]: 0,
       [ErrorDomain.INTERNAL]: 0,
       [ErrorDomain.PERFORMANCE]: 0,
+      [ErrorDomain.PERSISTENCE]: 0,
     };
   }
 

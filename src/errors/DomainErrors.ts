@@ -720,3 +720,117 @@ export class InsufficientAccountBalanceError extends TradingError {
     Object.setPrototypeOf(this, InsufficientAccountBalanceError.prototype);
   }
 }
+
+// ============================================================================
+// PERSISTENCE DOMAIN ERRORS
+// ============================================================================
+
+/**
+ * Journal read error
+ * Failed to load journal from disk (file missing, corrupted, or parse error)
+ */
+export class JournalReadError extends TradingError {
+  constructor(
+    message: string,
+    context: {
+      filePath: string;
+      operation: 'read' | 'parse' | 'corrupt';
+      reason: string;
+      [key: string]: unknown;
+    },
+    originalError?: Error,
+  ) {
+    super(
+      message,
+      'JOURNAL_READ_ERROR',
+      ErrorDomain.PERSISTENCE,
+      ErrorSeverity.MEDIUM,
+      originalError,
+      context,
+    );
+    Object.setPrototypeOf(this, JournalReadError.prototype);
+  }
+}
+
+/**
+ * Journal write error
+ * Failed to save journal to disk (write error, disk full, permission)
+ */
+export class JournalWriteError extends TradingError {
+  constructor(
+    message: string,
+    context: {
+      filePath: string;
+      operation: 'write' | 'serialize' | 'directory';
+      reason: string;
+      entriesCount?: number;
+      [key: string]: unknown;
+    },
+    originalError?: Error,
+  ) {
+    super(
+      message,
+      'JOURNAL_WRITE_ERROR',
+      ErrorDomain.PERSISTENCE,
+      ErrorSeverity.HIGH,
+      originalError,
+      context,
+    );
+    Object.setPrototypeOf(this, JournalWriteError.prototype);
+  }
+}
+
+/**
+ * Trade record validation error
+ * Invalid trade ID, duplicate, or missing required fields
+ */
+export class TradeRecordValidationError extends TradingError {
+  constructor(
+    message: string,
+    context: {
+      field: string;
+      value: unknown;
+      reason: string;
+      tradeId?: string;
+      [key: string]: unknown;
+    },
+    originalError?: Error,
+  ) {
+    super(
+      message,
+      'TRADE_RECORD_VALIDATION_ERROR',
+      ErrorDomain.TRADING,
+      ErrorSeverity.HIGH,
+      originalError,
+      context,
+    );
+    Object.setPrototypeOf(this, TradeRecordValidationError.prototype);
+  }
+}
+
+/**
+ * CSV export error
+ * Non-critical failure during CSV history export
+ */
+export class CSVExportError extends TradingError {
+  constructor(
+    message: string,
+    context: {
+      filePath: string;
+      reason: string;
+      recordsCount?: number;
+      [key: string]: unknown;
+    },
+    originalError?: Error,
+  ) {
+    super(
+      message,
+      'CSV_EXPORT_ERROR',
+      ErrorDomain.PERSISTENCE,
+      ErrorSeverity.LOW,
+      originalError,
+      context,
+    );
+    Object.setPrototypeOf(this, CSVExportError.prototype);
+  }
+}

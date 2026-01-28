@@ -17,6 +17,7 @@ export enum ErrorDomain {
   CONFIGURATION = 'CONFIGURATION',
   INTERNAL = 'INTERNAL',
   PERFORMANCE = 'PERFORMANCE',
+  PERSISTENCE = 'PERSISTENCE',
 }
 
 export enum ErrorSeverity {
